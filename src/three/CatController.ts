@@ -41,6 +41,10 @@ export type CatState =
   | 'walkSideboardTop'
   | 'sitOnSideboard'
   | 'jumpOffSideboard'
+  | 'goToLocker'
+  | 'jumpOnLocker'
+  | 'sitOnLocker'
+  | 'jumpOffLocker'
 
 /**
  * Live read-only handle the {@link CatController} uses to query Sushi's needs and signal
@@ -138,6 +142,18 @@ export interface CatNeedsBridge {
    * hopping up, so he ends on the opposite side of the moon lamp before sitting.
    */
   getSideboardSitWorldPosition?(out: THREE.Vector3): THREE.Vector3
+  /** Number of locker approach points available for the compact locker perch beat. */
+  getLockerSideCount?(): number
+  /**
+   * Write the world-space approach point in front of the locker into `out`.
+   * Sushi walks here before hopping onto the locker top.
+   */
+  getLockerApproachWorldPosition?(sideIndex: number, out: THREE.Vector3): THREE.Vector3
+  /**
+   * Write the world-space locker-top sit point into `out`. Sushi jumps straight
+   * here, rotates toward the cabin, and sits without a top-walk phase.
+   */
+  getLockerTopWorldPosition?(out: THREE.Vector3): THREE.Vector3
   /**
    * Cat just entered the sleeping state. Implementer should swap the live cat for the
    * baked sleeping clone (hide the live group, show the static curled-up mesh inside
@@ -220,6 +236,16 @@ const SIDEBOARD_JUMP_CHANCE = 0.16
  */
 const SIDEBOARD_SIT_YAW = 0
 /**
+ * Probability that {@link pickNextRestingState} picks the compact locker perch.
+ * Lower than the wider bed beat because the locker is a tight, one-pose perch.
+ */
+const LOCKER_JUMP_CHANCE = 0.14
+/**
+ * Final locker sit yaw (radians). `-π/2` faces -X, back into the cabin from the
+ * locker's +X wall position.
+ */
+const LOCKER_SIT_YAW = -Math.PI / 2
+/**
  * Seconds the leap-up and leap-down lerps take. Short enough to read as a hop rather
  * than a glide, long enough that the parabolic arc is visible.
  */
@@ -233,6 +259,8 @@ const BED_JUMP_ARC_HEIGHT = 0.18
 const SIT_ON_BED_DURATION_S = 10
 /** Seconds Sushi sits beside the moon lamp on the sideboard before hopping down. */
 const SIT_ON_SIDEBOARD_DURATION_S = 8
+/** Seconds Sushi sits on top of the locker before hopping down. */
+const SIT_ON_LOCKER_DURATION_S = 7
 
 /** Authored clip names embedded in `cat.glb`. */
 const CLIP_IDLE = 'Armature|4_Idle_Armature'
@@ -546,6 +574,12 @@ export class CatController {
   private sideboardSideIndex = 0
   /** World-space sideboard-top point Sushi walks to after the landing hop. */
   private readonly sideboardTopWalkTarget = new THREE.Vector3()
+  /** World-space start position of the active locker jump (snapped on enter). */
+  private readonly lockerJumpStart = new THREE.Vector3()
+  /** World-space end position of the active locker jump (snapped on enter). */
+  private readonly lockerJumpEnd = new THREE.Vector3()
+  /** Index of the locker approach side currently in use. */
+  private lockerSideIndex = 0
 
   private constructor(
     root: THREE.Group,
@@ -710,6 +744,8 @@ export class CatController {
       this.tickGoToBedSide(dt)
     } else if (this.state === 'goToSideboard') {
       this.tickGoToSideboard(dt)
+    } else if (this.state === 'goToLocker') {
+      this.tickGoToLocker(dt)
     } else if (this.state === 'jumpOnBed' || this.state === 'jumpOffBed') {
       this.tickPerchJumpLerp(this.bedJumpStart, this.bedJumpEnd, 'sitOnBed')
     } else if (this.state === 'jumpOnSideboard' || this.state === 'jumpOffSideboard') {
@@ -720,6 +756,8 @@ export class CatController {
       )
     } else if (this.state === 'walkSideboardTop') {
       this.tickWalkSideboardTop(dt)
+    } else if (this.state === 'jumpOnLocker' || this.state === 'jumpOffLocker') {
+      this.tickPerchJumpLerp(this.lockerJumpStart, this.lockerJumpEnd, 'sitOnLocker')
     } else if (this.state === 'sitOnBed') {
       if (this.stateTimer >= this.stateDuration) {
         this.enterState('jumpOffBed')
@@ -727,6 +765,10 @@ export class CatController {
     } else if (this.state === 'sitOnSideboard') {
       if (this.stateTimer >= this.stateDuration) {
         this.enterState('jumpOffSideboard')
+      }
+    } else if (this.state === 'sitOnLocker') {
+      if (this.stateTimer >= this.stateDuration) {
+        this.enterState('jumpOffLocker')
       }
     } else if (this.state === 'follow') {
       this.tickFollow(dt)
@@ -779,7 +821,10 @@ export class CatController {
       this.state !== 'jumpOnSideboard' &&
       this.state !== 'walkSideboardTop' &&
       this.state !== 'sitOnSideboard' &&
-      this.state !== 'jumpOffSideboard'
+      this.state !== 'jumpOffSideboard' &&
+      this.state !== 'jumpOnLocker' &&
+      this.state !== 'sitOnLocker' &&
+      this.state !== 'jumpOffLocker'
     ) {
       this.inner.updateMatrixWorld(true)
       this._tmpBox.setFromObject(this.inner)
@@ -1125,6 +1170,24 @@ export class CatController {
   }
 
   /**
+   * Walk Sushi toward the locker approach point. On arrival, switch to the
+   * locker jump so he hops straight onto the top and rotates into the sit pose.
+   *
+   * @param dt - Delta time in seconds.
+   */
+  private tickGoToLocker(dt: number): void {
+    if (!this.bridge?.getLockerApproachWorldPosition) {
+      this.pickNextRestingState()
+      return
+    }
+    this.bridge.getLockerApproachWorldPosition(this.lockerSideIndex, this._bridgeTmp)
+    this.target.set(this._bridgeTmp.x, this.bounds.floorY, this._bridgeTmp.z)
+    if (this.stepTowardTarget(dt)) {
+      this.enterState('jumpOnLocker')
+    }
+  }
+
+  /**
    * Per-frame lerp used by furniture perch jumps. Linearly
    * interpolates X/Z between the given start/end points, and adds a
    * sin-arc on top of the linear Y lerp so the leap reads as a hop. When the timer
@@ -1137,7 +1200,7 @@ export class CatController {
   private tickPerchJumpLerp(
     start: THREE.Vector3,
     end: THREE.Vector3,
-    afterJumpOnState: 'sitOnBed' | 'walkSideboardTop',
+    afterJumpOnState: 'sitOnBed' | 'walkSideboardTop' | 'sitOnLocker',
   ): void {
     const t = Math.min(1, this.stateTimer / BED_JUMP_DURATION_S)
     this.group.position.x = start.x + (end.x - start.x) * t
@@ -1146,7 +1209,11 @@ export class CatController {
     this.group.position.y = baseY + Math.sin(Math.PI * t) * BED_JUMP_ARC_HEIGHT
     if (t >= 1) {
       this.group.position.set(end.x, end.y, end.z)
-      if (this.state === 'jumpOnBed' || this.state === 'jumpOnSideboard') {
+      if (
+        this.state === 'jumpOnBed' ||
+        this.state === 'jumpOnSideboard' ||
+        this.state === 'jumpOnLocker'
+      ) {
         this.enterState(afterJumpOnState)
       } else {
         this.pickNextRestingState()
@@ -1301,7 +1368,11 @@ export class CatController {
       this.state === 'jumpOnSideboard' ||
       this.state === 'walkSideboardTop' ||
       this.state === 'sitOnSideboard' ||
-      this.state === 'jumpOffSideboard'
+      this.state === 'jumpOffSideboard' ||
+      this.state === 'goToLocker' ||
+      this.state === 'jumpOnLocker' ||
+      this.state === 'sitOnLocker' ||
+      this.state === 'jumpOffLocker'
     )
   }
 
@@ -1318,6 +1389,8 @@ export class CatController {
     // The sideboard lamp perch is a second rare ambient beat. It is host-gated,
     // because the sideboard loads asynchronously after the main cabin scene.
     if (this.tryStartSideboardJump()) return
+    // The locker is a compact one-pose perch: hop up, turn toward the cabin, sit.
+    if (this.tryStartLockerJump()) return
     // Pick a fresh waypoint whose straight-line path doesn't cut through any obstacle.
     const fromX = this.group.position.x
     const fromZ = this.group.position.z
@@ -1374,6 +1447,27 @@ export class CatController {
   }
 
   /**
+   * Roll for the locker perch diversion. When available, this sends Sushi to the
+   * floor in front of the bedside locker and then hops him straight onto the top.
+   *
+   * @returns Whether a locker perch run was started.
+   */
+  private tryStartLockerJump(): boolean {
+    const bridge = this.bridge
+    if (!bridge?.getLockerSideCount || !bridge.getLockerApproachWorldPosition) {
+      return false
+    }
+    const sideCount = bridge.getLockerSideCount()
+    if (sideCount <= 0) return false
+    if (Math.random() >= LOCKER_JUMP_CHANCE) return false
+    this.lockerSideIndex = Math.floor(Math.random() * sideCount)
+    bridge.getLockerApproachWorldPosition(this.lockerSideIndex, this._bridgeTmp)
+    this.target.set(this._bridgeTmp.x, this.bounds.floorY, this._bridgeTmp.z)
+    this.enterState('goToLocker')
+    return true
+  }
+
+  /**
    * Switch to a new state, crossfading the animation and resetting the timer.
    *
    * @param next - State to enter.
@@ -1420,6 +1514,9 @@ export class CatController {
     } else if (next === 'sitOnSideboard') {
       this.group.rotation.y = SIDEBOARD_SIT_YAW
       this.stateDuration = SIT_ON_SIDEBOARD_DURATION_S
+    } else if (next === 'sitOnLocker') {
+      this.group.rotation.y = LOCKER_SIT_YAW
+      this.stateDuration = SIT_ON_LOCKER_DURATION_S
     } else if (next === 'jumpOnBed') {
       // Capture the lerp endpoints the moment we leap. Start = current world pose
       // (cat just arrived at the approach point), end = mattress-top centre.
@@ -1432,6 +1529,17 @@ export class CatController {
       // tickWalk — the approach waypoint hands us a clean facing direction.
       const jumpDx = this.bedJumpEnd.x - this.bedJumpStart.x
       const jumpDz = this.bedJumpEnd.z - this.bedJumpStart.z
+      if (jumpDx * jumpDx + jumpDz * jumpDz > 1e-6) {
+        this.group.rotation.y = Math.atan2(jumpDx, jumpDz)
+      }
+      this.stateDuration = BED_JUMP_DURATION_S
+    } else if (next === 'jumpOnLocker') {
+      this.lockerJumpStart.copy(this.group.position)
+      this.lockerJumpEnd.copy(this.lockerJumpStart)
+      this.bridge?.getLockerTopWorldPosition?.(this._bridgeTmp)
+      this.lockerJumpEnd.set(this._bridgeTmp.x, this._bridgeTmp.y, this._bridgeTmp.z)
+      const jumpDx = this.lockerJumpEnd.x - this.lockerJumpStart.x
+      const jumpDz = this.lockerJumpEnd.z - this.lockerJumpStart.z
       if (jumpDx * jumpDx + jumpDz * jumpDz > 1e-6) {
         this.group.rotation.y = Math.atan2(jumpDx, jumpDz)
       }
@@ -1462,6 +1570,24 @@ export class CatController {
       // of as a tail-first shuffle.
       const offDx = this.bedJumpEnd.x - this.bedJumpStart.x
       const offDz = this.bedJumpEnd.z - this.bedJumpStart.z
+      if (offDx * offDx + offDz * offDz > 1e-6) {
+        this.group.rotation.y = Math.atan2(offDx, offDz)
+      }
+      this.stateDuration = BED_JUMP_DURATION_S
+    } else if (next === 'jumpOffLocker') {
+      this.lockerJumpStart.copy(this.group.position)
+      if (this.bridge?.getLockerApproachWorldPosition) {
+        this.bridge.getLockerApproachWorldPosition(this.lockerSideIndex, this._bridgeTmp)
+        this.lockerJumpEnd.set(this._bridgeTmp.x, this.bounds.floorY, this._bridgeTmp.z)
+      } else {
+        this.lockerJumpEnd.set(
+          this.lockerJumpStart.x,
+          this.bounds.floorY,
+          this.lockerJumpStart.z,
+        )
+      }
+      const offDx = this.lockerJumpEnd.x - this.lockerJumpStart.x
+      const offDz = this.lockerJumpEnd.z - this.lockerJumpStart.z
       if (offDx * offDx + offDz * offDz > 1e-6) {
         this.group.rotation.y = Math.atan2(offDx, offDz)
       }
@@ -1520,6 +1646,7 @@ export class CatController {
       case 'goToHouse':
       case 'goToBedSide':
       case 'goToSideboard':
+      case 'goToLocker':
       case 'walkSideboardTop':
       case 'follow':
         return 'walk'
@@ -1527,6 +1654,8 @@ export class CatController {
       case 'jumpOffBed':
       case 'jumpOnSideboard':
       case 'jumpOffSideboard':
+      case 'jumpOnLocker':
+      case 'jumpOffLocker':
         // No jump animation in the rig — keep the idle pose during the brief arc so
         // the body reads as briefly airborne instead of mid-stride.
         return 'idle'
@@ -1534,6 +1663,7 @@ export class CatController {
       case 'useLitter':
       case 'sitOnBed':
       case 'sitOnSideboard':
+      case 'sitOnLocker':
         return 'sit'
       case 'chase':
         return 'run'

@@ -652,7 +652,7 @@ const TWO_PI = Math.PI * 2
 /** Path to the bedroom locker GLB asset. */
 const LOCKER_MODEL_URL = '/models/locker.glb'
 /** World X of the locker, pressed close to the same +X wall as the bed. */
-const LOCKER_X = 4.42
+const LOCKER_X = 4.32
 /** World Z of the locker, placed at the bed end opposite Sushi's cat house. */
 const LOCKER_Z = 1.35
 /** Target world height of the locker after GLB normalization. */
@@ -685,6 +685,17 @@ const LOCKER_FILL_LIGHT_OFFSET_X = -0.28
 const LOCKER_FILL_LIGHT_OFFSET_Y = 1.12
 /** Local Z offset of the locker fill light. */
 const LOCKER_FILL_LIGHT_OFFSET_Z = 0.35
+/**
+ * Distance (world units) Sushi waits away from the locker front before hopping
+ * onto the top. Kept short because the locker is a compact perch.
+ */
+const LOCKER_CAT_APPROACH_OFFSET = 0.42
+/** Fraction of the locker half-width that biases Sushi's perch toward the +X wall. */
+const LOCKER_CAT_TOP_WALL_OFFSET_FRAC = 0.34
+/** Small sideways nudge that moves Sushi toward the locker right side on top. */
+const LOCKER_CAT_TOP_RIGHT_NUDGE_Z = 0.05
+/** Fraction of the authored locker height used to lower Sushi's perch target. */
+const LOCKER_CAT_TOP_HEIGHT_DROP_RATIO = 0.1
 
 // --- Sleeping cat clone tunables ------------------------------------------
 // The "asleep" visual is a separate baked clone of the live cat, parented to
@@ -1143,6 +1154,10 @@ export class HabitatInteriorScene {
   private readonly sideboardSitWorldPosition = new THREE.Vector3()
   /** Floor approach waypoints that let Sushi hop onto the sideboard from the cabin side. */
   private readonly sideboardApproachWorldPositions: THREE.Vector3[] = []
+  /** World-space locker-top sit point. Populated after locker placement. */
+  private readonly lockerTopWorldPosition = new THREE.Vector3()
+  /** Floor approach waypoints that let Sushi hop onto the bedside locker. */
+  private readonly lockerApproachWorldPositions: THREE.Vector3[] = []
 
   /** Stored world-space position of the cat house, populated by {@link buildCatHouse}. */
   private readonly houseWorldPosition = new THREE.Vector3()
@@ -1597,6 +1612,7 @@ export class HabitatInteriorScene {
     // --- Bedside locker -----------------------------------------------------
     configureLocker(lockerModel)
     this.scene.add(lockerModel)
+    this.computeLockerJumpWaypoints(lockerModel)
 
     // --- Sushi (habitat cat) -----------------------------------------------
     // Tribute NPC. Loaded best-effort: a load failure should not break the
@@ -2135,6 +2151,29 @@ export class HabitatInteriorScene {
   }
 
   /**
+   * Cache locker approach + top waypoints for Sushi's compact locker perch beat.
+   * The locker sits against the +X wall, so the approach point is on the cabin-facing
+   * -X side and the top point stays slightly wall-biased on the small flat surface.
+   *
+   * @param locker - Placed locker root after final scale/rotation/translation.
+   */
+  private computeLockerJumpWaypoints(locker: THREE.Object3D): void {
+    locker.updateMatrixWorld(true)
+    const box = new THREE.Box3().setFromObject(locker)
+    const cx = (box.min.x + box.max.x) / 2
+    const cz = (box.min.z + box.max.z) / 2
+    const halfWidthX = (box.max.x - box.min.x) / 2
+    const perchX = cx + halfWidthX * LOCKER_CAT_TOP_WALL_OFFSET_FRAC
+    const perchZ = cz + LOCKER_CAT_TOP_RIGHT_NUDGE_Z
+    const loweredTopY = box.max.y - LOCKER_TARGET_HEIGHT * LOCKER_CAT_TOP_HEIGHT_DROP_RATIO
+    this.lockerTopWorldPosition.set(perchX, loweredTopY, perchZ)
+    this.lockerApproachWorldPositions.length = 0
+    this.lockerApproachWorldPositions.push(
+      new THREE.Vector3(box.min.x - LOCKER_CAT_APPROACH_OFFSET, FLOOR_Y, cz),
+    )
+  }
+
+  /**
    * Toggle the baked sleeping-cat clone parented inside the cat house. The live
    * cat's visibility is owned by {@link CatController}; this method only flips
    * the static asleep visual that lives in scene space.
@@ -2191,6 +2230,14 @@ export class HabitatInteriorScene {
       },
       getSideboardTopWorldPosition: (out) => out.copy(this.sideboardTopWorldPosition),
       getSideboardSitWorldPosition: (out) => out.copy(this.sideboardSitWorldPosition),
+      getLockerSideCount: () => this.lockerApproachWorldPositions.length,
+      getLockerApproachWorldPosition: (sideIndex, out) => {
+        const i = Math.max(0, Math.min(this.lockerApproachWorldPositions.length - 1, sideIndex))
+        const wp = this.lockerApproachWorldPositions[i]
+        if (wp) out.copy(wp)
+        return out
+      },
+      getLockerTopWorldPosition: (out) => out.copy(this.lockerTopWorldPosition),
       onEatServing: () => callbacks.onEatServing(),
       onPetted: () => callbacks.onPetted(),
       onCaughtLaser: () => callbacks.onCaughtLaser(),
