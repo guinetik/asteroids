@@ -38,6 +38,7 @@ import { HabitatRecordPlayerModel } from '@/three/HabitatRecordPlayerModel'
 import { HabitatMoonLampModel } from '@/three/HabitatMoonLampModel'
 import { HabitatRefractorTelescopeModel } from '@/three/HabitatRefractorTelescopeModel'
 import { HabitatLoungeChairModel } from '@/three/HabitatLoungeChairModel'
+import { HabitatArcadeMachineModel } from '@/three/HabitatArcadeMachineModel'
 import { HabitatBackdrop, type HabitatBackdropContext } from '@/three/HabitatBackdrop'
 import { findCosmeticOptionById } from '@/lib/cosmetics/catalog'
 import { getPlayerCosmetics } from '@/lib/cosmetics/profileCosmetics'
@@ -175,7 +176,7 @@ const FLOOR_THICKNESS = 0.12
  * habitat cylinder, in world units. Picked from the dev grab tool output (LMB-place log)
  * so the prop sits flush against the cockpit wall without clipping the cap geometry.
  */
-const TABLE_FRONT_CAP_CLEARANCE = 0.7526
+const TABLE_FRONT_CAP_CLEARANCE = 0.65
 
 /**
  * World X position the bed is shoved to so its long edge sits against the +X wall (the
@@ -261,6 +262,20 @@ const LOUNGE_CHAIR_Z = -7
  * with its back tucked toward the corner walls.
  */
 const LOUNGE_CHAIR_ROTATION_Y = Math.PI / 5 + Math.PI
+
+/**
+ * World X of the arcade machine, tucked beside the cockpit table on the −X
+ * side. Far enough from the table edge to leave standing room, and clear of
+ * the cat feeding area further toward the −X wall.
+ */
+const ARCADE_MACHINE_X = -2.3
+/** World Z of the arcade machine — flush with the cockpit table line. */
+const ARCADE_MACHINE_Z = 7.5
+/**
+ * Y-axis rotation (radians) so the marquee + screen face into the cabin (−Z),
+ * letting the player walk up to it from the bed/sofa side.
+ */
+const ARCADE_MACHINE_ROTATION_Y = -Math.PI / 2
 /**
  * Player capsule radius (world units) used when resolving against furniture
  * obstacle AABBs. Tuned to feel like a person in a cabin without snagging on
@@ -942,6 +957,9 @@ export class HabitatInteriorScene {
   /** Lounge chair in the −X / −Z corner of the cabin. Optional appliance. */
   private readonly loungeChair = new HabitatLoungeChairModel()
 
+  /** Arcade machine next to the cockpit table on the −X side. Optional appliance. */
+  private readonly arcadeMachine = new HabitatArcadeMachineModel()
+
   /**
    * Conditional appliance unlocks consulted before fetching optional GLBs.
    * Default everything off — facade pushes the live profile flags in via
@@ -952,6 +970,7 @@ export class HabitatInteriorScene {
     recordPlayer: false,
     refractorTelescope: false,
     loungeChair: false,
+    arcadeMachine: false,
   }
 
   /** World-space AABBs the player movement resolver pushes the player out of. */
@@ -1219,6 +1238,7 @@ export class HabitatInteriorScene {
           recordPlayer: boolean
           refractorTelescope: boolean
           loungeChair: boolean
+          arcadeMachine: boolean
         }
       | undefined,
   ): void {
@@ -1227,6 +1247,7 @@ export class HabitatInteriorScene {
       recordPlayer: flags?.recordPlayer === true,
       refractorTelescope: flags?.refractorTelescope === true,
       loungeChair: flags?.loungeChair === true,
+      arcadeMachine: flags?.arcadeMachine === true,
     }
   }
 
@@ -1562,6 +1583,9 @@ export class HabitatInteriorScene {
     // Optional lounge chair tucked between telescope wall and hatch wall. Same
     // fire-and-forget rule + conditional gate.
     void this.loadLoungeChairAsync()
+
+    // Optional arcade machine next to the cockpit table. Same rule.
+    void this.loadArcadeMachineAsync()
   }
 
   /**
@@ -1605,6 +1629,26 @@ export class HabitatInteriorScene {
       this.playerObstacles.push(this.loungeChair.getCollisionAabb().clone())
     } catch (err) {
       console.warn('[HabitatInteriorScene] Lounge chair load failed:', err)
+    }
+  }
+
+  /**
+   * Deferred conditional load of the arcade machine. Skipped entirely when
+   * {@link habitatAppliances.arcadeMachine} is false. Bails silently on load
+   * errors so a missing prop doesn't kill the scene.
+   */
+  private async loadArcadeMachineAsync(): Promise<void> {
+    if (!this.habitatAppliances.arcadeMachine) return
+    try {
+      await this.arcadeMachine.load()
+      if (this.disposed) return
+      this.arcadeMachine.group.position.set(ARCADE_MACHINE_X, FLOOR_Y, ARCADE_MACHINE_Z)
+      this.arcadeMachine.group.rotation.y = ARCADE_MACHINE_ROTATION_Y
+      this.arcadeMachine.refreshAabb()
+      this.scene.add(this.arcadeMachine.group)
+      this.playerObstacles.push(this.arcadeMachine.getCollisionAabb().clone())
+    } catch (err) {
+      console.warn('[HabitatInteriorScene] Arcade machine load failed:', err)
     }
   }
 
@@ -1900,6 +1944,8 @@ export class HabitatInteriorScene {
     this.refractorTelescope.dispose()
     this.scene.remove(this.loungeChair.group)
     this.loungeChair.dispose()
+    this.scene.remove(this.arcadeMachine.group)
+    this.arcadeMachine.dispose()
     this.playerObstacles.length = 0
     this.scene.remove(this.backdrop.group)
     this.backdrop.dispose()

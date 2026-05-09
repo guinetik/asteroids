@@ -99,6 +99,8 @@ export interface PlayerHabitatAppliances {
   readonly refractorTelescope: boolean
   /** When true, the lounge chair GLB loads in the −X / −Z corner between the telescope and hatch walls. */
   readonly loungeChair: boolean
+  /** When true, the arcade machine GLB loads next to the cockpit table on the −X side. */
+  readonly arcadeMachine: boolean
 }
 
 /** Player save data persisted to localStorage. */
