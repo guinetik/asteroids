@@ -65,6 +65,12 @@ const SUSHI_LOVE_PER_PET = 10
 /** Love granted each time Sushi pounces on the laser dot (0..100 scale). Smaller than a
  * pet but stacks per catch, so a long laser session is comparable to a pet. */
 const SUSHI_LOVE_PER_LASER_CATCH = 5
+/**
+ * Love granted when Sushi finishes a hangout on the optional cat tower (0..100 scale).
+ * The tower is the dedicated cat appliance — the only perch with a purchase cost — so
+ * it's also the only perch that rewards the player on use.
+ */
+const SUSHI_LOVE_PER_TOWER_USE = 5
 /** Bowl-fill brings the bowl to this serving count (one full bag). */
 const SUSHI_BOWL_FULL_SERVINGS = 10
 /** Cat food units removed from the player's inventory per bowl refill. */
@@ -247,6 +253,7 @@ export class MapHabitatFacade {
       onEatServing: () => this.handleSushiEatServing(),
       onPetted: () => this.handleSushiPetted(),
       onCaughtLaser: () => this.handleSushiCaughtLaser(),
+      onUsedTower: () => this.handleSushiUsedTower(),
       onUsedLitter: () => this.handleSushiUsedLitter(),
       onEmptyLitter: () => this.handleEmptyLitter(),
       onFillBowl: () => this.handleSushiFillBowl(),
@@ -296,6 +303,23 @@ export class MapHabitatFacade {
     if (!deps) return
     const profile = deps.getProfile()
     const next = addSushiLove(profile, SUSHI_LOVE_PER_LASER_CATCH)
+    if (next === profile) return
+    deps.setProfile(next)
+    saveProfile(next)
+    deps.evaluateAchievements()
+  }
+
+  /**
+   * Apply the side-effects of Sushi finishing a hangout on the cat tower: add a
+   * small love bump and persist. The tower is the only purchasable cat perch, so
+   * this reward exists to make the appliance feel earned over the free furniture
+   * beats. Fires once per hangout, when the sit-on-tower timer expires.
+   */
+  private handleSushiUsedTower(): void {
+    const deps = this.deps
+    if (!deps) return
+    const profile = deps.getProfile()
+    const next = addSushiLove(profile, SUSHI_LOVE_PER_TOWER_USE)
     if (next === profile) return
     deps.setProfile(next)
     saveProfile(next)

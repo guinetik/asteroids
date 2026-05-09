@@ -154,13 +154,13 @@ const HABITAT_PITCH_CLAMP = Math.PI / 3
 /** Vertical field of view for the FPS camera (degrees). */
 const HABITAT_FOV = 70
 /** Intensity of the warm point light inside the habitat. */
-const INTERIOR_LIGHT_INTENSITY = 1.0
+const INTERIOR_LIGHT_INTENSITY = 1.4
 /** Maximum range of the interior point light (world units). */
-const INTERIOR_LIGHT_RANGE = 25
+const INTERIOR_LIGHT_RANGE = 28
 /** Intensity of the ambient fill light. */
-const AMBIENT_INTENSITY = 0.6
+const AMBIENT_INTENSITY = 0.9
 /** Intensity of the exterior directional rim light. */
-const EXTERIOR_LIGHT_INTENSITY = 0.3
+const EXTERIOR_LIGHT_INTENSITY = 0.5
 /** How far inside the cylinder radius the girder rings sit. */
 const GIRDER_INSET = 0.05
 /** Render size of each star point (world units, with sizeAttenuation). */
@@ -313,6 +313,27 @@ const CAT_TOWER_X = 4.3
  * to walk across the cabin from the feeding area to reach it.
  */
 const CAT_TOWER_Z = 2.2
+/**
+ * Distance (world units) Sushi waits away from the cat tower's cabin-facing edge
+ * before leaping onto the top platform. Same shape as the locker beat.
+ */
+const CAT_TOWER_APPROACH_OFFSET = 0.45
+/**
+ * Fraction of the cat tower's authored height shaved off the perch Y so Sushi sits
+ * on the visible top platform rather than floating a hair above the highest poly.
+ */
+const CAT_TOWER_TOP_HEIGHT_DROP_RATIO = 0.08
+/**
+ * Sideways nudge (world units) applied to the perch X so Sushi sits a touch back
+ * toward the +X wall on the top platform instead of teetering over its inner edge.
+ */
+const CAT_TOWER_TOP_WALL_NUDGE_X = 0.05
+/**
+ * Fraction of the tower's Z depth used to slide Sushi's perch toward the cockpit
+ * table side (+Z) instead of the hatch wall (-Z). Small offset so he reads as
+ * sitting on the table-facing edge of the top platform.
+ */
+const CAT_TOWER_TOP_TABLE_NUDGE_Z_FRAC = 0.05
 /**
  * Player capsule radius (world units) used when resolving against furniture
  * obstacle AABBs. Tuned to feel like a person in a cabin without snagging on
@@ -876,6 +897,11 @@ export interface SushiBridgeCallbacks {
   onEmptyLitter(): void
   /** Cat woke up from a nap — facade resets tiredness + saves. */
   onWoke(): void
+  /**
+   * Cat finished a hangout on the cat tower — facade adds a small love bump and
+   * persists. Fires once per visit, mirroring {@link onCaughtLaser}.
+   */
+  onUsedTower(): void
   /** True when the player can fill the bowl (≥1 cat-food in inventory AND bowl not full). */
   canFillBowl(): boolean
   /** True when the player has at least one cat-food unit available in the shuttle inventory. */
@@ -1172,6 +1198,14 @@ export class HabitatInteriorScene {
   private readonly tableTopWorldPosition = new THREE.Vector3()
   /** Floor approach waypoints that let Sushi hop onto the shuttle-control table. */
   private readonly tableApproachWorldPositions: THREE.Vector3[] = []
+  /** World-space cat-tower top-platform sit point. Populated after the tower loads. */
+  private readonly towerTopWorldPosition = new THREE.Vector3()
+  /**
+   * Floor approach waypoints that let Sushi hop onto the cat tower. Empty until
+   * the optional appliance has finished loading; the bridge reports a zero side
+   * count in that case so the cat falls back to ambient perch beats.
+   */
+  private readonly towerApproachWorldPositions: THREE.Vector3[] = []
 
   /** Stored world-space position of the cat house, populated by {@link buildCatHouse}. */
   private readonly houseWorldPosition = new THREE.Vector3()
@@ -1750,6 +1784,7 @@ export class HabitatInteriorScene {
       this.catTower.refreshAabb()
       this.scene.add(this.catTower.group)
       this.playerObstacles.push(this.catTower.getCollisionAabb().clone())
+      this.computeTowerJumpWaypoints()
     } catch (err) {
       console.warn('[HabitatInteriorScene] Cat tower load failed:', err)
     }
@@ -2212,6 +2247,29 @@ export class HabitatInteriorScene {
   }
 
   /**
+   * Cache cat-tower approach + top waypoints for Sushi's dedicated climbing-tower
+   * perch. The tower hugs the +X wall just outside the locker, so the approach
+   * point sits on the cabin-facing -X side and the perch sits on the top platform
+   * with a slight wall-side nudge so the cat doesn't teeter over the inner edge.
+   * Reads the tower's runtime AABB so the points follow the appliance wherever the
+   * loader places it.
+   */
+  private computeTowerJumpWaypoints(): void {
+    const box = this.catTower.getCollisionAabb()
+    const cz = (box.min.z + box.max.z) / 2
+    const depthZ = box.max.z - box.min.z
+    const towerHeight = box.max.y - box.min.y
+    const perchX = CAT_TOWER_X + CAT_TOWER_TOP_WALL_NUDGE_X
+    const perchZ = cz + depthZ * CAT_TOWER_TOP_TABLE_NUDGE_Z_FRAC
+    const perchY = box.max.y - towerHeight * CAT_TOWER_TOP_HEIGHT_DROP_RATIO
+    this.towerTopWorldPosition.set(perchX, perchY, perchZ)
+    this.towerApproachWorldPositions.length = 0
+    this.towerApproachWorldPositions.push(
+      new THREE.Vector3(box.min.x - CAT_TOWER_APPROACH_OFFSET, FLOOR_Y, cz),
+    )
+  }
+
+  /**
    * Toggle the baked sleeping-cat clone parented inside the cat house. The live
    * cat's visibility is owned by {@link CatController}; this method only flips
    * the static asleep visual that lives in scene space.
@@ -2284,6 +2342,15 @@ export class HabitatInteriorScene {
         return out
       },
       getTableTopWorldPosition: (out) => out.copy(this.tableTopWorldPosition),
+      getTowerSideCount: () => this.towerApproachWorldPositions.length,
+      getTowerApproachWorldPosition: (sideIndex, out) => {
+        const i = Math.max(0, Math.min(this.towerApproachWorldPositions.length - 1, sideIndex))
+        const wp = this.towerApproachWorldPositions[i]
+        if (wp) out.copy(wp)
+        return out
+      },
+      getTowerTopWorldPosition: (out) => out.copy(this.towerTopWorldPosition),
+      onUsedTower: () => callbacks.onUsedTower(),
       onEatServing: () => callbacks.onEatServing(),
       onPetted: () => callbacks.onPetted(),
       onCaughtLaser: () => callbacks.onCaughtLaser(),
