@@ -20,6 +20,7 @@
 import * as THREE from 'three'
 import type { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
 import { HabitatInteriorScene } from '@/three/HabitatInteriorScene'
+import type { HabitatBackdropContext } from '@/three/HabitatBackdrop'
 import type { Inventory } from '@/lib/inventory/types'
 import type { PlayerProfile } from '@/lib/player/types'
 import {
@@ -134,6 +135,12 @@ export interface MapHabitatFacadeDeps {
   notifyJourneyTrigger: (trigger: JourneyTriggerId) => void
   /** Persisted achievement ids used by habitat visual rewards. */
   getUnlockedAchievementIds: () => readonly string[]
+  /**
+   * Snapshot of what the canopy backdrop should render — sun (always), the orbited
+   * planet (when captured), and the live ship-to-body distances used to scale them.
+   * Returning `null` clears the backdrop so the cabin falls back to the starfield.
+   */
+  getHabitatBackdropContext: () => HabitatBackdropContext | null
   /** Read the live player profile (Pinia-backed). */
   getProfile: () => PlayerProfile
   /** Write a new profile back to the controller (the controller saves + emits). */
@@ -191,6 +198,7 @@ export class MapHabitatFacade {
     const deps = this.deps
     const next = new HabitatInteriorScene()
     next.setUnlockedAchievementIds(deps?.getUnlockedAchievementIds() ?? [])
+    next.setBackdropContext(deps?.getHabitatBackdropContext() ?? null)
     await next.load()
     next.onInteract = (target) => {
       if (target === 'table') {

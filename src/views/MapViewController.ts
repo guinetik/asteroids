@@ -34,6 +34,7 @@ import { isDebugHudEnabled } from '@/lib/debug/debugMetrics'
 import { DebugMetricsTracker } from '@/lib/debug/DebugMetricsTracker'
 import { DEFAULT_TIME_SCALE, ORBIT_SCALE } from '@/lib/planets/constants'
 import { PINNED_BODIES, PLANETS, SUN } from '@/lib/planets/catalog'
+import type { HabitatBackdropContext } from '@/three/HabitatBackdrop'
 import type { Planet } from '@/lib/planets/types'
 import type { MapSceneObjects } from '@/three/MapSceneSetup'
 import { SunController } from '@/three/controllers/SunController'
@@ -1003,6 +1004,7 @@ export class MapViewController implements Tickable {
         this.setEarthStartupOrbitHudSuppressed(suppressed),
       notifyJourneyTrigger: (trigger) => this.notifyJourneyTrigger(trigger),
       getUnlockedAchievementIds: () => this.unlockedAchievementIds,
+      getHabitatBackdropContext: () => this.buildHabitatBackdropContext(),
       getProfile: () => this.playerProfile,
       setProfile: (profile) => {
         this.playerProfile = profile
@@ -4595,6 +4597,37 @@ export class MapViewController implements Tickable {
     this.awaitingStartupCinematicOrbitHandoff = false
     this.cancelPostStartupIntroHabitatTimer()
     this.setEarthStartupOrbitHudSuppressed(false)
+  }
+
+  /**
+   * Build a snapshot of what the habitat canopy backdrop should currently render.
+   * Captures the sun (always shown) and the orbited planet (if any) plus the live
+   * ship-to-body distances used to scale them. Called by the habitat facade once at
+   * scene construction; gameplay is paused inside the cabin so a single snapshot
+   * is enough.
+   *
+   * @returns Backdrop context, or `null` if shuttle state isn't ready.
+   */
+  private buildHabitatBackdropContext(): HabitatBackdropContext | null {
+    const shuttle = this.shuttleController
+    if (!shuttle) return null
+    const shipPos = shuttle.position
+    const shipToSunDistance = Math.hypot(shipPos.x, shipPos.z)
+    const target = this.orbitFacade.system?.target ?? null
+    const planet =
+      target && target.id && target.id !== 'sun'
+        ? PLANETS.find((p) => p.id === target.id) ?? null
+        : null
+    const shipToPlanetDistance =
+      planet && target
+        ? Math.hypot(target.getWorldX() - shipPos.x, target.getWorldZ() - shipPos.z)
+        : 0
+    return {
+      sun: SUN,
+      shipToSunDistance,
+      planet,
+      shipToPlanetDistance,
+    }
   }
 
   private setEarthStartupOrbitHudSuppressed(suppressed: boolean): void {

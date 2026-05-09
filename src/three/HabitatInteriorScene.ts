@@ -32,6 +32,7 @@ import { HabitatLargeAchievementPoster } from '@/three/HabitatLargeAchievementPo
 import { HabitatPosterWall } from '@/three/HabitatPosterWall'
 import { HabitatTablePosterRow } from '@/three/HabitatTablePosterRow'
 import { LavaLampModel } from '@/three/LavaLampModel'
+import { HabitatBackdrop, type HabitatBackdropContext } from '@/three/HabitatBackdrop'
 
 // ---------------------------------------------------------------------------
 // Constants — no magic numbers
@@ -740,6 +741,13 @@ export class HabitatInteriorScene {
   /** Procedural animated lava lamp placed on the raised bed rail. */
   private readonly lavaLamp = new LavaLampModel()
 
+  /**
+   * Backdrop celestial body visible through the canopy. Smoke-test stage:
+   * Earth is hardcoded; future patches will route the docked / nearest-orbit
+   * body in from the map controller.
+   */
+  private readonly backdrop = new HabitatBackdrop()
+
   /** Act I journey art — large frame port of the hatch grid on the −Z back cap (viewer −X). */
   private readonly journeyAct1Wall = new HabitatLargeAchievementPoster({
     poster: JOURNEY_LARGE_POSTER_CATALOG[0]!,
@@ -918,6 +926,7 @@ export class HabitatInteriorScene {
     this.buildTablePosterRow()
     this.buildLighting()
     this.buildStarfield()
+    this.buildBackdrop()
     this.buildFloor()
     this.buildLaserDot()
   }
@@ -1197,6 +1206,7 @@ export class HabitatInteriorScene {
     this.tickLitterChunkVisual()
     this.tickHatchKnob(dt)
     this.lavaLamp.tick(dt)
+    this.backdrop.tick(dt)
   }
 
   /**
@@ -1333,6 +1343,8 @@ export class HabitatInteriorScene {
     this.tablePosterRow.dispose()
     this.scene.remove(this.lavaLamp.group)
     this.lavaLamp.dispose()
+    this.scene.remove(this.backdrop.group)
+    this.backdrop.dispose()
     this.scene.traverse((child) => {
       if (
         child instanceof THREE.Mesh ||
@@ -1344,6 +1356,21 @@ export class HabitatInteriorScene {
         mats.forEach((m) => m.dispose())
       }
     })
+  }
+
+  /**
+   * Mount the canopy backdrop from a frozen snapshot of the docked state. The sun is
+   * always shown; the orbited planet (if any) is added on the opposite side of the
+   * canopy. Pass `null` to clear both — the cabin then falls back to the starfield.
+   *
+   * @param context - Snapshot built by the map facade at habitat-entry time.
+   */
+  setBackdropContext(context: HabitatBackdropContext | null): void {
+    if (!context) {
+      this.backdrop.clear()
+      return
+    }
+    this.backdrop.setContext(context)
   }
 
   /**
@@ -1763,6 +1790,15 @@ export class HabitatInteriorScene {
     const directional = new THREE.DirectionalLight(0x6688cc, EXTERIOR_LIGHT_INTENSITY)
     directional.position.set(0, CYLINDER_RADIUS * 2, CYLINDER_LENGTH / 2)
     this.scene.add(directional)
+  }
+
+  /**
+   * Mount the backdrop group on the scene. The body itself is set later via
+   * {@link setBackdropPlanetId} (called by the map facade before {@link load}), so
+   * the player sees whatever body the shuttle is actually orbiting.
+   */
+  private buildBackdrop(): void {
+    this.scene.add(this.backdrop.group)
   }
 
   /** Scatter stars on a large sphere, rejecting any that fall inside the cylinder. */
