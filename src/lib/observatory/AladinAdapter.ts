@@ -56,6 +56,14 @@ export class AladinAdapter {
     const containerId = `observatory-aladin-${aladinHostCounter}-${Date.now()}`
     opts.hostElement.id = containerId
 
+    const rect = opts.hostElement.getBoundingClientRect()
+    console.info(
+      '[AladinAdapter] host dims at init:',
+      Math.round(rect.width),
+      'x',
+      Math.round(rect.height),
+    )
+
     const target = opts.initialTarget
     const instance = A.aladin(`#${containerId}`, {
       survey: target.survey,
@@ -70,6 +78,12 @@ export class AladinAdapter {
       showSimbadPointerTool: false,
       showSearchBox: false,
     })
+
+    // Aladin sizes its canvas at init from getBoundingClientRect. If the host
+    // wasn't fully laid out, the canvas can lock to a tiny size and never
+    // recover. Dispatching a resize event forces Aladin's internal handler
+    // to re-measure once the dialog is visibly painted.
+    window.dispatchEvent(new Event('resize'))
 
     return new AladinAdapter(instance, target.survey)
   }
