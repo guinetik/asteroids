@@ -16,6 +16,7 @@ import MapOverlay from '@/components/MapOverlay.vue'
 import FastTravelConfirmDialog from '@/components/FastTravelConfirmDialog.vue'
 import ShipMessageDialog from '@/components/ShipMessageDialog.vue'
 import ShuttleControlOverlay from '@/components/ShuttleControlOverlay.vue'
+import ObservatoryOverlay from '@/components/ObservatoryOverlay.vue'
 import PlanetShopDialog from '@/components/shop/PlanetShopDialog.vue'
 import PimpMyShuttleDialog from '@/components/shop/PimpMyShuttleDialog.vue'
 import CreditsBadge from '@/components/hud/CreditsBadge.vue'
@@ -360,6 +361,7 @@ const habitatActive = ref(false)
 /** Hides orbit shuttle chrome during Earth first-mail cinematic → habitat (not used when intro is skipped). */
 const earthStartupOrbitHudSuppressed = ref(false)
 const shuttleControlVisible = ref(false)
+const observatoryVisible = ref(false)
 /** Programs the map nav bar can deep-link the shuttle terminal into. */
 type ShuttleControlInitialProgram = 'mail' | 'missions' | 'inventory' | 'upgrades'
 
@@ -965,6 +967,9 @@ onMounted(async () => {
         shopProfile.value = viewController.getPlayerProfileSnapshot()
         shopInventory.value = viewController.getPlayerInventorySnapshot()
       }
+    }
+    viewController.onObservatory = (visible) => {
+      observatoryVisible.value = visible
     }
     viewController.onHabitatPrompt = (prompt) => {
       habitatPrompt.value = prompt
@@ -2015,6 +2020,10 @@ watch(
       @deliver-mining-mission="handleDeliverMiningMission"
       @use-item="handleUseInventoryItem"
       @mail-changed="refreshActiveMessage"
+    />
+    <ObservatoryOverlay
+      :visible="observatoryVisible"
+      @close="observatoryVisible = false"
     />
     <UpgradeInstalledAnnouncement
       :visible="upgradeInstalledVisible"
