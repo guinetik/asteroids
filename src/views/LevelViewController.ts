@@ -1809,6 +1809,22 @@ export class LevelViewController implements Tickable {
           this.postProcessing.setCamera(fpsCam)
         }
         this.postProcessing.render()
+
+        // The shuttle parks high above the EVA player and is outside the
+        // FPS camera's frustum on level entry. Without a real draw, its
+        // per-(material, geometry) VAOs and any other lazy first-frame GPU
+        // state are deferred — paid all at once the first time the player
+        // tilts the camera up to look at it (~2s freeze). Aim the FPS cam
+        // at the shuttle for one prewarm frame to force that work now.
+        const shuttleGroup = this.arrivalSequence?.shuttleGroup ?? null
+        if (fpsCam && shuttleGroup) {
+          const savedQuat = fpsCam.quaternion.clone()
+          const shuttleTarget = new THREE.Vector3()
+          shuttleGroup.getWorldPosition(shuttleTarget)
+          fpsCam.lookAt(shuttleTarget)
+          this.postProcessing.render()
+          fpsCam.quaternion.copy(savedQuat)
+        }
       }
     } catch (err) {
       console.warn(
