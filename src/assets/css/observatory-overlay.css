@@ -64,7 +64,7 @@
 }
 
 .observatory-viewport {
-  @apply absolute inset-0;
+  @apply block w-full h-full;
   background: #000;
 }
 
