@@ -87,6 +87,7 @@ export const AUDIO_SOUND_IDS = [
   'sfx.geiger',
   'sfx.cargo.open',
   'sfx.cargo.close',
+  'sfx.hatch.open',
   // SFX — footsteps
   'sfx.step.habitat.1',
   'sfx.step.habitat.2',
@@ -791,6 +792,15 @@ const manifestById: ManifestById = {
   'sfx.cargo.close': {
     id: 'sfx.cargo.close',
     src: '/sound/sfx.cargo.close.mp3',
+    category: 'sfx',
+    load: 'lazy',
+    playback: 'restart',
+    volume: 0.7,
+    effect: 'none',
+  },
+  'sfx.hatch.open': {
+    id: 'sfx.hatch.open',
+    src: '/sound/sfx.hatch.open.mp3',
     category: 'sfx',
     load: 'lazy',
     playback: 'restart',

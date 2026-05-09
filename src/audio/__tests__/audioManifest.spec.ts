@@ -75,6 +75,7 @@ describe('audioManifest', () => {
       'sfx.geiger',
       'sfx.cargo.open',
       'sfx.cargo.close',
+      'sfx.hatch.open',
       // footsteps
       'sfx.step.habitat.1',
       'sfx.step.habitat.2',

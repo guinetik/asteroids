@@ -9,6 +9,7 @@
  * @spec docs/superpowers/specs/2026-04-27-bunker-mission-design.md
  */
 import * as THREE from 'three'
+import { useAudio } from '@/audio/useAudio'
 import { applyBunkerMeshStandardSpecularSoften } from '@/three/bunker/bunkerMeshStandardSpecularSoften'
 import { ANTECHAMBER, ARENA, CORRIDOR, WALL_THICKNESS } from './BunkerWallBuilder'
 
@@ -166,6 +167,9 @@ export class BunkerVaultDoorController {
 
   setOpen(open: boolean): void {
     if (this.targetOpen !== open) {
+      if (open && !this.targetOpen) {
+        useAudio().play('sfx.hatch.open')
+      }
       this.targetOpen = open
       this.phaseTime = 0
     }

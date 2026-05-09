@@ -1367,6 +1367,7 @@ export class LevelViewController implements Tickable {
         this.disturbanceAlertMessage = message
         this.onTerminalPrompt?.(message)
       }
+      this.installDropObserver(this.disturbanceDirector)
     }
     await this.minigames.initializeObjectives({
       mission,
@@ -2658,6 +2659,14 @@ export class LevelViewController implements Tickable {
       this.landerAudio.notifyArrivalCinematicEnd()
       this.onArrivalFade?.(0)
       this.stateMachine.setState('lander' as LevelState)
+    }
+
+    // ESC → skip exfil cinematic. Snap the fade to fully black so the
+    // navigation handoff to /map doesn't flash the half-docked shuttle.
+    if (this.inputManager?.wasActionPressed('skipCinematic') && this.stateMachine?.is('exfil')) {
+      this.landerAudio.notifyExfilCinematicEnd()
+      this.onArrivalFade?.(1)
+      this.stateMachine.setState('complete' as LevelState)
     }
 
     if (this.stateMachine?.is('lander') && this.isLanderAdrift()) {
