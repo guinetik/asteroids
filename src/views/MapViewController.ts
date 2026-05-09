@@ -633,6 +633,8 @@ export class MapViewController implements Tickable {
   onHabitatActive: ((active: boolean) => void) | null = null
   /** Fired when the shuttle control overlay should open/close. */
   onShuttleControl: ((visible: boolean) => void) | null = null
+  /** Fired when the observatory dialog should open/close. */
+  onObservatory: ((visible: boolean) => void) | null = null
   /** Fired when the habitat interaction prompt changes. */
   onHabitatPrompt: ((prompt: string | null) => void) | null = null
   /**
@@ -1017,6 +1019,7 @@ export class MapViewController implements Tickable {
       callbacks: {
         onHabitatActive: (active) => this.onHabitatActive?.(active),
         onShuttleControl: (visible) => this.onShuttleControl?.(visible),
+        onObservatory: (visible) => this.onObservatory?.(visible),
         onHabitatPrompt: (prompt) => this.onHabitatPrompt?.(prompt),
         onHatchExit: () => {
           if (this.canLeaveHabitatJourney()) {
