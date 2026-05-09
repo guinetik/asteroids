@@ -66,13 +66,13 @@ const PLANET_ANGULAR_BOOST = 6
  * boost because at outer planets the sun's real angular size is tiny — without a
  * boost it would render as a faint dot at Saturn / Neptune.
  */
-const SUN_ANGULAR_BOOST = 2
+const SUN_ANGULAR_BOOST = 3
 /** Hard cap on sun angular diameter (rad) — keeps the inner-planet sun from filling the canopy. */
-const SUN_MAX_ANGULAR_DIAMETER = (20 * Math.PI) / 180
+const SUN_MAX_ANGULAR_DIAMETER = (80 * Math.PI) / 180
 /** Hard cap on planet angular diameter (rad) — gas giants can read large but not engulf the canopy. */
 const PLANET_MAX_ANGULAR_DIAMETER = (60 * Math.PI) / 180
 /** Floor on angular diameter (rad) so distant bodies stay a recognisable disk. */
-const MIN_ANGULAR_DIAMETER = (3 * Math.PI) / 180
+const MIN_ANGULAR_DIAMETER = (1.5 * Math.PI) / 180
 
 /**
  * Snapshot describing what the habitat backdrop should currently render. Captured at
@@ -113,12 +113,19 @@ interface MountedBody {
 }
 
 /**
- * Compute angular scale to apply to a body's mesh so it occupies a target
- * angular diameter at {@link PLACEMENT_DISTANCE}.
+ * Maps catalog body radius and live ship-to-body distance to uniform mesh scale at
+ * {@link PLACEMENT_DISTANCE}. Distance enters via `2 * atan(radius / shipDistance)` (true angular
+ * diameter), then `boost` stretches that before clamping.
+ *
+ * - **Sun:** {@link shipDistance} is shuttle→sun (orrery XZ, i.e. heliocentric parking radius).
+ *   Pass a distance-shaped boost from {@link computeSunDistanceWeightedAngularBoost}.
+ * - **Orbited planet:** {@link shipDistance} is shuttle→planet; {@link boost} is a fixed constant
+ *   (no extra distance curve on the multiplier today).
  *
  * @param bodyRadius - True visual radius of the body in scene units.
- * @param shipDistance - Real ship-to-body distance, scene units.
- * @param boost - Artistic multiplier applied to the true angular size.
+ * @param shipDistance - Ship-to-body distance for this body (sun vs planet — see above).
+ * @param boost - Artistic multiplier applied to the true angular size (may already include sun-only distance shaping).
+ * @param maxAngularDiameter - Ceiling on boosted angular diameter (radians).
  * @returns Uniform scale to assign to the mesh.
  */
 function computeBackdropScale(
