@@ -101,6 +101,8 @@ export interface PlayerHabitatAppliances {
   readonly loungeChair: boolean
   /** When true, the arcade machine GLB loads next to the cockpit table on the −X side. */
   readonly arcadeMachine: boolean
+  /** When true, the cat tower GLB loads beside the bedside locker on the +X side. */
+  readonly catTower: boolean
 }
 
 /** Player save data persisted to localStorage. */

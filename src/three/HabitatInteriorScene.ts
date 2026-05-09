@@ -39,6 +39,7 @@ import { HabitatMoonLampModel } from '@/three/HabitatMoonLampModel'
 import { HabitatRefractorTelescopeModel } from '@/three/HabitatRefractorTelescopeModel'
 import { HabitatLoungeChairModel } from '@/three/HabitatLoungeChairModel'
 import { HabitatArcadeMachineModel } from '@/three/HabitatArcadeMachineModel'
+import { HabitatCatTowerModel } from '@/three/HabitatCatTowerModel'
 import { HabitatBackdrop, type HabitatBackdropContext } from '@/three/HabitatBackdrop'
 import { findCosmeticOptionById } from '@/lib/cosmetics/catalog'
 import { getPlayerCosmetics } from '@/lib/cosmetics/profileCosmetics'
@@ -276,6 +277,17 @@ const ARCADE_MACHINE_Z = 7.5
  * letting the player walk up to it from the bed/sofa side.
  */
 const ARCADE_MACHINE_ROTATION_Y = -Math.PI / 2
+
+/**
+ * World X of the cat tower, hugging the +X wall just outside the locker so the
+ * climbing tower silhouette doesn't intrude on the bed walking lane.
+ */
+const CAT_TOWER_X = 4.3
+/**
+ * World Z of the cat tower — placed forward (+Z) of the locker so the cat has
+ * to walk across the cabin from the feeding area to reach it.
+ */
+const CAT_TOWER_Z = 2.2
 /**
  * Player capsule radius (world units) used when resolving against furniture
  * obstacle AABBs. Tuned to feel like a person in a cabin without snagging on
@@ -619,7 +631,7 @@ const LOCKER_X = 4.42
 /** World Z of the locker, placed at the bed end opposite Sushi's cat house. */
 const LOCKER_Z = 1.35
 /** Target world height of the locker after GLB normalization. */
-const LOCKER_TARGET_HEIGHT = 1.45
+const LOCKER_TARGET_HEIGHT = 1.7
 /** Yaw applied to the locker so its front faces back into the walkable cabin. */
 const LOCKER_YAW_RADIANS = -Math.PI / 2
 /** Node name of the locker body transform in `locker.glb`. */
@@ -960,6 +972,9 @@ export class HabitatInteriorScene {
   /** Arcade machine next to the cockpit table on the −X side. Optional appliance. */
   private readonly arcadeMachine = new HabitatArcadeMachineModel()
 
+  /** Cat climbing tower next to the bedside locker. Optional appliance. */
+  private readonly catTower = new HabitatCatTowerModel()
+
   /**
    * Conditional appliance unlocks consulted before fetching optional GLBs.
    * Default everything off — facade pushes the live profile flags in via
@@ -971,6 +986,7 @@ export class HabitatInteriorScene {
     refractorTelescope: false,
     loungeChair: false,
     arcadeMachine: false,
+    catTower: false,
   }
 
   /** World-space AABBs the player movement resolver pushes the player out of. */
@@ -1239,6 +1255,7 @@ export class HabitatInteriorScene {
           refractorTelescope: boolean
           loungeChair: boolean
           arcadeMachine: boolean
+          catTower: boolean
         }
       | undefined,
   ): void {
@@ -1248,6 +1265,7 @@ export class HabitatInteriorScene {
       refractorTelescope: flags?.refractorTelescope === true,
       loungeChair: flags?.loungeChair === true,
       arcadeMachine: flags?.arcadeMachine === true,
+      catTower: flags?.catTower === true,
     }
   }
 
@@ -1586,6 +1604,9 @@ export class HabitatInteriorScene {
 
     // Optional arcade machine next to the cockpit table. Same rule.
     void this.loadArcadeMachineAsync()
+
+    // Optional cat tower next to the bedside locker. Same rule.
+    void this.loadCatTowerAsync()
   }
 
   /**
@@ -1649,6 +1670,25 @@ export class HabitatInteriorScene {
       this.playerObstacles.push(this.arcadeMachine.getCollisionAabb().clone())
     } catch (err) {
       console.warn('[HabitatInteriorScene] Arcade machine load failed:', err)
+    }
+  }
+
+  /**
+   * Deferred conditional load of the cat tower. Skipped entirely when
+   * {@link habitatAppliances.catTower} is false. Bails silently on load
+   * errors so a missing prop doesn't kill the scene.
+   */
+  private async loadCatTowerAsync(): Promise<void> {
+    if (!this.habitatAppliances.catTower) return
+    try {
+      await this.catTower.load()
+      if (this.disposed) return
+      this.catTower.group.position.set(CAT_TOWER_X, FLOOR_Y, CAT_TOWER_Z)
+      this.catTower.refreshAabb()
+      this.scene.add(this.catTower.group)
+      this.playerObstacles.push(this.catTower.getCollisionAabb().clone())
+    } catch (err) {
+      console.warn('[HabitatInteriorScene] Cat tower load failed:', err)
     }
   }
 
@@ -1946,6 +1986,8 @@ export class HabitatInteriorScene {
     this.loungeChair.dispose()
     this.scene.remove(this.arcadeMachine.group)
     this.arcadeMachine.dispose()
+    this.scene.remove(this.catTower.group)
+    this.catTower.dispose()
     this.playerObstacles.length = 0
     this.scene.remove(this.backdrop.group)
     this.backdrop.dispose()

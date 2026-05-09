@@ -548,6 +548,7 @@ function createDefaultHabitatAppliances(): PlayerHabitatAppliances {
     refractorTelescope: false,
     loungeChair: false,
     arcadeMachine: false,
+    catTower: false,
   }
 }
 
@@ -573,6 +574,7 @@ function normalizeHabitatAppliances(raw: unknown): PlayerHabitatAppliances {
     loungeChair: typeof r.loungeChair === 'boolean' ? r.loungeChair : defaults.loungeChair,
     arcadeMachine:
       typeof r.arcadeMachine === 'boolean' ? r.arcadeMachine : defaults.arcadeMachine,
+    catTower: typeof r.catTower === 'boolean' ? r.catTower : defaults.catTower,
   }
 }
 
