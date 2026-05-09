@@ -37,6 +37,7 @@ import { HabitatCoffeeMachineModel } from '@/three/HabitatCoffeeMachineModel'
 import { HabitatRecordPlayerModel } from '@/three/HabitatRecordPlayerModel'
 import { HabitatMoonLampModel } from '@/three/HabitatMoonLampModel'
 import { HabitatRefractorTelescopeModel } from '@/three/HabitatRefractorTelescopeModel'
+import { HabitatLoungeChairModel } from '@/three/HabitatLoungeChairModel'
 import { HabitatBackdrop, type HabitatBackdropContext } from '@/three/HabitatBackdrop'
 import { findCosmeticOptionById } from '@/lib/cosmetics/catalog'
 import { getPlayerCosmetics } from '@/lib/cosmetics/profileCosmetics'
@@ -244,6 +245,22 @@ const REFRACTOR_TELESCOPE_X = -4.0
 const REFRACTOR_TELESCOPE_Z = 0.0
 /** Y-axis rotation (radians) so the telescope lens points east (3 o'clock) instead of south. */
 const REFRACTOR_TELESCOPE_ROTATION_Y = Math.PI / 2
+
+/**
+ * World X of the lounge chair, tucked into the −X (telescope-side) wall in the
+ * back-left corner of the cabin so it doesn't crowd the centre walking path.
+ */
+const LOUNGE_CHAIR_X = -3.8
+/**
+ * World Z of the lounge chair, near the −Z hatch wall so it sits in the corner
+ * between the telescope wall and the hatch wall.
+ */
+const LOUNGE_CHAIR_Z = -7
+/**
+ * Y-axis rotation (radians) so the chair faces into the cabin (toward +X, +Z)
+ * with its back tucked toward the corner walls.
+ */
+const LOUNGE_CHAIR_ROTATION_Y = Math.PI / 5 + Math.PI
 /**
  * Player capsule radius (world units) used when resolving against furniture
  * obstacle AABBs. Tuned to feel like a person in a cabin without snagging on
@@ -922,6 +939,9 @@ export class HabitatInteriorScene {
   /** Free-standing refractor telescope in the −X sun corner. Optional appliance. */
   private readonly refractorTelescope = new HabitatRefractorTelescopeModel()
 
+  /** Lounge chair in the −X / −Z corner of the cabin. Optional appliance. */
+  private readonly loungeChair = new HabitatLoungeChairModel()
+
   /**
    * Conditional appliance unlocks consulted before fetching optional GLBs.
    * Default everything off — facade pushes the live profile flags in via
@@ -931,6 +951,7 @@ export class HabitatInteriorScene {
     coffeeMachine: false,
     recordPlayer: false,
     refractorTelescope: false,
+    loungeChair: false,
   }
 
   /** World-space AABBs the player movement resolver pushes the player out of. */
@@ -1193,13 +1214,19 @@ export class HabitatInteriorScene {
    */
   setHabitatAppliances(
     flags:
-      | { coffeeMachine: boolean; recordPlayer: boolean; refractorTelescope: boolean }
+      | {
+          coffeeMachine: boolean
+          recordPlayer: boolean
+          refractorTelescope: boolean
+          loungeChair: boolean
+        }
       | undefined,
   ): void {
     this.habitatAppliances = {
       coffeeMachine: flags?.coffeeMachine === true,
       recordPlayer: flags?.recordPlayer === true,
       refractorTelescope: flags?.refractorTelescope === true,
+      loungeChair: flags?.loungeChair === true,
     }
   }
 
@@ -1531,6 +1558,10 @@ export class HabitatInteriorScene {
     // Optional refractor telescope in the −X sun corner. Conditional on its
     // own profile flag — when locked, the GLB is never fetched.
     void this.loadRefractorTelescopeAsync()
+
+    // Optional lounge chair tucked between telescope wall and hatch wall. Same
+    // fire-and-forget rule + conditional gate.
+    void this.loadLoungeChairAsync()
   }
 
   /**
@@ -1554,6 +1585,26 @@ export class HabitatInteriorScene {
       this.playerObstacles.push(this.refractorTelescope.getCollisionAabb().clone())
     } catch (err) {
       console.warn('[HabitatInteriorScene] Refractor telescope load failed:', err)
+    }
+  }
+
+  /**
+   * Deferred conditional load of the lounge chair. Skipped entirely when
+   * {@link habitatAppliances.loungeChair} is false. Bails silently on load
+   * errors so a missing prop doesn't kill the scene.
+   */
+  private async loadLoungeChairAsync(): Promise<void> {
+    if (!this.habitatAppliances.loungeChair) return
+    try {
+      await this.loungeChair.load()
+      if (this.disposed) return
+      this.loungeChair.group.position.set(LOUNGE_CHAIR_X, FLOOR_Y, LOUNGE_CHAIR_Z)
+      this.loungeChair.group.rotation.y = LOUNGE_CHAIR_ROTATION_Y
+      this.loungeChair.refreshAabb()
+      this.scene.add(this.loungeChair.group)
+      this.playerObstacles.push(this.loungeChair.getCollisionAabb().clone())
+    } catch (err) {
+      console.warn('[HabitatInteriorScene] Lounge chair load failed:', err)
     }
   }
 
@@ -1847,6 +1898,8 @@ export class HabitatInteriorScene {
     this.moonLamp.dispose()
     this.scene.remove(this.refractorTelescope.group)
     this.refractorTelescope.dispose()
+    this.scene.remove(this.loungeChair.group)
+    this.loungeChair.dispose()
     this.playerObstacles.length = 0
     this.scene.remove(this.backdrop.group)
     this.backdrop.dispose()

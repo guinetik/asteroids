@@ -542,7 +542,12 @@ function normalizeLoadedProfile(data: unknown): PlayerProfile | null {
  * Both optional counter-top props start locked — gameplay events flip them on later.
  */
 function createDefaultHabitatAppliances(): PlayerHabitatAppliances {
-  return { coffeeMachine: false, recordPlayer: false, refractorTelescope: false }
+  return {
+    coffeeMachine: false,
+    recordPlayer: false,
+    refractorTelescope: false,
+    loungeChair: false,
+  }
 }
 
 /**
@@ -564,6 +569,7 @@ function normalizeHabitatAppliances(raw: unknown): PlayerHabitatAppliances {
       typeof r.refractorTelescope === 'boolean'
         ? r.refractorTelescope
         : defaults.refractorTelescope,
+    loungeChair: typeof r.loungeChair === 'boolean' ? r.loungeChair : defaults.loungeChair,
   }
 }
 

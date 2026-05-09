@@ -97,6 +97,8 @@ export interface PlayerHabitatAppliances {
   readonly recordPlayer: boolean
   /** When true, the free-standing refractor telescope GLB loads in the −X "sun corner" of the cabin. */
   readonly refractorTelescope: boolean
+  /** When true, the lounge chair GLB loads in the −X / −Z corner between the telescope and hatch walls. */
+  readonly loungeChair: boolean
 }
 
 /** Player save data persisted to localStorage. */
