@@ -55,7 +55,6 @@ describe('achievements', () => {
       'flight-first-launch',
       'missions-first-contract',
       'exploration-first-asteroid',
-      'credits-two-thousand',
       'upgrades-first-install',
     ])
   })
@@ -86,8 +85,6 @@ describe('achievements', () => {
     expect(result.newlyUnlocked.map((item) => item.id)).toEqual([
       'missions-five-contracts',
       'exploration-three-asteroids',
-      'credits-two-thousand',
-      'credits-five-thousand',
       'upgrades-first-install',
       'upgrades-five-tiers',
       'upgrades-gravity-surfing',
@@ -122,28 +119,15 @@ describe('achievements', () => {
   })
 
   it('returns contextual locked hints', () => {
-    const hint = getAchievementLockedHint(
-      {
-        id: 'credits-five-thousand',
-        category: 'credits',
-        icon: '💰',
-        title: 'RETIREMENT IS A LIE',
-        subtitle: '5,000 CR on hand · dreams sold separately',
-        description: 'Hold 5,000 credits at once.',
-        type: 'CREDITS',
-        rewardCredits: 1000,
-        kind: 'credits_balance',
-        threshold: 5000,
-      },
-      {
-        profile: createProfile('Pilot'),
-        upgradeLevels: {},
-        contractSnapshot: emptyContractSnapshot(),
-      },
-    )
+    const walletMid = ACHIEVEMENT_DEFINITIONS.find((d) => d.id === 'credits-five-thousand')
+    expect(walletMid).toBeDefined()
+    const hint = getAchievementLockedHint(walletMid!, {
+      profile: createProfile('Pilot'),
+      upgradeLevels: {},
+      contractSnapshot: emptyContractSnapshot(),
+    })
 
-    expect(hint).toContain('5,000 CR')
-    expect(hint).toContain('1,000 CR')
+    expect(hint).toContain('50,000 CR')
   })
 
   it('does not unlock malformed achievement definitions with missing required fields', () => {
@@ -256,21 +240,24 @@ describe('achievements', () => {
     const baseProfile = createProfile('Pilot')
     const profile = {
       ...baseProfile,
-      credits: 10000,
+      credits: 150_000,
       achievementStats: {
         ...baseProfile.achievementStats,
-        lifetimeCreditsEarned: 100000,
-        lifetimeCreditsSpent: 50000,
-        lifetimeTradeCreditsEarned: 10000,
+        lifetimeCreditsEarned: 1_000_000,
+        lifetimeCreditsSpent: 250_000,
+        lifetimeTradeCreditsEarned: 125_000,
       },
     }
 
     const ids = evaluateAchievementUnlocks(progress(profile), []).newlyUnlocked.map((a) => a.id)
 
+    expect(ids).toContain('credits-two-thousand')
+    expect(ids).toContain('credits-five-thousand')
     expect(ids).toContain('credits-ten-thousand')
     expect(ids).toContain('credits-earned-one-hundred-thousand')
     expect(ids).toContain('credits-spent-fifty-thousand')
     expect(ids).toContain('credits-trade-ten-thousand')
+    expect(ids).toContain('credits-trade-one-twenty-five-k')
   })
 
   it('unlocks contract and mission family achievements from contract snapshot', () => {
@@ -670,7 +657,7 @@ describe('achievements', () => {
     const base = createProfile('Pilot')
     const at2k = {
       ...base,
-      achievementStats: { ...base.achievementStats, lifetimeCargoIntakeCreditsEarned: 2000 },
+      achievementStats: { ...base.achievementStats, lifetimeCargoIntakeCreditsEarned: 10_000 },
     }
     expect(
       evaluateAchievementUnlocks(progress(at2k), []).newlyUnlocked.some(
@@ -682,7 +669,7 @@ describe('achievements', () => {
       ...base,
       achievementStats: {
         ...base.achievementStats,
-        lifetimeCargoIntakeCreditsEarned: 25_000,
+        lifetimeCargoIntakeCreditsEarned: 75_000,
       },
     }
     const bulk = evaluateAchievementUnlocks(progress(at25k), []).newlyUnlocked.map((a) => a.id)
@@ -693,7 +680,7 @@ describe('achievements', () => {
       ...base,
       achievementStats: {
         ...base.achievementStats,
-        lifetimeCargoIntakeCreditsEarned: 50_000,
+        lifetimeCargoIntakeCreditsEarned: 250_000,
       },
     }
     const allThree = evaluateAchievementUnlocks(progress(at50k), []).newlyUnlocked.map((a) => a.id)

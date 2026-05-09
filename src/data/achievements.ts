@@ -2,7 +2,7 @@
  * Achievement definitions — titles, subtitles, unlock rules, and rewards.
  *
  * @author guinetik
- * @date 2026-04-12
+ * @date 2026-05-09
  * @spec docs/superpowers/specs/2026-04-03-player-profile-design.md
  */
 import type { UpgradeId, UpgradeLevels } from '@/lib/upgrades'
@@ -126,24 +126,29 @@ export interface AchievementProgress {
   contractSnapshot: ContractStoreSnapshot
 }
 
-/** Balance threshold for the legacy 2,000-credit wallet achievement. */
-const CREDIT_BALANCE_TWO_THOUSAND = 2_000
-/** Balance threshold for the legacy 5,000-credit wallet achievement. */
-const CREDIT_BALANCE_FIVE_THOUSAND = 5_000
-/** Credit balance needed for the first five-figure wallet achievement. */
-const CREDIT_BALANCE_TEN_THOUSAND = 10_000
-/** Lifetime earned-credit threshold for a midgame economy achievement. */
-const CREDITS_EARNED_TWENTY_FIVE_THOUSAND = 25_000
-/** Lifetime earned-credit threshold for an advanced economy achievement. */
-const CREDITS_EARNED_FIFTY_THOUSAND = 50_000
-/** Lifetime earned-credit threshold for the six-figure economy achievement. */
-const CREDITS_EARNED_ONE_HUNDRED_THOUSAND = 100_000
-/** Lifetime spent-credit threshold for the first spender achievement. */
-const CREDITS_SPENT_TEN_THOUSAND = 10_000
-/** Lifetime spent-credit threshold for the advanced spender achievement. */
-const CREDITS_SPENT_FIFTY_THOUSAND = 50_000
-/** Lifetime trade-credit threshold for the first trade route achievement. */
-const CREDITS_TRADE_TEN_THOUSAND = 10_000
+/**
+ * Credit-economy achievement ladder anchored at five figures — wallet first, wider tiers after.
+ * `id` fields on achievements stay fixed for persisted unlock lists; numeric suffixes in ids are legacy.
+ */
+const CREDITS_WALLET_HOLD_FIRST_TIER = 10_000
+/** Second simultaneous balance milestone — mid five figures on hand. */
+const CREDITS_WALLET_HOLD_SECOND_TIER = 50_000
+/** Third simultaneous balance milestone — six figures restrained in one wallet. */
+const CREDITS_WALLET_HOLD_THIRD_TIER = 150_000
+/** First lifetime gross-credits milestone after profile creation. */
+const CREDITS_LIFETIME_EARNED_FIRST_TIER = 75_000
+/** Second lifetime gross-credits milestone — deep-career pacing. */
+const CREDITS_LIFETIME_EARNED_SECOND_TIER = 300_000
+/** Capstone lifetime gross-credits milestone — seven-digit career total. */
+const CREDITS_LIFETIME_EARNED_THIRD_TIER = 1_000_000
+/** First lifetime spend-through successful sinks — meaningful reinvestment bar. */
+const CREDITS_LIFETIME_SPENT_FIRST_TIER = 50_000
+/** Heavy lifetime spender bar — fleets and fantasies financed. */
+const CREDITS_LIFETIME_SPENT_SECOND_TIER = 250_000
+/** First cumulative trade-route sales trophy. */
+const CREDITS_TRADE_LIFETIME_FIRST_TIER = 50_000
+/** Second cumulative trade-route sales trophy. */
+const CREDITS_TRADE_LIFETIME_SECOND_TIER = 125_000
 /** Count needed for first-time achievements. */
 const FIRST_COUNT = 1
 /** Count needed for small-set achievements. */
@@ -190,12 +195,12 @@ const REWARD_SPECIAL_UPGRADE = 1_200
 const REWARD_CAPSTONE = 1_500
 /** Reward for generated planet orbit achievements. */
 const REWARD_PLANET_ORBIT = 220
-/** Lifetime Cargo Intake (Fantasia premium tab) credit totals for economy trophies. */
-const CARGO_INTAKE_LIFETIME_TWO_THOUSAND = 2_000
-/** Lifetime Cargo Intake credit total for the mid intake trophy. */
-const CARGO_INTAKE_LIFETIME_TWENTY_FIVE_THOUSAND = 25_000
-/** Lifetime Cargo Intake credit total for the capstone intake trophy. */
-const CARGO_INTAKE_LIFETIME_FIFTY_THOUSAND = 50_000
+/** First lifetime Cargo Intake (Fantasia tab) payout total — aligns with credits ladder opener. */
+const CARGO_INTAKE_LIFETIME_FIRST_TIER = 10_000
+/** Mid lifetime Cargo Intake payout total — dedicated premium seller pacing. */
+const CARGO_INTAKE_LIFETIME_SECOND_TIER = 75_000
+/** Capstone lifetime Cargo Intake payout total — premium lane whale marker. */
+const CARGO_INTAKE_LIFETIME_THIRD_TIER = 250_000
 /** Reward for filling every slot in one cosmetic category. */
 const REWARD_COSMETIC_COMPLETE = 2_500
 /** Pet threshold for the "Beloved" Sushi achievement. */
@@ -378,109 +383,121 @@ export const ACHIEVEMENT_DEFINITIONS: readonly AchievementDefinition[] = [
     id: 'credits-two-thousand',
     category: 'credits',
     icon: '\u{1F4B3}',
-    title: 'FIRST FAT WALLET',
-    subtitle: '2,000 CR · stacked and smug',
-    description: 'Hold 2,000 credits at once.',
+    title: 'FIVE FIGURES, NO ALIBI',
+    subtitle: '10,000 CR on hand · the wallet has mass',
+    description: 'Hold 10,000 credits at once.',
     type: 'CREDITS',
     rewardCredits: REWARD_STARTER,
     kind: 'credits_balance',
-    threshold: CREDIT_BALANCE_TWO_THOUSAND,
+    threshold: CREDITS_WALLET_HOLD_FIRST_TIER,
   },
   {
     id: 'credits-five-thousand',
     category: 'credits',
     icon: '\u{1F4B0}',
-    title: 'RETIREMENT IS A LIE',
-    subtitle: '5,000 CR on hand · dreams sold separately',
-    description: 'Hold 5,000 credits at once.',
+    title: 'MID-FIVE STORAGE',
+    subtitle: '50,000 CR on hand · inertia with interest',
+    description: 'Hold 50,000 credits at once.',
     type: 'CREDITS',
     rewardCredits: REWARD_MAJOR,
     kind: 'credits_balance',
-    threshold: CREDIT_BALANCE_FIVE_THOUSAND,
+    threshold: CREDITS_WALLET_HOLD_SECOND_TIER,
   },
   {
     id: 'credits-ten-thousand',
     category: 'credits',
     icon: '\u{1F4B0}',
-    title: 'FIVE FIGURES, NO ALIBI',
-    subtitle: '10,000 CR on hand · the wallet has mass',
-    description: 'Hold 10,000 credits at once.',
+    title: 'SIX FIGURES, SEALED',
+    subtitle: '150,000 CR on hand · the bank clears its throat',
+    description: 'Hold 150,000 credits at once.',
     type: 'CREDITS',
     rewardCredits: REWARD_STANDARD,
     kind: 'credits_balance',
-    threshold: CREDIT_BALANCE_TEN_THOUSAND,
+    threshold: CREDITS_WALLET_HOLD_THIRD_TIER,
   },
   {
     id: 'credits-earned-twenty-five-thousand',
     category: 'credits',
     icon: '\u{1F4C8}',
     title: 'GROSS RECEIPTS',
-    subtitle: '25,000 CR earned · the books wake up',
-    description: 'Earn 25,000 lifetime credits after profile creation.',
+    subtitle: '75,000 CR earned · the books wake up loud',
+    description: 'Earn 75,000 lifetime credits after profile creation.',
     type: 'CREDITS',
     rewardCredits: REWARD_STANDARD,
     kind: 'credits_lifetime_earned',
-    threshold: CREDITS_EARNED_TWENTY_FIVE_THOUSAND,
+    threshold: CREDITS_LIFETIME_EARNED_FIRST_TIER,
   },
   {
     id: 'credits-earned-fifty-thousand',
     category: 'credits',
     icon: '\u{1F4C8}',
-    title: 'HALF A HUNDRED',
-    subtitle: '50,000 CR earned · signatures everywhere',
-    description: 'Earn 50,000 lifetime credits after profile creation.',
+    title: 'TRIPLE CENTURY TRACK',
+    subtitle: '300,000 CR earned · signatures everywhere',
+    description: 'Earn 300,000 lifetime credits after profile creation.',
     type: 'CREDITS',
     rewardCredits: REWARD_NOTABLE,
     kind: 'credits_lifetime_earned',
-    threshold: CREDITS_EARNED_FIFTY_THOUSAND,
+    threshold: CREDITS_LIFETIME_EARNED_SECOND_TIER,
   },
   {
     id: 'credits-earned-one-hundred-thousand',
     category: 'credits',
     icon: '\u{1F48E}',
-    title: 'SIX-FIGURE ORBIT',
-    subtitle: '100,000 CR earned · gravity likes you now',
-    description: 'Earn 100,000 lifetime credits after profile creation.',
+    title: 'SEVEN-DIGIT LEDGER',
+    subtitle: '1,000,000 CR earned · gravity likes you now',
+    description: 'Earn 1,000,000 lifetime credits after profile creation.',
     type: 'CREDITS',
     rewardCredits: REWARD_MAJOR,
     kind: 'credits_lifetime_earned',
-    threshold: CREDITS_EARNED_ONE_HUNDRED_THOUSAND,
+    threshold: CREDITS_LIFETIME_EARNED_THIRD_TIER,
   },
   {
     id: 'credits-spent-ten-thousand',
     category: 'credits',
     icon: '\u{1F6D2}',
     title: 'MONEY HAS THRUST',
-    subtitle: '10,000 CR spent · receipts in the exhaust',
-    description: 'Spend 10,000 lifetime credits through successful credit sinks.',
+    subtitle: '50,000 CR spent · receipts in the exhaust',
+    description: 'Spend 50,000 lifetime credits through successful credit sinks.',
     type: 'CREDITS',
     rewardCredits: REWARD_STANDARD,
     kind: 'credits_lifetime_spent',
-    threshold: CREDITS_SPENT_TEN_THOUSAND,
+    threshold: CREDITS_LIFETIME_SPENT_FIRST_TIER,
   },
   {
     id: 'credits-spent-fifty-thousand',
     category: 'credits',
     icon: '\u{1F6D2}',
     title: 'AUTHORIZED BAD IDEAS',
-    subtitle: '50,000 CR spent · engineering applauds',
-    description: 'Spend 50,000 lifetime credits through successful credit sinks.',
+    subtitle: '250,000 CR spent · engineering applauds',
+    description: 'Spend 250,000 lifetime credits through successful credit sinks.',
     type: 'CREDITS',
     rewardCredits: REWARD_NOTABLE,
     kind: 'credits_lifetime_spent',
-    threshold: CREDITS_SPENT_FIFTY_THOUSAND,
+    threshold: CREDITS_LIFETIME_SPENT_SECOND_TIER,
   },
   {
     id: 'credits-trade-ten-thousand',
     category: 'credits',
     icon: '\u{1F69A}',
     title: 'LANE MAKER',
-    subtitle: '10,000 CR traded · margin with manners',
-    description: 'Earn 10,000 credits from trade-good sales.',
+    subtitle: '50,000 CR from trade-good sales · margin with manners',
+    description: 'Earn 50,000 credits from trade-good sales.',
     type: 'TRADE',
     rewardCredits: REWARD_NOTABLE,
     kind: 'credits_trade_earned',
-    threshold: CREDITS_TRADE_TEN_THOUSAND,
+    threshold: CREDITS_TRADE_LIFETIME_FIRST_TIER,
+  },
+  {
+    id: 'credits-trade-one-twenty-five-k',
+    category: 'credits',
+    icon: '\u{1F6A2}',
+    title: 'MARGIN ADMIRAL',
+    subtitle: '125,000 CR from trade-good sales · haulers whisper your callsign',
+    description: 'Earn 125,000 credits from trade-good sales.',
+    type: 'TRADE',
+    rewardCredits: REWARD_CAPSTONE,
+    kind: 'credits_trade_earned',
+    threshold: CREDITS_TRADE_LIFETIME_SECOND_TIER,
   },
   {
     id: 'contracts-first-complete',
@@ -1309,39 +1326,39 @@ export const ACHIEVEMENT_DEFINITIONS: readonly AchievementDefinition[] = [
     category: 'cosmetics',
     icon: '\u{1F4B0}',
     title: 'FANTASIA TIPS',
-    subtitle: '2,000 CR lifetime through Cargo Intake',
+    subtitle: '10,000 CR lifetime through Cargo Intake',
     description:
-      'Earn 2,000 CR total selling trade goods through the Cargo Intake tab at Pimp My Shuttle.',
+      'Earn 10,000 CR total selling trade goods through the Cargo Intake tab at Pimp My Shuttle.',
     type: 'PIMP MY SHUTTLE',
     rewardCredits: REWARD_STANDARD,
     kind: 'cargo_intake_lifetime_earned',
-    threshold: CARGO_INTAKE_LIFETIME_TWO_THOUSAND,
+    threshold: CARGO_INTAKE_LIFETIME_FIRST_TIER,
   },
   {
     id: 'cosmetics-cargo-intake-twenty-five-k',
     category: 'cosmetics',
     icon: '\u{1F4C8}',
     title: 'PREMIUM CLEARANCE',
-    subtitle: '25,000 CR lifetime through Cargo Intake',
+    subtitle: '75,000 CR lifetime through Cargo Intake',
     description:
-      'Earn 25,000 CR total selling trade goods through the Cargo Intake tab at Pimp My Shuttle.',
+      'Earn 75,000 CR total selling trade goods through the Cargo Intake tab at Pimp My Shuttle.',
     type: 'PIMP MY SHUTTLE',
     rewardCredits: REWARD_MAJOR,
     kind: 'cargo_intake_lifetime_earned',
-    threshold: CARGO_INTAKE_LIFETIME_TWENTY_FIVE_THOUSAND,
+    threshold: CARGO_INTAKE_LIFETIME_SECOND_TIER,
   },
   {
     id: 'cosmetics-cargo-intake-fifty-k',
     category: 'cosmetics',
     icon: '\u{1F465}',
     title: 'MAGENTA MOGUL',
-    subtitle: '50,000 CR lifetime through Cargo Intake',
+    subtitle: '250,000 CR lifetime through Cargo Intake',
     description:
-      'Earn 50,000 CR total selling trade goods through the Cargo Intake tab at Pimp My Shuttle.',
+      'Earn 250,000 CR total selling trade goods through the Cargo Intake tab at Pimp My Shuttle.',
     type: 'PIMP MY SHUTTLE',
     rewardCredits: REWARD_CAPSTONE,
     kind: 'cargo_intake_lifetime_earned',
-    threshold: CARGO_INTAKE_LIFETIME_FIFTY_THOUSAND,
+    threshold: CARGO_INTAKE_LIFETIME_THIRD_TIER,
   },
 ]
 
