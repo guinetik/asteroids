@@ -53,6 +53,14 @@ export type CatState =
   | 'jumpOnTower'
   | 'sitOnTower'
   | 'jumpOffTower'
+  | 'goToChair'
+  | 'jumpOnChair'
+  | 'sitOnChair'
+  | 'jumpOffChair'
+  | 'goToArcade'
+  | 'jumpOnArcade'
+  | 'sitOnArcade'
+  | 'jumpOffArcade'
 
 /**
  * Live read-only handle the {@link CatController} uses to query Sushi's needs and signal
@@ -195,6 +203,30 @@ export interface CatNeedsBridge {
    * Fires once per visit, not per frame.
    */
   onUsedTower?(): void
+  /** Number of approach points available for the optional lounge-chair perch. */
+  getChairSideCount?(): number
+  /**
+   * Write the world-space approach point in front of the lounge chair into `out`.
+   * Sushi walks here before hopping onto the seat cushion.
+   */
+  getChairApproachWorldPosition?(sideIndex: number, out: THREE.Vector3): THREE.Vector3
+  /**
+   * Write the world-space lounge-chair seat sit point into `out`. Sushi leaps here,
+   * faces back into the cabin (matching the chair's open end), and hangs out.
+   */
+  getChairTopWorldPosition?(out: THREE.Vector3): THREE.Vector3
+  /** Number of approach points available for the optional arcade-machine top perch. */
+  getArcadeSideCount?(): number
+  /**
+   * Write the world-space approach point beside the arcade machine into `out`.
+   * Sushi walks here before hopping onto the cabinet top.
+   */
+  getArcadeApproachWorldPosition?(sideIndex: number, out: THREE.Vector3): THREE.Vector3
+  /**
+   * Write the world-space arcade-cabinet top sit point into `out`. Sushi leaps here,
+   * faces back into the cabin, and hangs out above the marquee.
+   */
+  getArcadeTopWorldPosition?(out: THREE.Vector3): THREE.Vector3
   /**
    * Cat just entered the sleeping state. Implementer should swap the live cat for the
    * baked sleeping clone (hide the live group, show the static curled-up mesh inside
@@ -308,6 +340,30 @@ const TOWER_JUMP_CHANCE = 0.4
  */
 const TOWER_SIT_YAW = -Math.PI / 2
 /**
+ * Probability that {@link pickNextRestingState} picks the optional lounge chair
+ * perch when the appliance is installed. Rolled alongside the tower for testing
+ * — see {@link TOWER_JUMP_CHANCE}.
+ */
+const CHAIR_JUMP_CHANCE = 0.4
+/**
+ * Final chair sit yaw (radians). Matches the lounge chair's open-end facing so
+ * Sushi lies along the cushion looking back into the cabin. Authored to track
+ * `LOUNGE_CHAIR_ROTATION_Y - π` in {@link HabitatInteriorScene} — keep both in sync.
+ */
+const CHAIR_SIT_YAW = Math.PI / 5
+/**
+ * Probability that {@link pickNextRestingState} picks the optional arcade-machine
+ * top perch when the appliance is installed. Tuned the same as the other ambient
+ * appliance beats so the cabinet reads as one option among many.
+ */
+const ARCADE_JUMP_CHANCE = 0.4
+/**
+ * Final arcade sit yaw (radians). `π` faces -Z, back into the cabin from the
+ * cockpit-end +Z position, so Sushi looks toward the bed/sofa side from the top
+ * of the cabinet.
+ */
+const ARCADE_SIT_YAW = Math.PI
+/**
  * Seconds the leap-up and leap-down lerps take. Short enough to read as a hop rather
  * than a glide, long enough that the parabolic arc is visible.
  */
@@ -331,6 +387,23 @@ const SIT_ON_TABLE_DURATION_S = 11
  * player paid for a real hangout spot and Sushi treats it like one.
  */
 const SIT_ON_TOWER_DURATION_S = 16
+/**
+ * Seconds Sushi sits on the lounge chair before hopping back to the floor. Paired
+ * with {@link CHAIR_TIRED_RECOVER_PER_SEC} so a full hangout restores ~10 tiredness.
+ */
+const SIT_ON_CHAIR_DURATION_S = 10
+/**
+ * Tiredness recovered per second while Sushi lounges on the chair (negative
+ * delta to {@link CatNeedsBridge.addTired}). At 1/sec across the 10-second
+ * hangout, a full visit shaves 10 points off the tiredness meter — enough to
+ * keep Sushi out of the cat house if he was creeping toward a nap.
+ */
+const CHAIR_TIRED_RECOVER_PER_SEC = 1
+/**
+ * Seconds Sushi sits on top of the arcade cabinet before hopping back down.
+ * Reads as a casual top-of-the-cabinet hangout, similar to the locker beat.
+ */
+const SIT_ON_ARCADE_DURATION_S = 12
 
 /** Authored clip names embedded in `cat.glb`. */
 const CLIP_IDLE = 'Armature|4_Idle_Armature'
@@ -662,6 +735,33 @@ export class CatController {
   private readonly towerJumpEnd = new THREE.Vector3()
   /** Index of the tower approach side currently in use. */
   private towerSideIndex = 0
+  /** World-space start position of the active chair jump (snapped on enter). */
+  private readonly chairJumpStart = new THREE.Vector3()
+  /** World-space end position of the active chair jump (snapped on enter). */
+  private readonly chairJumpEnd = new THREE.Vector3()
+  /** Index of the chair approach side currently in use. */
+  private chairSideIndex = 0
+  /** World-space start position of the active arcade jump (snapped on enter). */
+  private readonly arcadeJumpStart = new THREE.Vector3()
+  /** World-space end position of the active arcade jump (snapped on enter). */
+  private readonly arcadeJumpEnd = new THREE.Vector3()
+  /** Index of the arcade approach side currently in use. */
+  private arcadeSideIndex = 0
+  /**
+   * Identifier of the perch beat Sushi most recently completed (or `null` after a
+   * wander/sit fallback). Used to suppress immediate repeats so he never leaves a
+   * beat and rolls straight back into the same one — unless the beat's probability
+   * is `1.0` (test mode), in which case repeats are allowed by design.
+   */
+  private lastPerchBeat:
+    | 'bed'
+    | 'sideboard'
+    | 'locker'
+    | 'table'
+    | 'tower'
+    | 'chair'
+    | 'arcade'
+    | null = null
 
   private constructor(
     root: THREE.Group,
@@ -834,6 +934,14 @@ export class CatController {
       this.tickGoToTower(dt)
     } else if (this.state === 'jumpOnTower' || this.state === 'jumpOffTower') {
       this.tickPerchJumpLerp(this.towerJumpStart, this.towerJumpEnd, 'sitOnTower')
+    } else if (this.state === 'goToChair') {
+      this.tickGoToChair(dt)
+    } else if (this.state === 'jumpOnChair' || this.state === 'jumpOffChair') {
+      this.tickPerchJumpLerp(this.chairJumpStart, this.chairJumpEnd, 'sitOnChair')
+    } else if (this.state === 'goToArcade') {
+      this.tickGoToArcade(dt)
+    } else if (this.state === 'jumpOnArcade' || this.state === 'jumpOffArcade') {
+      this.tickPerchJumpLerp(this.arcadeJumpStart, this.arcadeJumpEnd, 'sitOnArcade')
     } else if (this.state === 'jumpOnBed' || this.state === 'jumpOffBed') {
       this.tickPerchJumpLerp(this.bedJumpStart, this.bedJumpEnd, 'sitOnBed')
     } else if (this.state === 'jumpOnSideboard' || this.state === 'jumpOffSideboard') {
@@ -868,6 +976,15 @@ export class CatController {
       if (this.stateTimer >= this.stateDuration) {
         this.bridge?.onUsedTower?.()
         this.enterState('jumpOffTower')
+      }
+    } else if (this.state === 'sitOnChair') {
+      this.bridge?.addTired(-CHAIR_TIRED_RECOVER_PER_SEC * dt)
+      if (this.stateTimer >= this.stateDuration) {
+        this.enterState('jumpOffChair')
+      }
+    } else if (this.state === 'sitOnArcade') {
+      if (this.stateTimer >= this.stateDuration) {
+        this.enterState('jumpOffArcade')
       }
     } else if (this.state === 'follow') {
       this.tickFollow(dt)
@@ -929,7 +1046,13 @@ export class CatController {
       this.state !== 'jumpOffTable' &&
       this.state !== 'jumpOnTower' &&
       this.state !== 'sitOnTower' &&
-      this.state !== 'jumpOffTower'
+      this.state !== 'jumpOffTower' &&
+      this.state !== 'jumpOnChair' &&
+      this.state !== 'sitOnChair' &&
+      this.state !== 'jumpOffChair' &&
+      this.state !== 'jumpOnArcade' &&
+      this.state !== 'sitOnArcade' &&
+      this.state !== 'jumpOffArcade'
     ) {
       this.inner.updateMatrixWorld(true)
       this._tmpBox.setFromObject(this.inner)
@@ -1329,6 +1452,42 @@ export class CatController {
   }
 
   /**
+   * Walk Sushi toward the lounge chair approach point. On arrival, switch to the
+   * chair jump so he hops onto the seat cushion.
+   *
+   * @param dt - Delta time in seconds.
+   */
+  private tickGoToChair(dt: number): void {
+    if (!this.bridge?.getChairApproachWorldPosition) {
+      this.pickNextRestingState()
+      return
+    }
+    this.bridge.getChairApproachWorldPosition(this.chairSideIndex, this._bridgeTmp)
+    this.target.set(this._bridgeTmp.x, this.bounds.floorY, this._bridgeTmp.z)
+    if (this.stepTowardTarget(dt)) {
+      this.enterState('jumpOnChair')
+    }
+  }
+
+  /**
+   * Walk Sushi toward the arcade-machine approach point. On arrival, switch to the
+   * arcade jump so he hops onto the cabinet top.
+   *
+   * @param dt - Delta time in seconds.
+   */
+  private tickGoToArcade(dt: number): void {
+    if (!this.bridge?.getArcadeApproachWorldPosition) {
+      this.pickNextRestingState()
+      return
+    }
+    this.bridge.getArcadeApproachWorldPosition(this.arcadeSideIndex, this._bridgeTmp)
+    this.target.set(this._bridgeTmp.x, this.bounds.floorY, this._bridgeTmp.z)
+    if (this.stepTowardTarget(dt)) {
+      this.enterState('jumpOnArcade')
+    }
+  }
+
+  /**
    * Per-frame lerp used by furniture perch jumps. Linearly
    * interpolates X/Z between the given start/end points, and adds a
    * sin-arc on top of the linear Y lerp so the leap reads as a hop. When the timer
@@ -1346,7 +1505,9 @@ export class CatController {
       | 'walkSideboardTop'
       | 'sitOnLocker'
       | 'sitOnTable'
-      | 'sitOnTower',
+      | 'sitOnTower'
+      | 'sitOnChair'
+      | 'sitOnArcade',
   ): void {
     const t = Math.min(1, this.stateTimer / BED_JUMP_DURATION_S)
     this.group.position.x = start.x + (end.x - start.x) * t
@@ -1360,7 +1521,9 @@ export class CatController {
         this.state === 'jumpOnSideboard' ||
         this.state === 'jumpOnLocker' ||
         this.state === 'jumpOnTable' ||
-        this.state === 'jumpOnTower'
+        this.state === 'jumpOnTower' ||
+        this.state === 'jumpOnChair' ||
+        this.state === 'jumpOnArcade'
       ) {
         this.enterState(afterJumpOnState)
       } else {
@@ -1528,13 +1691,22 @@ export class CatController {
       this.state === 'goToTower' ||
       this.state === 'jumpOnTower' ||
       this.state === 'sitOnTower' ||
-      this.state === 'jumpOffTower'
+      this.state === 'jumpOffTower' ||
+      this.state === 'goToChair' ||
+      this.state === 'jumpOnChair' ||
+      this.state === 'sitOnChair' ||
+      this.state === 'jumpOffChair' ||
+      this.state === 'goToArcade' ||
+      this.state === 'jumpOnArcade' ||
+      this.state === 'sitOnArcade' ||
+      this.state === 'jumpOffArcade'
     )
   }
 
   /** After idling/sitting expires, decide whether to sit longer or set a new walk target. */
   private pickNextRestingState(): void {
     if (this.state === 'idle' && Math.random() < SIT_CHANCE) {
+      this.lastPerchBeat = null
       this.enterState('sit')
       return
     }
@@ -1542,6 +1714,11 @@ export class CatController {
     // first with the buffed {@link TOWER_JUMP_CHANCE}. Falling through means the player
     // hasn't bought it yet and Sushi falls back to the ambient furniture beats below.
     if (this.tryStartTowerJump()) return
+    // The lounge chair is also optional — gated on its host bridge wiring being present
+    // (i.e. the appliance is installed). No love reward, just another resting spot.
+    if (this.tryStartChairJump()) return
+    // The arcade machine is the third optional appliance — same gating as the chair.
+    if (this.tryStartArcadeJump()) return
     // Occasionally divert to a "jump on the bed and chill" routine instead of a
     // plain wander walk. Only available when the host wired bed metadata onto the
     // bridge — otherwise `getBedSideCount` is undefined and we fall through.
@@ -1553,6 +1730,9 @@ export class CatController {
     if (this.tryStartLockerJump()) return
     // The shuttle-control table perch is another rare furniture beat in the cockpit.
     if (this.tryStartTableJump()) return
+    // Falling through to a wander walk — clear the perch memo so a single non-perch
+    // beat is enough to re-enable any previously completed perch.
+    this.lastPerchBeat = null
     // Pick a fresh waypoint whose straight-line path doesn't cut through any obstacle.
     const fromX = this.group.position.x
     const fromZ = this.group.position.z
@@ -1576,12 +1756,14 @@ export class CatController {
   private tryStartBedJump(): boolean {
     const bridge = this.bridge
     if (!bridge?.getBedSideCount || !bridge.getBedApproachWorldPosition) return false
+    if (this.lastPerchBeat === 'bed' && BED_JUMP_CHANCE < 1) return false
     const sideCount = bridge.getBedSideCount()
     if (sideCount <= 0) return false
     if (Math.random() >= BED_JUMP_CHANCE) return false
     this.bedSideIndex = Math.floor(Math.random() * sideCount)
     bridge.getBedApproachWorldPosition(this.bedSideIndex, this._bridgeTmp)
     this.target.set(this._bridgeTmp.x, this.bounds.floorY, this._bridgeTmp.z)
+    this.lastPerchBeat = 'bed'
     this.enterState('goToBedSide')
     return true
   }
@@ -1598,12 +1780,14 @@ export class CatController {
     if (!bridge?.getSideboardSideCount || !bridge.getSideboardApproachWorldPosition) {
       return false
     }
+    if (this.lastPerchBeat === 'sideboard' && SIDEBOARD_JUMP_CHANCE < 1) return false
     const sideCount = bridge.getSideboardSideCount()
     if (sideCount <= 0) return false
     if (Math.random() >= SIDEBOARD_JUMP_CHANCE) return false
     this.sideboardSideIndex = Math.floor(Math.random() * sideCount)
     bridge.getSideboardApproachWorldPosition(this.sideboardSideIndex, this._bridgeTmp)
     this.target.set(this._bridgeTmp.x, this.bounds.floorY, this._bridgeTmp.z)
+    this.lastPerchBeat = 'sideboard'
     this.enterState('goToSideboard')
     return true
   }
@@ -1619,12 +1803,14 @@ export class CatController {
     if (!bridge?.getLockerSideCount || !bridge.getLockerApproachWorldPosition) {
       return false
     }
+    if (this.lastPerchBeat === 'locker' && LOCKER_JUMP_CHANCE < 1) return false
     const sideCount = bridge.getLockerSideCount()
     if (sideCount <= 0) return false
     if (Math.random() >= LOCKER_JUMP_CHANCE) return false
     this.lockerSideIndex = Math.floor(Math.random() * sideCount)
     bridge.getLockerApproachWorldPosition(this.lockerSideIndex, this._bridgeTmp)
     this.target.set(this._bridgeTmp.x, this.bounds.floorY, this._bridgeTmp.z)
+    this.lastPerchBeat = 'locker'
     this.enterState('goToLocker')
     return true
   }
@@ -1640,12 +1826,14 @@ export class CatController {
     if (!bridge?.getTableSideCount || !bridge.getTableApproachWorldPosition) {
       return false
     }
+    if (this.lastPerchBeat === 'table' && TABLE_JUMP_CHANCE < 1) return false
     const sideCount = bridge.getTableSideCount()
     if (sideCount <= 0) return false
     if (Math.random() >= TABLE_JUMP_CHANCE) return false
     this.tableSideIndex = Math.floor(Math.random() * sideCount)
     bridge.getTableApproachWorldPosition(this.tableSideIndex, this._bridgeTmp)
     this.target.set(this._bridgeTmp.x, this.bounds.floorY, this._bridgeTmp.z)
+    this.lastPerchBeat = 'table'
     this.enterState('goToTable')
     return true
   }
@@ -1663,13 +1851,63 @@ export class CatController {
     if (!bridge?.getTowerSideCount || !bridge.getTowerApproachWorldPosition) {
       return false
     }
+    if (this.lastPerchBeat === 'tower' && TOWER_JUMP_CHANCE < 1) return false
     const sideCount = bridge.getTowerSideCount()
     if (sideCount <= 0) return false
     if (Math.random() >= TOWER_JUMP_CHANCE) return false
     this.towerSideIndex = Math.floor(Math.random() * sideCount)
     bridge.getTowerApproachWorldPosition(this.towerSideIndex, this._bridgeTmp)
     this.target.set(this._bridgeTmp.x, this.bounds.floorY, this._bridgeTmp.z)
+    this.lastPerchBeat = 'tower'
     this.enterState('goToTower')
+    return true
+  }
+
+  /**
+   * Roll for the optional lounge-chair perch. Only available when the host wires
+   * {@link CatNeedsBridge.getChairSideCount} to a non-zero count (the appliance has
+   * been purchased and loaded). No love reward — this is a pure ambient hangout.
+   *
+   * @returns Whether a chair perch run was started.
+   */
+  private tryStartChairJump(): boolean {
+    const bridge = this.bridge
+    if (!bridge?.getChairSideCount || !bridge.getChairApproachWorldPosition) {
+      return false
+    }
+    if (this.lastPerchBeat === 'chair' && CHAIR_JUMP_CHANCE < 1) return false
+    const sideCount = bridge.getChairSideCount()
+    if (sideCount <= 0) return false
+    if (Math.random() >= CHAIR_JUMP_CHANCE) return false
+    this.chairSideIndex = Math.floor(Math.random() * sideCount)
+    bridge.getChairApproachWorldPosition(this.chairSideIndex, this._bridgeTmp)
+    this.target.set(this._bridgeTmp.x, this.bounds.floorY, this._bridgeTmp.z)
+    this.lastPerchBeat = 'chair'
+    this.enterState('goToChair')
+    return true
+  }
+
+  /**
+   * Roll for the optional arcade-machine top perch. Only available when the host
+   * wires {@link CatNeedsBridge.getArcadeSideCount} to a non-zero count (the
+   * appliance has been purchased and loaded). No love reward.
+   *
+   * @returns Whether an arcade perch run was started.
+   */
+  private tryStartArcadeJump(): boolean {
+    const bridge = this.bridge
+    if (!bridge?.getArcadeSideCount || !bridge.getArcadeApproachWorldPosition) {
+      return false
+    }
+    if (this.lastPerchBeat === 'arcade' && ARCADE_JUMP_CHANCE < 1) return false
+    const sideCount = bridge.getArcadeSideCount()
+    if (sideCount <= 0) return false
+    if (Math.random() >= ARCADE_JUMP_CHANCE) return false
+    this.arcadeSideIndex = Math.floor(Math.random() * sideCount)
+    bridge.getArcadeApproachWorldPosition(this.arcadeSideIndex, this._bridgeTmp)
+    this.target.set(this._bridgeTmp.x, this.bounds.floorY, this._bridgeTmp.z)
+    this.lastPerchBeat = 'arcade'
+    this.enterState('goToArcade')
     return true
   }
 
@@ -1729,6 +1967,12 @@ export class CatController {
     } else if (next === 'sitOnTower') {
       this.group.rotation.y = TOWER_SIT_YAW
       this.stateDuration = SIT_ON_TOWER_DURATION_S
+    } else if (next === 'sitOnChair') {
+      this.group.rotation.y = CHAIR_SIT_YAW
+      this.stateDuration = SIT_ON_CHAIR_DURATION_S
+    } else if (next === 'sitOnArcade') {
+      this.group.rotation.y = ARCADE_SIT_YAW
+      this.stateDuration = SIT_ON_ARCADE_DURATION_S
     } else if (next === 'jumpOnBed') {
       // Capture the lerp endpoints the moment we leap. Start = current world pose
       // (cat just arrived at the approach point), end = mattress-top centre.
@@ -1774,6 +2018,28 @@ export class CatController {
       this.towerJumpEnd.set(this._bridgeTmp.x, this._bridgeTmp.y, this._bridgeTmp.z)
       const jumpDx = this.towerJumpEnd.x - this.towerJumpStart.x
       const jumpDz = this.towerJumpEnd.z - this.towerJumpStart.z
+      if (jumpDx * jumpDx + jumpDz * jumpDz > 1e-6) {
+        this.group.rotation.y = Math.atan2(jumpDx, jumpDz)
+      }
+      this.stateDuration = BED_JUMP_DURATION_S
+    } else if (next === 'jumpOnChair') {
+      this.chairJumpStart.copy(this.group.position)
+      this.chairJumpEnd.copy(this.chairJumpStart)
+      this.bridge?.getChairTopWorldPosition?.(this._bridgeTmp)
+      this.chairJumpEnd.set(this._bridgeTmp.x, this._bridgeTmp.y, this._bridgeTmp.z)
+      const jumpDx = this.chairJumpEnd.x - this.chairJumpStart.x
+      const jumpDz = this.chairJumpEnd.z - this.chairJumpStart.z
+      if (jumpDx * jumpDx + jumpDz * jumpDz > 1e-6) {
+        this.group.rotation.y = Math.atan2(jumpDx, jumpDz)
+      }
+      this.stateDuration = BED_JUMP_DURATION_S
+    } else if (next === 'jumpOnArcade') {
+      this.arcadeJumpStart.copy(this.group.position)
+      this.arcadeJumpEnd.copy(this.arcadeJumpStart)
+      this.bridge?.getArcadeTopWorldPosition?.(this._bridgeTmp)
+      this.arcadeJumpEnd.set(this._bridgeTmp.x, this._bridgeTmp.y, this._bridgeTmp.z)
+      const jumpDx = this.arcadeJumpEnd.x - this.arcadeJumpStart.x
+      const jumpDz = this.arcadeJumpEnd.z - this.arcadeJumpStart.z
       if (jumpDx * jumpDx + jumpDz * jumpDz > 1e-6) {
         this.group.rotation.y = Math.atan2(jumpDx, jumpDz)
       }
@@ -1862,6 +2128,42 @@ export class CatController {
         this.group.rotation.y = Math.atan2(offDx, offDz)
       }
       this.stateDuration = BED_JUMP_DURATION_S
+    } else if (next === 'jumpOffChair') {
+      this.chairJumpStart.copy(this.group.position)
+      if (this.bridge?.getChairApproachWorldPosition) {
+        this.bridge.getChairApproachWorldPosition(this.chairSideIndex, this._bridgeTmp)
+        this.chairJumpEnd.set(this._bridgeTmp.x, this.bounds.floorY, this._bridgeTmp.z)
+      } else {
+        this.chairJumpEnd.set(
+          this.chairJumpStart.x,
+          this.bounds.floorY,
+          this.chairJumpStart.z,
+        )
+      }
+      const offDx = this.chairJumpEnd.x - this.chairJumpStart.x
+      const offDz = this.chairJumpEnd.z - this.chairJumpStart.z
+      if (offDx * offDx + offDz * offDz > 1e-6) {
+        this.group.rotation.y = Math.atan2(offDx, offDz)
+      }
+      this.stateDuration = BED_JUMP_DURATION_S
+    } else if (next === 'jumpOffArcade') {
+      this.arcadeJumpStart.copy(this.group.position)
+      if (this.bridge?.getArcadeApproachWorldPosition) {
+        this.bridge.getArcadeApproachWorldPosition(this.arcadeSideIndex, this._bridgeTmp)
+        this.arcadeJumpEnd.set(this._bridgeTmp.x, this.bounds.floorY, this._bridgeTmp.z)
+      } else {
+        this.arcadeJumpEnd.set(
+          this.arcadeJumpStart.x,
+          this.bounds.floorY,
+          this.arcadeJumpStart.z,
+        )
+      }
+      const offDx = this.arcadeJumpEnd.x - this.arcadeJumpStart.x
+      const offDz = this.arcadeJumpEnd.z - this.arcadeJumpStart.z
+      if (offDx * offDx + offDz * offDz > 1e-6) {
+        this.group.rotation.y = Math.atan2(offDx, offDz)
+      }
+      this.stateDuration = BED_JUMP_DURATION_S
     } else if (next === 'jumpOffSideboard') {
       this.sideboardJumpStart.copy(this.group.position)
       if (this.bridge?.getSideboardApproachWorldPosition) {
@@ -1919,6 +2221,8 @@ export class CatController {
       case 'goToLocker':
       case 'goToTable':
       case 'goToTower':
+      case 'goToChair':
+      case 'goToArcade':
       case 'walkSideboardTop':
       case 'follow':
         return 'walk'
@@ -1932,6 +2236,10 @@ export class CatController {
       case 'jumpOffTable':
       case 'jumpOnTower':
       case 'jumpOffTower':
+      case 'jumpOnChair':
+      case 'jumpOffChair':
+      case 'jumpOnArcade':
+      case 'jumpOffArcade':
         // No jump animation in the rig — keep the idle pose during the brief arc so
         // the body reads as briefly airborne instead of mid-stride.
         return 'idle'
@@ -1942,6 +2250,8 @@ export class CatController {
       case 'sitOnLocker':
       case 'sitOnTable':
       case 'sitOnTower':
+      case 'sitOnChair':
+      case 'sitOnArcade':
         return 'sit'
       case 'chase':
         return 'run'

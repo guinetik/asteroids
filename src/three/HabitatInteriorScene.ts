@@ -132,6 +132,13 @@ const HABITAT_DEFAULT_POINT_LIGHT_COLOR = '#ffeedd'
 const HABITAT_DEFAULT_AMBIENT_COLOR = '#334466'
 /** Default cool exterior rim tint applied through the canopy. */
 const HABITAT_DEFAULT_RIM_COLOR = 0x6688cc
+/**
+ * Gradient stop index for the moon lamp's local point-light tint. Optional —
+ * themes that omit it fall back to {@link HABITAT_DEFAULT_MOON_LAMP_LIGHT_COLOR}.
+ */
+const HABITAT_THEME_MOON_LAMP_STOP_INDEX = 7
+/** Default warm tungsten tint for the moon lamp's local point light. */
+const HABITAT_DEFAULT_MOON_LAMP_LIGHT_COLOR = '#ffe2bd'
 /** Number of star points in the background starfield. */
 const STAR_COUNT = 2000
 /** Radius of the sphere on which stars are placed. */
@@ -288,6 +295,22 @@ const LOUNGE_CHAIR_Z = -7
  * with its back tucked toward the corner walls.
  */
 const LOUNGE_CHAIR_ROTATION_Y = Math.PI / 5 + Math.PI
+/**
+ * Distance (world units) Sushi waits away from the lounge chair before hopping
+ * onto the seat cushion. Tuned so he doesn't clip the armrest on the leap.
+ */
+const LOUNGE_CHAIR_APPROACH_OFFSET = 0.45
+/**
+ * Fraction of the lounge chair's authored height shaved off the perch Y so Sushi
+ * lies on the cushion rather than floating above the seat.
+ */
+const LOUNGE_CHAIR_TOP_HEIGHT_DROP_RATIO = 0.65
+/**
+ * Fraction of the chair's bbox half-extents used to slide the perch toward the
+ * back-corner walls (-X, -Z). Positive values shift Sushi toward the headrest end
+ * of the chaise so he sits leaning against the wall instead of mid-cushion.
+ */
+const LOUNGE_CHAIR_TOP_WALL_NUDGE_FRAC = 0.09
 
 /**
  * World X of the arcade machine, tucked beside the cockpit table on the −X
@@ -302,6 +325,16 @@ const ARCADE_MACHINE_Z = 7.5
  * letting the player walk up to it from the bed/sofa side.
  */
 const ARCADE_MACHINE_ROTATION_Y = -Math.PI / 2
+/**
+ * Distance (world units) Sushi waits beside the arcade cabinet before hopping
+ * onto the top. Uses the +X side as the approach lane (cabin-facing flank).
+ */
+const ARCADE_CAT_APPROACH_OFFSET = 0.4
+/**
+ * Fraction of the arcade cabinet's authored height shaved off the perch Y so
+ * Sushi sits on the visible top instead of clipping into the marquee shell.
+ */
+const ARCADE_CAT_TOP_HEIGHT_DROP_RATIO = 0.06
 
 /**
  * World X of the cat tower, hugging the +X wall just outside the locker so the
@@ -1206,6 +1239,20 @@ export class HabitatInteriorScene {
    * count in that case so the cat falls back to ambient perch beats.
    */
   private readonly towerApproachWorldPositions: THREE.Vector3[] = []
+  /** World-space lounge-chair seat-cushion sit point. Populated after the chair loads. */
+  private readonly chairTopWorldPosition = new THREE.Vector3()
+  /**
+   * Floor approach waypoints that let Sushi hop onto the lounge chair. Empty
+   * until the optional appliance loads; mirrors the tower beat.
+   */
+  private readonly chairApproachWorldPositions: THREE.Vector3[] = []
+  /** World-space arcade-cabinet top sit point. Populated after the arcade loads. */
+  private readonly arcadeTopWorldPosition = new THREE.Vector3()
+  /**
+   * Floor approach waypoints that let Sushi hop onto the arcade cabinet. Empty
+   * until the optional appliance loads; bridge reports zero count otherwise.
+   */
+  private readonly arcadeApproachWorldPositions: THREE.Vector3[] = []
 
   /** Stored world-space position of the cat house, populated by {@link buildCatHouse}. */
   private readonly houseWorldPosition = new THREE.Vector3()
@@ -1383,6 +1430,8 @@ export class HabitatInteriorScene {
 
     const pointLight = stops[HABITAT_THEME_POINT_LIGHT_STOP_INDEX] ?? HABITAT_DEFAULT_POINT_LIGHT_COLOR
     const ambient = stops[HABITAT_THEME_AMBIENT_STOP_INDEX] ?? HABITAT_DEFAULT_AMBIENT_COLOR
+    const moonLampLight =
+      stops[HABITAT_THEME_MOON_LAMP_STOP_INDEX] ?? HABITAT_DEFAULT_MOON_LAMP_LIGHT_COLOR
 
     this.applyHabitatPaintMaterial(this.habitatFloorMaterial, floor, {
       emissiveIntensity: HABITAT_PAINT_FLOOR_EMISSIVE_INTENSITY,
@@ -1406,6 +1455,7 @@ export class HabitatInteriorScene {
     this.habitatPointLight?.color.set(pointLight)
     this.habitatAmbientLight?.color.set(ambient)
     this.habitatRimLight?.color.set(ambient)
+    this.moonLamp.setLightColor(moonLampLight)
   }
 
   /**
@@ -1745,6 +1795,7 @@ export class HabitatInteriorScene {
       this.loungeChair.refreshAabb()
       this.scene.add(this.loungeChair.group)
       this.playerObstacles.push(this.loungeChair.getCollisionAabb().clone())
+      this.computeChairJumpWaypoints()
     } catch (err) {
       console.warn('[HabitatInteriorScene] Lounge chair load failed:', err)
     }
@@ -1765,6 +1816,7 @@ export class HabitatInteriorScene {
       this.arcadeMachine.refreshAabb()
       this.scene.add(this.arcadeMachine.group)
       this.playerObstacles.push(this.arcadeMachine.getCollisionAabb().clone())
+      this.computeArcadeJumpWaypoints()
     } catch (err) {
       console.warn('[HabitatInteriorScene] Arcade machine load failed:', err)
     }
@@ -2270,6 +2322,52 @@ export class HabitatInteriorScene {
   }
 
   /**
+   * Cache lounge-chair approach + seat waypoints for Sushi's optional chair perch.
+   * The chair sits in the −X/−Z corner facing back into the cabin, so the approach
+   * point sits on the cabin-facing +X side of the bbox and the seat point lands
+   * roughly at the cushion height. Only populated when the optional appliance loads
+   * — the bridge reports a zero side count otherwise so the cat skips the beat.
+   */
+  private computeChairJumpWaypoints(): void {
+    const box = this.loungeChair.getCollisionAabb()
+    const cx = (box.min.x + box.max.x) / 2
+    const cz = (box.min.z + box.max.z) / 2
+    const halfWidthX = (box.max.x - box.min.x) / 2
+    const halfDepthZ = (box.max.z - box.min.z) / 2
+    const chairHeight = box.max.y - box.min.y
+    const seatY = box.max.y - chairHeight * LOUNGE_CHAIR_TOP_HEIGHT_DROP_RATIO
+    const perchX = cx + halfWidthX * LOUNGE_CHAIR_TOP_WALL_NUDGE_FRAC
+    const perchZ = cz + halfDepthZ * LOUNGE_CHAIR_TOP_WALL_NUDGE_FRAC
+    this.chairTopWorldPosition.set(perchX, seatY, perchZ)
+    this.chairApproachWorldPositions.length = 0
+    // Approach lines up directly in front of the seat point on the cabin-facing
+    // +X edge, matching the perch Z so Sushi leaps mostly straight up instead of
+    // arcing across the chair from the foot-end corner.
+    this.chairApproachWorldPositions.push(
+      new THREE.Vector3(box.max.x + LOUNGE_CHAIR_APPROACH_OFFSET, FLOOR_Y, perchZ),
+    )
+  }
+
+  /**
+   * Cache arcade-machine approach + top waypoints for Sushi's optional cabinet
+   * perch. The arcade sits at the +Z cockpit end with its screen facing -Z, so
+   * Sushi approaches from the cabin-facing +X flank and the perch sits on the
+   * cabinet top with a small drop ratio to keep him out of the marquee shell.
+   */
+  private computeArcadeJumpWaypoints(): void {
+    const box = this.arcadeMachine.getCollisionAabb()
+    const cx = (box.min.x + box.max.x) / 2
+    const cz = (box.min.z + box.max.z) / 2
+    const arcadeHeight = box.max.y - box.min.y
+    const perchY = box.max.y - arcadeHeight * ARCADE_CAT_TOP_HEIGHT_DROP_RATIO
+    this.arcadeTopWorldPosition.set(cx, perchY, cz)
+    this.arcadeApproachWorldPositions.length = 0
+    this.arcadeApproachWorldPositions.push(
+      new THREE.Vector3(box.max.x + ARCADE_CAT_APPROACH_OFFSET, FLOOR_Y, cz),
+    )
+  }
+
+  /**
    * Toggle the baked sleeping-cat clone parented inside the cat house. The live
    * cat's visibility is owned by {@link CatController}; this method only flips
    * the static asleep visual that lives in scene space.
@@ -2351,6 +2449,22 @@ export class HabitatInteriorScene {
       },
       getTowerTopWorldPosition: (out) => out.copy(this.towerTopWorldPosition),
       onUsedTower: () => callbacks.onUsedTower(),
+      getChairSideCount: () => this.chairApproachWorldPositions.length,
+      getChairApproachWorldPosition: (sideIndex, out) => {
+        const i = Math.max(0, Math.min(this.chairApproachWorldPositions.length - 1, sideIndex))
+        const wp = this.chairApproachWorldPositions[i]
+        if (wp) out.copy(wp)
+        return out
+      },
+      getChairTopWorldPosition: (out) => out.copy(this.chairTopWorldPosition),
+      getArcadeSideCount: () => this.arcadeApproachWorldPositions.length,
+      getArcadeApproachWorldPosition: (sideIndex, out) => {
+        const i = Math.max(0, Math.min(this.arcadeApproachWorldPositions.length - 1, sideIndex))
+        const wp = this.arcadeApproachWorldPositions[i]
+        if (wp) out.copy(wp)
+        return out
+      },
+      getArcadeTopWorldPosition: (out) => out.copy(this.arcadeTopWorldPosition),
       onEatServing: () => callbacks.onEatServing(),
       onPetted: () => callbacks.onPetted(),
       onCaughtLaser: () => callbacks.onCaughtLaser(),
