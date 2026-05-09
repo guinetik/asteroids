@@ -1,0 +1,47 @@
+[
+  {
+    "id": "sgr-a-star",
+    "label": "Sagittarius A*",
+    "ra": "17 45 40.04",
+    "dec": "-29 00 28.1",
+    "fovDeg": 5.0,
+    "survey": "P/Mellinger/color",
+    "blurb": "Galactic center. The supermassive black hole at the heart of the Milky Way. From your bunk, four million suns of mass crammed into a region smaller than Mercury's orbit. The dust hides it; the stars orbit it. You are looking at gravity itself."
+  },
+  {
+    "id": "m31-andromeda",
+    "label": "M31 Andromeda",
+    "ra": "00 42 44.30",
+    "dec": "+41 16 09",
+    "fovDeg": 3.0,
+    "survey": "P/DSS2/color",
+    "blurb": "Andromeda Galaxy. Two and a half million light-years away, and closing. In about four billion years it will collide with the Milky Way and the night sky will, briefly, have two cores. You will not be there. Neither, statistically, will anyone you know."
+  },
+  {
+    "id": "m42-orion-nebula",
+    "label": "M42 Orion Nebula",
+    "ra": "05 35 17.3",
+    "dec": "-05 23 28",
+    "fovDeg": 1.5,
+    "survey": "P/DSS2/color",
+    "blurb": "Orion Nebula. A stellar nursery, the closest one to Earth, twenty-four light-years across and visible to the naked eye. Hot young stars are still igniting in there. The pink is hydrogen being kicked into emission by ultraviolet light. The blue is dust scattering everything else."
+  },
+  {
+    "id": "m51-whirlpool",
+    "label": "M51 Whirlpool",
+    "ra": "13 29 52.7",
+    "dec": "+47 11 43",
+    "fovDeg": 0.2,
+    "survey": "P/SDSS9/color",
+    "blurb": "Whirlpool Galaxy. A grand-design spiral interacting with its smaller companion NGC 5195. The tidal pull is what keeps the spiral arms so cleanly drawn. Twenty-three million light-years away. The light reaching the optic now left when proto-humans were still figuring out fire."
+  },
+  {
+    "id": "m45-pleiades",
+    "label": "Pleiades (M45)",
+    "ra": "03 47 24",
+    "dec": "+24 07 00",
+    "fovDeg": 2.0,
+    "survey": "P/DSS2/color",
+    "blurb": "The Seven Sisters. An open cluster of hot blue stars about 444 light-years away, drifting through a cloud of unrelated dust the cluster happens to be passing through. The reflection nebulae you see are a coincidence of timing. In a hundred million years they will be apart."
+  }
+]
