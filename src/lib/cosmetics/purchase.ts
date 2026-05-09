@@ -6,8 +6,13 @@
  * @spec docs/superpowers/specs/2026-04-30-pimp-my-shuttle-shop-design.md
  */
 
-import type { CosmeticPurchaseResult, PlayerCosmetics, ShuttleTitlePurchaseResult } from './types'
-import type { PlayerProfile } from '@/lib/player/types'
+import type {
+  CosmeticPurchaseResult,
+  HabitatFurnitureApplianceKey,
+  PlayerCosmetics,
+  ShuttleTitlePurchaseResult,
+} from './types'
+import type { PlayerHabitatAppliances, PlayerProfile } from '@/lib/player/types'
 import { findCosmeticOptionById, SHUTTLE_TITLE_SERVICE_OPTION_ID } from './catalog'
 import {
   COSMETIC_CATEGORY_TO_FIELD,
@@ -28,6 +33,37 @@ function withCosmetics(profile: PlayerProfile, cosmetics: PlayerCosmetics): Play
 }
 
 /**
+ * Default habitat-appliance flags used when a legacy profile is missing the
+ * block. Mirrors `createDefaultHabitatAppliances` in `profile.ts` to avoid an
+ * import cycle through the player profile module.
+ */
+function defaultHabitatAppliances(): PlayerHabitatAppliances {
+  return {
+    coffeeMachine: false,
+    recordPlayer: false,
+    refractorTelescope: false,
+    loungeChair: false,
+    arcadeMachine: false,
+    catTower: false,
+  }
+}
+
+/**
+ * Copy the profile with a single habitat-appliance flag flipped to `true`.
+ *
+ * @param profile - Current profile.
+ * @param appliance - Appliance key to enable.
+ */
+function withApplianceUnlocked(
+  profile: PlayerProfile,
+  appliance: HabitatFurnitureApplianceKey,
+): PlayerProfile {
+  const current = profile.habitatAppliances ?? defaultHabitatAppliances()
+  if (current[appliance] === true) return profile
+  return { ...profile, habitatAppliances: { ...current, [appliance]: true } }
+}
+
+/**
  * Apply selection fields for a cosmetic row the player already owns.
  *
  * @param profile - Current profile.
@@ -36,6 +72,10 @@ function withCosmetics(profile: PlayerProfile, cosmetics: PlayerCosmetics): Play
 function applyOptionToProfile(profile: PlayerProfile, optionId: string): PlayerProfile {
   const option = findCosmeticOptionById(optionId)
   if (!option || option.category === 'shuttle-title') return profile
+  if (option.category === 'habitat-furniture') {
+    if (!option.appliance) return profile
+    return withApplianceUnlocked(profile, option.appliance)
+  }
   const cosmetics = getPlayerCosmetics(profile)
   const field = COSMETIC_CATEGORY_TO_FIELD[option.category]
   return withCosmetics(profile, { ...cosmetics, [field]: optionId })
@@ -61,14 +101,21 @@ export function purchaseCosmeticOption(
     }
 
     const cosmetics = getPlayerCosmetics(profile)
-    const activeId = cosmetics[COSMETIC_CATEGORY_TO_FIELD[option.category]]
 
-    if (activeId === optionId) {
-      return { ok: false, profile, reason: 'already-active' }
-    }
-
-    if (playerOwnsCosmeticOption(cosmetics, optionId)) {
-      return { ok: true, profile: applyOptionToProfile(profile, optionId) }
+    // Habitat-furniture has no "active vs inactive" — owning the row IS the
+    // unlock. Reject re-purchase, otherwise fall through to the spend path.
+    if (option.category === 'habitat-furniture') {
+      if (playerOwnsCosmeticOption(cosmetics, optionId)) {
+        return { ok: false, profile, reason: 'already-active' }
+      }
+    } else {
+      const activeId = cosmetics[COSMETIC_CATEGORY_TO_FIELD[option.category]]
+      if (activeId === optionId) {
+        return { ok: false, profile, reason: 'already-active' }
+      }
+      if (playerOwnsCosmeticOption(cosmetics, optionId)) {
+        return { ok: true, profile: applyOptionToProfile(profile, optionId) }
+      }
     }
 
     const wallet = option.price === 0 ? profile : spendCredits(profile, option.price)
@@ -104,6 +151,15 @@ export function applyOwnedCosmetic(
   }
 
   const cosmetics = getPlayerCosmetics(profile)
+
+  // Habitat-furniture has no apply-different-row flow — every owned row stays
+  // unlocked. Surface a soft `already-active` so the UI does nothing.
+  if (option.category === 'habitat-furniture') {
+    if (playerOwnsCosmeticOption(cosmetics, optionId)) {
+      return { ok: false, profile, reason: 'already-active' }
+    }
+    return { ok: false, profile, reason: 'unknown-option' }
+  }
 
   const activeId = cosmetics[COSMETIC_CATEGORY_TO_FIELD[option.category]]
 

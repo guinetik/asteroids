@@ -24,6 +24,24 @@ export type CosmeticCategory =
   | 'lander-thruster-trail'
   | 'multitool-paintjob'
   | 'habitat-interior'
+  | 'habitat-furniture'
+
+/**
+ * Appliance ids that can be unlocked by buying a `habitat-furniture` row.
+ * Each id maps 1:1 to a boolean field on
+ * {@link import('@/lib/player/types').PlayerHabitatAppliances}.
+ */
+export const HABITAT_FURNITURE_APPLIANCE_KEYS = [
+  'coffeeMachine',
+  'recordPlayer',
+  'refractorTelescope',
+  'loungeChair',
+  'arcadeMachine',
+  'catTower',
+] as const
+
+/** Union of legal appliance keys for catalog `habitat-furniture` rows. */
+export type HabitatFurnitureApplianceKey = (typeof HABITAT_FURNITURE_APPLIANCE_KEYS)[number]
 
 /**
  * Per-channel paint finish for a {@link CosmeticOptionData}. Every field is
@@ -116,6 +134,17 @@ export interface CosmeticOptionData {
   readonly gradientStops: readonly string[]
   /** Optional emoji used for curated flag selections. */
   readonly emoji?: string
+  /**
+   * Optional thumbnail URL for catalog rows that prefer an icon instead of a
+   * gradient swatch. Currently consumed by `habitat-furniture` rows.
+   */
+  readonly thumbnailUrl?: string
+  /**
+   * Optional appliance id linked to a habitat-furniture purchase. Buying the row
+   * flips the matching {@link import('@/lib/player/types').PlayerHabitatAppliances}
+   * flag to `true`. Required for `habitat-furniture` rows; ignored elsewhere.
+   */
+  readonly appliance?: HabitatFurnitureApplianceKey
   /**
    * Optional per-channel PBR finish overrides. Currently consumed by the
    * shuttle replace-mode paint pipeline. Other vehicles ignore unknown blocks

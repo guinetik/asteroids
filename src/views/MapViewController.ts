@@ -3301,6 +3301,7 @@ export class MapViewController implements Tickable {
     this.shuttleEffects?.applyShuttleThrusterTrailFromProfile(this.playerProfile)
     this.evaMapMultitoolFacade.applyMultitoolPaintjobFromProfile(this.playerProfile)
     this.habitatFacade.applyHabitatInteriorFromProfile(this.playerProfile)
+    this.habitatFacade.applyHabitatAppliancesFromProfile(this.playerProfile)
     this.persistPlayerProfile()
     this.onCreditsUpdate?.(this.playerProfile.credits)
     this.emitShopState()

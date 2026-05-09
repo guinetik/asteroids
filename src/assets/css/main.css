@@ -3760,20 +3760,32 @@ body,
 }
 
 .cosmetic-shop-body {
-  @apply relative z-[1] flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-4;
+  @apply relative z-[1] flex min-h-0 flex-1 flex-row gap-3 overflow-hidden p-4;
 }
 
 .cosmetic-shop-tabs-rail {
-  @apply shrink-0 rounded-xl border border-slate-800/90 bg-slate-950/80 p-2 shadow-[inset_0_1px_0_rgb(255_255_255/0.08)]
-         backdrop-blur-md;
+  @apply flex shrink-0 basis-1/4 flex-col rounded-xl border border-slate-800/90 bg-slate-950/80
+         p-2 shadow-[inset_0_1px_0_rgb(255_255_255/0.08)] backdrop-blur-md;
+  max-width: 14.5rem;
+  min-width: 11rem;
 }
 
 .cosmetic-shop-tabs {
-  @apply flex flex-wrap gap-1.5;
+  @apply flex flex-1 flex-col gap-3 overflow-y-auto pr-1;
+}
+
+.cosmetic-shop-tab-group {
+  @apply flex flex-col gap-1;
+}
+
+.cosmetic-shop-tab-group__label {
+  @apply mb-1 px-2 font-mono text-[10px] uppercase tracking-[0.18em] text-fuchsia-200/55;
+  border-bottom: 1px solid rgb(232 121 249 / 0.16);
+  padding-bottom: 0.2rem;
 }
 
 .cosmetic-shop-tab {
-  @apply rounded-full border px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.12em]
+  @apply w-full rounded-md border px-3 py-2 text-left font-mono text-[11px] uppercase tracking-[0.12em]
          text-slate-200 shadow-sm transition-[transform,color,background-color,border-color,box-shadow]
          duration-200 ease-out;
   border-color: rgb(255 255 255 / 0.14);
@@ -3845,7 +3857,7 @@ body,
 }
 
 .cosmetic-shop-panel {
-  @apply flex min-h-0 flex-1 flex-col gap-2 overflow-hidden pr-1;
+  @apply flex min-h-0 min-w-0 flex-1 flex-col gap-2 overflow-hidden pr-1;
 }
 
 .cosmetic-shop-panel--category {
@@ -3996,6 +4008,21 @@ body,
     inset 0 -2px 8px rgb(0 0 0 / 0.5),
     0 8px 18px rgb(0 0 0 / 0.28);
   isolation: isolate;
+}
+
+.cosmetic-furniture-thumb {
+  @apply relative overflow-hidden rounded-md border border-white/10;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.12),
+    inset 0 -2px 8px rgb(0 0 0 / 0.5),
+    0 8px 18px rgb(0 0 0 / 0.28);
+  isolation: isolate;
+}
+
+.cosmetic-furniture-thumb__img {
+  @apply absolute inset-0 h-full w-full object-contain;
+  padding: 6px;
+  filter: drop-shadow(0 2px 3px rgb(0 0 0 / 0.45));
 }
 
 .cosmetic-habitat-swatch::after {

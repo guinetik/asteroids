@@ -14,7 +14,9 @@ import type {
   CosmeticRim,
   CosmeticShopCatalog,
   CosmeticShopConfig,
+  HabitatFurnitureApplianceKey,
 } from './types'
+import { HABITAT_FURNITURE_APPLIANCE_KEYS } from './types'
 
 import rawCatalog from '@/data/cosmetics/pimp-my-shuttle.json'
 
@@ -27,6 +29,7 @@ const COSMETIC_CATEGORY_SET: ReadonlySet<string> = new Set<string>([
   'lander-thruster-trail',
   'multitool-paintjob',
   'habitat-interior',
+  'habitat-furniture',
 ])
 
 /** Legal CSS hex color `#rrggbb` (validation is case-insensitive). */
@@ -164,6 +167,34 @@ function parseOption(raw: unknown, ids: Set<string>): CosmeticOptionData {
     throw new Error(`cosmetics catalog: emoji on '${id}' must be a string when set`)
   }
 
+  const thumbnailRaw = row['thumbnailUrl']
+  if (thumbnailRaw !== undefined && (typeof thumbnailRaw !== 'string' || thumbnailRaw.trim() === '')) {
+    throw new Error(`cosmetics catalog: thumbnailUrl on '${id}' must be a non-empty string`)
+  }
+  const thumbnailUrl = thumbnailRaw as string | undefined
+
+  const applianceRaw = row['appliance']
+  let appliance: HabitatFurnitureApplianceKey | undefined
+  if (applianceRaw !== undefined) {
+    if (typeof applianceRaw !== 'string') {
+      throw new Error(`cosmetics catalog: appliance on '${id}' must be a string`)
+    }
+    if (!(HABITAT_FURNITURE_APPLIANCE_KEYS as readonly string[]).includes(applianceRaw)) {
+      throw new Error(
+        `cosmetics catalog: appliance '${applianceRaw}' on '${id}' is not a valid habitat appliance key`,
+      )
+    }
+    appliance = applianceRaw as HabitatFurnitureApplianceKey
+  }
+  if (category === 'habitat-furniture' && appliance === undefined) {
+    throw new Error(`cosmetics catalog: habitat-furniture row '${id}' requires an 'appliance' field`)
+  }
+  if (category !== 'habitat-furniture' && appliance !== undefined) {
+    throw new Error(
+      `cosmetics catalog: 'appliance' on '${id}' is only valid for habitat-furniture rows`,
+    )
+  }
+
   const finish = parseFinishProfile(row['finish'], id)
 
   return {
@@ -174,6 +205,8 @@ function parseOption(raw: unknown, ids: Set<string>): CosmeticOptionData {
     price,
     gradientStops,
     ...(emoji !== undefined ? { emoji } : {}),
+    ...(thumbnailUrl !== undefined ? { thumbnailUrl } : {}),
+    ...(appliance !== undefined ? { appliance } : {}),
     ...(finish !== undefined ? { finish } : {}),
   }
 }

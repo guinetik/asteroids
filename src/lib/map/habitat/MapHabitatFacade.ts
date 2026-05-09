@@ -420,6 +420,17 @@ export class MapHabitatFacade {
     this.scene?.applyHabitatInteriorFromProfile(profile)
   }
 
+  /**
+   * Push the player's habitat-appliance unlock flags into the live scene, when
+   * loaded. Live scene won't hot-reload props purchased mid-session — flags are
+   * read at next scene construction (i.e. next habitat entry from the map).
+   *
+   * @param profile - Active player profile after a habitat-furniture purchase.
+   */
+  applyHabitatAppliancesFromProfile(profile: PlayerProfile): void {
+    this.scene?.setHabitatAppliances(profile.habitatAppliances)
+  }
+
   /** Per-frame transition tick — swaps composer scene + runs the wake-up animation. */
   tickTransition(phase: HabitatPhase, progress: number): void {
     const deps = this.deps

@@ -431,6 +431,66 @@
       ]
     },
     {
+      "id": "habitat-furniture-coffee-machine",
+      "category": "habitat-furniture",
+      "label": "Espresso Bar",
+      "description": "Counter-top espresso machine for the sideboard. Adds a chrome-warm silhouette and the implication of caffeine.",
+      "price": 25000,
+      "gradientStops": ["#3a2418", "#a16240"],
+      "appliance": "coffeeMachine",
+      "thumbnailUrl": "/thumbnails/coffee-machine.webp"
+    },
+    {
+      "id": "habitat-furniture-record-player",
+      "category": "habitat-furniture",
+      "label": "Vinyl Deck",
+      "description": "Belt-drive turntable for the sideboard. Pretends to spin a record between transmissions from Marta.",
+      "price": 25000,
+      "gradientStops": ["#1f1310", "#c97f4a"],
+      "appliance": "recordPlayer",
+      "thumbnailUrl": "/thumbnails/record-player.webp"
+    },
+    {
+      "id": "habitat-furniture-refractor-telescope",
+      "category": "habitat-furniture",
+      "label": "Refractor Telescope",
+      "description": "Free-standing refractor for the −X sun corner. Optical-grade vanity for the asteroid lander who has everything.",
+      "price": 25000,
+      "gradientStops": ["#1c1c24", "#8e94a3"],
+      "appliance": "refractorTelescope",
+      "thumbnailUrl": "/thumbnails/refractor-telescope.webp"
+    },
+    {
+      "id": "habitat-furniture-lounge-chair",
+      "category": "habitat-furniture",
+      "label": "Discovery Lounge Chair",
+      "description": "Single-seat lounge chair for the back-corner reading nook. White cushion, black frame — Kubrick-coded.",
+      "price": 25000,
+      "gradientStops": ["#101012", "#eeeeee"],
+      "appliance": "loungeChair",
+      "thumbnailUrl": "/thumbnails/lounge-chair.webp"
+    },
+    {
+      "id": "habitat-furniture-arcade-machine",
+      "category": "habitat-furniture",
+      "label": "Arcade Cabinet",
+      "description": "Two-player arcade cabinet wedged next to the cockpit table. Marquee glow doubles as ambient cabin light.",
+      "price": 25000,
+      "gradientStops": ["#0b0b18", "#ec4899"],
+      "appliance": "arcadeMachine",
+      "thumbnailUrl": "/thumbnails/arcade-machine.webp"
+    },
+    {
+      "id": "habitat-furniture-cat-tower",
+      "category": "habitat-furniture",
+      "label": "Cat Climbing Tower",
+      "description": "Multi-tier carpeted climbing tower next to Sushi's locker. Gives the cat a reason to walk across the cabin.",
+      "price": 25000,
+      "gradientStops": ["#3a2a1f", "#d6a679"],
+      "appliance": "catTower",
+      "thumbnailUrl": "/thumbnails/cat-tower.webp"
+    },
+    {
       "id": "shuttle-title-registry",
       "category": "shuttle-title",
       "label": "Hull Title Registry",

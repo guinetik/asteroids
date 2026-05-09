@@ -52,32 +52,50 @@ function bindingCodeToLetter(code: string): string {
   return code
 }
 
-const tabOrder = computed(() => {
-  const order = new Map<CosmeticCategory, number>()
-  ;(
-    [
-      'shuttle-paintjob',
-      'lander-paintjob',
-      'multitool-paintjob',
-      'habitat-interior',
-      'shuttle-title',
-      'vehicle-flag',
-      'shuttle-thruster-trail',
-      'lander-thruster-trail',
-    ] as unknown as CosmeticCategory[]
-  ).forEach((id, index) => {
-    order.set(id, index)
-  })
-  const fromCatalog = getCosmeticCategories()
-  const sorted = [...fromCatalog].sort((a, b) => {
-    const ax = order.get(a) ?? 99
-    const bx = order.get(b) ?? 99
-    return ax - bx
-  })
-  return [...sorted, 'premium'] as const
-})
-
 type ShopTabId = CosmeticCategory | 'premium'
+
+/** Visible group of cosmetic categories rendered as a labelled section in the sidebar. */
+interface ShopTabGroup {
+  /** Section label rendered above the group (e.g. `'Paint Jobs'`). */
+  readonly label: string
+  /** Ordered tab ids that belong to this section. */
+  readonly tabs: readonly ShopTabId[]
+}
+
+/**
+ * Sidebar groupings (top → bottom). Tabs missing from the catalog are filtered
+ * out at render time so the sidebar never shows an empty section.
+ */
+const SHOP_TAB_GROUPS: readonly ShopTabGroup[] = [
+  {
+    label: 'Paint Jobs',
+    tabs: ['shuttle-paintjob', 'lander-paintjob', 'multitool-paintjob'],
+  },
+  {
+    label: 'Habitat',
+    tabs: ['habitat-interior', 'habitat-furniture'],
+  },
+  {
+    label: 'Thrusters',
+    tabs: ['shuttle-thruster-trail', 'lander-thruster-trail'],
+  },
+  {
+    label: 'Misc',
+    tabs: ['shuttle-title', 'vehicle-flag'],
+  },
+  {
+    label: 'Trading',
+    tabs: ['premium'],
+  },
+]
+
+const tabGroups = computed(() => {
+  const fromCatalog = new Set(getCosmeticCategories() as readonly string[])
+  return SHOP_TAB_GROUPS.map((group) => ({
+    label: group.label,
+    tabs: group.tabs.filter((tab) => tab === 'premium' || fromCatalog.has(tab)),
+  })).filter((group) => group.tabs.length > 0)
+})
 
 const activeTab = ref<ShopTabId>('shuttle-paintjob')
 
@@ -108,6 +126,7 @@ function tabLabel(tab: ShopTabId): string {
   if (tab === 'lander-thruster-trail') return 'Lander Trails'
   if (tab === 'multitool-paintjob') return 'Multitool'
   if (tab === 'habitat-interior') return 'Habitat Paintjob'
+  if (tab === 'habitat-furniture') return 'Habitat Furniture'
   return tab
 }
 
@@ -119,7 +138,8 @@ const COSMETIC_PANEL_INTROS: Record<
   | 'shuttle-thruster-trail'
   | 'lander-thruster-trail'
   | 'multitool-paintjob'
-  | 'habitat-interior',
+  | 'habitat-interior'
+  | 'habitat-furniture',
   string
 > = {
   'shuttle-paintjob':
@@ -136,6 +156,8 @@ const COSMETIC_PANEL_INTROS: Record<
     'Multitool tinsel stays with you EVA-side. Fleet issue hides coffee stains—garish tinsel broadcasts that you wrench with intent.',
   'habitat-interior':
     'Cabin paint is a one-time vanity bill for the walls you wake up inside. Buy a theme once, then repaint the hatch wall, table wall, floor, and lamp whenever the mood changes.',
+  'habitat-furniture':
+    'Cabin furniture is the credit-sink wing of the shop — every piece is a one-time unlock that bolts permanent decor into your habitat. Buy what your apartment is missing; it stays bought.',
 }
 
 /** Shuttle title tab narration above the rename field. */
@@ -234,7 +256,10 @@ function canAffordPrice(price: number): boolean {
 function primaryActionLabel(
   optionId: string,
   category: CosmeticCategory,
-): 'Active' | 'Apply' | 'Buy' {
+): 'Active' | 'Apply' | 'Buy' | 'Owned' {
+  if (category === 'habitat-furniture') {
+    return playerOwnsCosmeticOption(cosmetics.value, optionId) ? 'Owned' : 'Buy'
+  }
   const activeId = getActiveCosmeticOptionId(cosmetics.value, category)
   if (activeId === optionId) return 'Active'
   if (playerOwnsCosmeticOption(cosmetics.value, optionId)) return 'Apply'
@@ -243,14 +268,14 @@ function primaryActionLabel(
 
 function isPrimaryDisabled(optionId: string, category: CosmeticCategory, price: number): boolean {
   const label = primaryActionLabel(optionId, category)
-  if (label === 'Active') return true
+  if (label === 'Active' || label === 'Owned') return true
   if (label === 'Buy') return !canAffordPrice(price)
   return false
 }
 
 function onPrimary(optionId: string, category: CosmeticCategory): void {
   const label = primaryActionLabel(optionId, category)
-  if (label === 'Active') return
+  if (label === 'Active' || label === 'Owned') return
   uiAudio.notifyConfirm()
   if (label === 'Buy') {
     emit('purchaseOption', optionId)
@@ -341,17 +366,24 @@ function normalizedTitleBlocked(): boolean {
           <div class="cosmetic-shop-body">
             <div class="cosmetic-shop-tabs-rail">
               <div class="cosmetic-shop-tabs" role="tablist">
-                <button
-                  v-for="tab in tabOrder"
-                  :key="'tab-' + tab"
-                  type="button"
-                  role="tab"
-                  class="cosmetic-shop-tab"
-                  :aria-selected="activeTab === tab"
-                  @click="onShopTabClick(tab)"
+                <div
+                  v-for="group in tabGroups"
+                  :key="'group-' + group.label"
+                  class="cosmetic-shop-tab-group"
                 >
-                  {{ tabLabel(tab) }}
-                </button>
+                  <span class="cosmetic-shop-tab-group__label">{{ group.label }}</span>
+                  <button
+                    v-for="tab in group.tabs"
+                    :key="'tab-' + tab"
+                    type="button"
+                    role="tab"
+                    class="cosmetic-shop-tab"
+                    :aria-selected="activeTab === tab"
+                    @click="onShopTabClick(tab)"
+                  >
+                    {{ tabLabel(tab) }}
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -423,7 +455,22 @@ function normalizedTitleBlocked(): boolean {
                       class="cosmetic-option-row"
                     >
                       <div
-                        v-if="activeTab === 'habitat-interior'"
+                        v-if="activeTab === 'habitat-furniture' && option.thumbnailUrl"
+                        class="cosmetic-furniture-thumb cosmetic-option-row__swatch"
+                        :style="{
+                          background: `linear-gradient(135deg, ${option.gradientStops[0] ?? '#1a1a22'}, ${option.gradientStops[1] ?? option.gradientStops[0] ?? '#1a1a22'})`,
+                        }"
+                        aria-hidden="true"
+                      >
+                        <img
+                          class="cosmetic-furniture-thumb__img"
+                          :src="option.thumbnailUrl"
+                          :alt="option.label"
+                          loading="lazy"
+                        />
+                      </div>
+                      <div
+                        v-else-if="activeTab === 'habitat-interior'"
                         class="cosmetic-habitat-swatch cosmetic-option-row__swatch"
                         :style="habitatInteriorSwatchStyle(option.gradientStops)"
                         aria-hidden="true"

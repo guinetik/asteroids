@@ -15,10 +15,14 @@ export const SHUTTLE_TITLE_MAX_VISIBLE_CHARS = 24
 
 /**
  * Cosmetic categories whose active selection persists as a single id field on
- * {@link PlayerCosmetics}. Excludes `'shuttle-title'`, which uses the string field
- * {@link PlayerCosmetics.shuttleTitle}.
+ * {@link PlayerCosmetics}. Excludes `'shuttle-title'` (uses the string field
+ * {@link PlayerCosmetics.shuttleTitle}) and `'habitat-furniture'` (boolean unlock
+ * flags persisted on {@link PlayerProfile.habitatAppliances}).
  */
-export type CosmeticOptionCategory = Exclude<CosmeticCategory, 'shuttle-title'>
+export type CosmeticOptionCategory = Exclude<
+  CosmeticCategory,
+  'shuttle-title' | 'habitat-furniture'
+>
 
 /**
  * Map from selection-bearing category id to its {@link PlayerCosmetics} field name.
@@ -222,7 +226,7 @@ export function getActiveCosmeticOptionId(
   cosmetics: PlayerCosmetics,
   category: CosmeticCategory,
 ): string | undefined {
-  if (category === 'shuttle-title') return undefined
+  if (category === 'shuttle-title' || category === 'habitat-furniture') return undefined
   const field = COSMETIC_CATEGORY_TO_FIELD[category]
   const value = cosmetics[field]
   return typeof value === 'string' ? value : undefined

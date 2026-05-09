@@ -525,6 +525,7 @@ async function main() {
     join(IMAGE_ROOT, 'telescope'),
     join(IMAGE_ROOT, 'portraits'),
     join(IMAGE_ROOT, 'posters'),
+    join(IMAGE_ROOT, 'thumbnails'),
   ]
 
   /** @type {string[]} */
