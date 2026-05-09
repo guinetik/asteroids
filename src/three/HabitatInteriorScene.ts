@@ -176,10 +176,16 @@ const POSTER_WALL_Z_OFFSET = 0.085
 /** Height of the poster wall centre above the hatch centre. */
 const POSTER_WALL_ABOVE_HATCH_Y = 2.06
 /**
- * Horizontal distance from hatch centre for large framed posters on the −Z back cap — Act I
- * journey at −X (port side when facing the hatch) and solar completion (all planets) at +X.
+ * Horizontal distance from hatch centre for the solar completion poster on the −Z back cap at +X
+ * (starboard when facing the hatch).
  */
 const HATCH_WALL_SIDE_LARGE_POSTER_OFFSET_X = 2.18
+/**
+ * Port (−X) horizontal offset for the Act I journey poster on the −Z back cap — slightly larger
+ * than {@link HATCH_WALL_SIDE_LARGE_POSTER_OFFSET_X} so the tall frame clears the scaled solar
+ * grid's port-column bottom row (e.g. Jupiter) without overlapping.
+ */
+const HATCH_WALL_PORT_ACT1_JOURNEY_POSTER_OFFSET_X = 2.62
 /** Y offset for large hatch-wall frames relative to the hatch centre (Act I + solar completion). */
 const COMPLETION_POSTER_ABOVE_HATCH_Y = 0.55
 /** Back-cap offset that keeps large hatch-wall frames in front of the cap. */
@@ -1732,7 +1738,7 @@ export class HabitatInteriorScene {
     const capZ = -CYLINDER_LENGTH / 2
     const z = capZ + COMPLETION_POSTER_Z_OFFSET
 
-    this.journeyAct1Wall.group.position.set(-HATCH_WALL_SIDE_LARGE_POSTER_OFFSET_X, y, z)
+    this.journeyAct1Wall.group.position.set(-HATCH_WALL_PORT_ACT1_JOURNEY_POSTER_OFFSET_X, y, z)
     this.journeyAct1Wall.group.rotation.set(0, 0, 0)
 
     this.scene.add(this.journeyAct1Wall.group)
