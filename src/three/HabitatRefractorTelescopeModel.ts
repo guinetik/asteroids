@@ -43,7 +43,10 @@ export class HabitatRefractorTelescopeModel {
   /** Cached world-space bbox used for player obstacle collision. */
   private readonly worldAabb = new THREE.Box3()
 
-  /** Guards against repeated load() calls. */
+  /** Guards against repeated load() calls. Set as soon as load() is invoked. */
+  private loadStarted = false
+
+  /** True once the GLB has resolved and been mounted into {@link group}. */
   private loaded = false
 
   /** Build an empty wrapper. Call {@link load} before adding {@link group} to the scene. */
@@ -57,8 +60,8 @@ export class HabitatRefractorTelescopeModel {
    * {@link REFRACTOR_TELESCOPE_TARGET_LONGEST_DIMENSION}. Idempotent.
    */
   async load(): Promise<void> {
-    if (this.loaded) return
-    this.loaded = true
+    if (this.loadStarted) return
+    this.loadStarted = true
 
     const inner = await loadGLB(REFRACTOR_TELESCOPE_MODEL_URL)
     this.tameMaterials(inner)
@@ -79,6 +82,17 @@ export class HabitatRefractorTelescopeModel {
 
     this.group.add(inner)
     this.inner = inner
+    this.loaded = true
+  }
+
+  /**
+   * Whether {@link load} has finished and the GLB is present in the scene
+   * graph. Used by the host scene to gate the telescope's `F  Observe`
+   * prompt — the model is only constructed when the cosmetic is owned, so
+   * `isLoaded() === true` doubles as the ownership signal.
+   */
+  isLoaded(): boolean {
+    return this.loaded
   }
 
   /**
@@ -111,6 +125,7 @@ export class HabitatRefractorTelescopeModel {
     })
     this.group.remove(this.inner)
     this.inner = null
+    this.loaded = false
   }
 
   /**

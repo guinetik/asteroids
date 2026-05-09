@@ -284,6 +284,14 @@ const REFRACTOR_TELESCOPE_Z = 0.0
 const REFRACTOR_TELESCOPE_ROTATION_Y = Math.PI / 2
 
 /**
+ * XZ distance from the player at which the `F  Observe` prompt appears
+ * next to the refractor telescope. Tuned to match the cat-perch / litterbox
+ * prompt feel — the player must be standing right at the lens, not just
+ * walking past.
+ */
+const OBSERVE_PROMPT_RADIUS = 1.4
+
+/**
  * World X of the lounge chair, tucked into the −X (telescope-side) wall in the
  * back-left corner of the cabin so it doesn't crowd the centre walking path.
  */
@@ -3552,6 +3560,20 @@ export class HabitatInteriorScene {
       }
       this.onPrompt?.('Litterbox Clean')
       return
+    }
+
+    // --- Refractor telescope (Observe) -----------------------------------
+    if (this.refractorTelescope.isLoaded()) {
+      const tx = this.player.position.x - REFRACTOR_TELESCOPE_X
+      const tz = this.player.position.z - REFRACTOR_TELESCOPE_Z
+      const telescopeDist = Math.hypot(tx, tz)
+      if (telescopeDist < OBSERVE_PROMPT_RADIUS && !tableInRange) {
+        this.onPrompt?.('F  Observe')
+        if (this.inputManager.wasActionPressed('interact')) {
+          this.onInteract?.('observatory')
+        }
+        return
+      }
     }
 
     // --- Table -------------------------------------------------------------
