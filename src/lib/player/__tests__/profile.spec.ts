@@ -78,6 +78,7 @@ describe('createProfile', () => {
       lifetimeCreditsEarned: 0,
       lifetimeCreditsSpent: 0,
       lifetimeTradeCreditsEarned: 0,
+      lifetimeCargoIntakeCreditsEarned: 0,
       missionObjectivesCompletedByType: {},
       runtimeTipsShownCount: {},
       slingshotLaunches: 0,

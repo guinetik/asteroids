@@ -7,6 +7,7 @@
  */
 import type { UpgradeId, UpgradeLevels } from '@/lib/upgrades'
 import type { BodyAccessState, PlayerProfile } from '@/lib/player/types'
+import type { CosmeticCategory } from '@/lib/cosmetics/types'
 import { PLANETS } from '@/lib/planets/catalog'
 import {
   ACT_1_JOURNEY_ID,
@@ -26,6 +27,7 @@ export type AchievementCategory =
   | 'contracts'
   | 'upgrades'
   | 'cat'
+  | 'cosmetics'
 
 /** Rule discriminator used by the achievement evaluator. */
 export type AchievementKind =
@@ -56,6 +58,9 @@ export type AchievementKind =
   | 'body_access_state'
   | 'sushi_pets'
   | 'sushi_bowl_refills'
+  | 'cosmetic_paid_owned_count'
+  | 'cosmetic_full_collection'
+  | 'cargo_intake_lifetime_earned'
 
 /** Static row from `ACHIEVEMENT_DEFINITIONS` — copy, rule kind, and optional thresholds. */
 export interface AchievementDefinition {
@@ -107,6 +112,8 @@ export interface AchievementDefinition {
   bodyId?: string
   /** Required access state for `body_access_state` achievements. */
   bodyAccessState?: BodyAccessState
+  /** Cosmetic shop category for `cosmetic_paid_owned_count` / `cosmetic_full_collection`. */
+  cosmeticCategory?: CosmeticCategory
 }
 
 /** Snapshot of profile + upgrades passed into unlock evaluation. */
@@ -183,6 +190,14 @@ const REWARD_SPECIAL_UPGRADE = 1_200
 const REWARD_CAPSTONE = 1_500
 /** Reward for generated planet orbit achievements. */
 const REWARD_PLANET_ORBIT = 220
+/** Lifetime Cargo Intake (Fantasia premium tab) credit totals for economy trophies. */
+const CARGO_INTAKE_LIFETIME_TWO_THOUSAND = 2_000
+/** Lifetime Cargo Intake credit total for the mid intake trophy. */
+const CARGO_INTAKE_LIFETIME_TWENTY_FIVE_THOUSAND = 25_000
+/** Lifetime Cargo Intake credit total for the capstone intake trophy. */
+const CARGO_INTAKE_LIFETIME_FIFTY_THOUSAND = 50_000
+/** Reward for filling every slot in one cosmetic category. */
+const REWARD_COSMETIC_COMPLETE = 2_500
 /** Pet threshold for the "Beloved" Sushi achievement. */
 const SUSHI_PET_THRESHOLD = 25
 /** Empty-bowl refill threshold for the "Bowl-Filler" Sushi achievement. */
@@ -1114,6 +1129,170 @@ export const ACHIEVEMENT_DEFINITIONS: readonly AchievementDefinition[] = [
     kind: 'upgrade_tiers',
     threshold: TWENTY_COUNT,
   },
+  {
+    id: 'cosmetics-shuttle-paint-first-paid',
+    category: 'cosmetics',
+    icon: '\u{1F68F}',
+    title: 'FIRST BRUSHSTROKE',
+    subtitle: 'Shuttle paint · paid for color that fights the void',
+    description: "Buy your first premium shuttle paintjob at Pimp My Shuttle.",
+    type: 'PIMP MY SHUTTLE',
+    rewardCredits: REWARD_STARTER,
+    kind: 'cosmetic_paid_owned_count',
+    cosmeticCategory: 'shuttle-paintjob',
+    threshold: FIRST_COUNT,
+  },
+  {
+    id: 'cosmetics-shuttle-paint-complete',
+    category: 'cosmetics',
+    icon: '\u{2728}',
+    title: 'SHUTTLE SHOWROOM',
+    subtitle: 'Every shuttle livery in the catalog — yours',
+    description: 'Own every shuttle paintjob listed at Pimp My Shuttle.',
+    type: 'PIMP MY SHUTTLE',
+    rewardCredits: REWARD_COSMETIC_COMPLETE,
+    kind: 'cosmetic_full_collection',
+    cosmeticCategory: 'shuttle-paintjob',
+  },
+  {
+    id: 'cosmetics-lander-paint-first-paid',
+    category: 'cosmetics',
+    icon: '\u{1F6F8}',
+    title: 'DESCENT DRIP',
+    subtitle: 'Lander paint · first paid coat on the workhorse',
+    description: 'Buy your first premium lander paintjob at Pimp My Shuttle.',
+    type: 'PIMP MY SHUTTLE',
+    rewardCredits: REWARD_STARTER,
+    kind: 'cosmetic_paid_owned_count',
+    cosmeticCategory: 'lander-paintjob',
+    threshold: FIRST_COUNT,
+  },
+  {
+    id: 'cosmetics-lander-paint-complete',
+    category: 'cosmetics',
+    icon: '\u{1F3A8}',
+    title: 'FULL DESCENT PALETTE',
+    subtitle: 'Every lander scheme unlocked',
+    description: 'Own every lander paintjob listed at Pimp My Shuttle.',
+    type: 'PIMP MY SHUTTLE',
+    rewardCredits: REWARD_COSMETIC_COMPLETE,
+    kind: 'cosmetic_full_collection',
+    cosmeticCategory: 'lander-paintjob',
+  },
+  {
+    id: 'cosmetics-multitool-paint-first-paid',
+    category: 'cosmetics',
+    icon: '\u{1F52B}',
+    title: 'SIDEARM RUNWAY',
+    subtitle: 'Multitool paint · first premium finish on the gun',
+    description: 'Buy your first premium multitool paintjob at Pimp My Shuttle.',
+    type: 'PIMP MY SHUTTLE',
+    rewardCredits: REWARD_STARTER,
+    kind: 'cosmetic_paid_owned_count',
+    cosmeticCategory: 'multitool-paintjob',
+    threshold: FIRST_COUNT,
+  },
+  {
+    id: 'cosmetics-multitool-paint-complete',
+    category: 'cosmetics',
+    icon: '\u{1F3AF}',
+    title: 'ARMORY CHROME SET',
+    subtitle: 'Every multitool finish stocked',
+    description: 'Own every multitool paintjob listed at Pimp My Shuttle.',
+    type: 'PIMP MY SHUTTLE',
+    rewardCredits: REWARD_COSMETIC_COMPLETE,
+    kind: 'cosmetic_full_collection',
+    cosmeticCategory: 'multitool-paintjob',
+  },
+  {
+    id: 'cosmetics-shuttle-trail-first-paid',
+    category: 'cosmetics',
+    icon: '\u{2604}\u{FE0F}',
+    title: 'FIRST CONTRAIL',
+    subtitle: 'Shuttle thruster trail · paid accent in the burn',
+    description: 'Buy your first premium shuttle thruster trail at Pimp My Shuttle.',
+    type: 'PIMP MY SHUTTLE',
+    rewardCredits: REWARD_STARTER,
+    kind: 'cosmetic_paid_owned_count',
+    cosmeticCategory: 'shuttle-thruster-trail',
+    threshold: FIRST_COUNT,
+  },
+  {
+    id: 'cosmetics-shuttle-trail-complete',
+    category: 'cosmetics',
+    icon: '\u{1F4A5}',
+    title: 'ION RAINBOW',
+    subtitle: 'Every shuttle plume style owned',
+    description: 'Own every shuttle thruster trail listed at Pimp My Shuttle.',
+    type: 'PIMP MY SHUTTLE',
+    rewardCredits: REWARD_COSMETIC_COMPLETE,
+    kind: 'cosmetic_full_collection',
+    cosmeticCategory: 'shuttle-thruster-trail',
+  },
+  {
+    id: 'cosmetics-lander-trail-first-paid',
+    category: 'cosmetics',
+    icon: '\u{1F319}',
+    title: 'PLUME UPGRADE',
+    subtitle: 'Lander thruster trail · first paid streak',
+    description: 'Buy your first premium lander thruster trail at Pimp My Shuttle.',
+    type: 'PIMP MY SHUTTLE',
+    rewardCredits: REWARD_STARTER,
+    kind: 'cosmetic_paid_owned_count',
+    cosmeticCategory: 'lander-thruster-trail',
+    threshold: FIRST_COUNT,
+  },
+  {
+    id: 'cosmetics-lander-trail-complete',
+    category: 'cosmetics',
+    icon: '\u{2B50}',
+    title: 'FULL PLUME LIBRARY',
+    subtitle: 'Every lander trail unlocked',
+    description: 'Own every lander thruster trail listed at Pimp My Shuttle.',
+    type: 'PIMP MY SHUTTLE',
+    rewardCredits: REWARD_COSMETIC_COMPLETE,
+    kind: 'cosmetic_full_collection',
+    cosmeticCategory: 'lander-thruster-trail',
+  },
+  {
+    id: 'cosmetics-cargo-intake-two-thousand',
+    category: 'cosmetics',
+    icon: '\u{1F4B0}',
+    title: 'FANTASIA TIPS',
+    subtitle: '2,000 CR lifetime through Cargo Intake',
+    description:
+      'Earn 2,000 CR total selling trade goods through the Cargo Intake tab at Pimp My Shuttle.',
+    type: 'PIMP MY SHUTTLE',
+    rewardCredits: REWARD_STANDARD,
+    kind: 'cargo_intake_lifetime_earned',
+    threshold: CARGO_INTAKE_LIFETIME_TWO_THOUSAND,
+  },
+  {
+    id: 'cosmetics-cargo-intake-twenty-five-k',
+    category: 'cosmetics',
+    icon: '\u{1F4C8}',
+    title: 'PREMIUM CLEARANCE',
+    subtitle: '25,000 CR lifetime through Cargo Intake',
+    description:
+      'Earn 25,000 CR total selling trade goods through the Cargo Intake tab at Pimp My Shuttle.',
+    type: 'PIMP MY SHUTTLE',
+    rewardCredits: REWARD_MAJOR,
+    kind: 'cargo_intake_lifetime_earned',
+    threshold: CARGO_INTAKE_LIFETIME_TWENTY_FIVE_THOUSAND,
+  },
+  {
+    id: 'cosmetics-cargo-intake-fifty-k',
+    category: 'cosmetics',
+    icon: '\u{1F465}',
+    title: 'MAGENTA MOGUL',
+    subtitle: '50,000 CR lifetime through Cargo Intake',
+    description:
+      'Earn 50,000 CR total selling trade goods through the Cargo Intake tab at Pimp My Shuttle.',
+    type: 'PIMP MY SHUTTLE',
+    rewardCredits: REWARD_CAPSTONE,
+    kind: 'cargo_intake_lifetime_earned',
+    threshold: CARGO_INTAKE_LIFETIME_FIFTY_THOUSAND,
+  },
 ]
 
 /**
@@ -1173,6 +1352,10 @@ function getAchievementDefinitionError(definition: AchievementDefinition): strin
     case 'worldline_single_run_distance':
     case 'sushi_pets':
     case 'sushi_bowl_refills':
+    case 'cargo_intake_lifetime_earned':
+      return hasPositiveThreshold(definition) ? null : 'missing positive threshold'
+    case 'cosmetic_paid_owned_count':
+      if (!definition.cosmeticCategory) return 'missing cosmeticCategory'
       return hasPositiveThreshold(definition) ? null : 'missing positive threshold'
     case 'specific_upgrade':
       return definition.upgradeId ? null : 'missing upgradeId'
@@ -1199,6 +1382,8 @@ function getAchievementDefinitionError(definition: AchievementDefinition): strin
     case 'body_access_state':
       if (!hasNonEmptyString(definition.bodyId)) return 'missing bodyId'
       return definition.bodyAccessState ? null : 'missing bodyAccessState'
+    case 'cosmetic_full_collection':
+      return definition.cosmeticCategory ? null : 'missing cosmeticCategory'
   }
 }
 
@@ -1224,4 +1409,5 @@ export const ACHIEVEMENT_CATEGORY_LABELS: Record<AchievementCategory, string> = 
   contracts: 'Contracts',
   upgrades: 'Engineering',
   cat: 'Habitat Cat',
+  cosmetics: 'Pimp My Shuttle',
 }

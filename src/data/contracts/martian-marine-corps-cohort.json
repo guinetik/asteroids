@@ -14,10 +14,10 @@
     "Pilot. Sampaio. Phobos desk, Engineering & Mining.",
     "Cowboys handler vouched. Recorded. Mars line logged. Enough to open the door — not enough to hand you keys.",
     "Contract terms follow:",
-    "1. Mount is first. No turret, no Corps board access. Engineering bay on Mars — B at the terminal.",
-    "2. You work our giver lines, not tourist runs. MMC board only.",
-    "3. Stack builds in order. Each op unlocks the next. Do not skip the sequence.",
-    "4. Finish clean: double pay on Mars-issued work, manifold certification filed. Map opens Phobos fast travel — M to navigate.",
+    "1. Turret mount first. No mount, no Corps board access. Engineering bay at the Mars spaceport — U at the terminal.",
+    "2. You work our giver line, not tourist runs. MMC board, posted on Mars only.",
+    "3. Stack builds in order. Five hardware boxes, each followed by a field proof. Do not skip the sequence.",
+    "4. Finish clean: double pay on every Mars-issued contract you take after, plus manifold certification — your shuttle locks to the posted orbital corridors instead of guessing the line.",
     "Tap Accept or Decline. No follow-up from me either way.",
     "— Sampaio, MMC"
   ],
@@ -27,9 +27,9 @@
       "upgradeId": "turretMiningUnlock",
       "minLevel": 1,
       "creditsReward": 1000,
-      "subject": "OP 1 — TURRET MOUNT, ENGINEERING CERT",
+      "subject": "OP 1 — INSTALL TURRET MOUNT",
       "flavor": [
-        "Pilot. Turret mount before anything else. Engineering bay, Mars spaceport — B at the terminal. No mount, no Corps board access. File already shows green? Good. We keep moving."
+        "Pilot. Hardware first. Dock at the Mars spaceport, terminal, U for the engineering bay. Buy the turret mount. Mining beam rides on the shuttle hull — fired from orbit, not the surface. No mount, no MMC board access. File already green from the Cowboys end? Good. We keep moving."
       ]
     },
     {
@@ -38,9 +38,9 @@
       "missionType": "mining",
       "giverId": "martian-marines",
       "creditsReward": 4000,
-      "subject": "OP 2 — TURRET LIVE, MMC BOARD",
+      "subject": "OP 2 — FIRST MMC MINING RUN",
       "flavor": [
-        "Mount is live. Now use it. Pull one mining run off the MMC board — giver line reads Martian Marine Corps. Not a tourist run. Come back with a clean receipt."
+        "Mount is live. Now use it. Mars mission board, MMC giver line — pull one mining contract. Burn to the rock, hold orbit, fire the beam, fill the hold from up there. Lander stays docked on this kind of work. Clean close. Receipt on file."
       ]
     },
     {
@@ -48,9 +48,9 @@
       "upgradeId": "shuttleCargoBay",
       "minLevel": 3,
       "creditsReward": 1000,
-      "subject": "OP 3 — CARGO BAY, TIER III",
+      "subject": "OP 3 — CARGO BAY UPGRADE, TIER III",
       "flavor": [
-        "Drill-grade work needs drill-grade capacity. Cargo bay to tier three. No room in the hold, no room in the cohort."
+        "Drill-grade work needs drill-grade capacity. Engineering bay, U at the terminal. Cargo bay to tier three — bigger hold, more ore per closeout, fewer return trips. No room in the hold, no room in the cohort."
       ]
     },
     {
@@ -59,9 +59,9 @@
       "missionType": "mining",
       "giverPlanetId": "mars",
       "creditsReward": 4000,
-      "subject": "OP 4 — CARGO PROOF, MARS RUN",
+      "subject": "OP 4 — CARGO PROOF, MARS MINING RUN",
       "flavor": [
-        "Bigger hold means nothing without a receipt. One Mars-posted mining mission. Full load. Clean close."
+        "Bigger hold means nothing without a receipt. One mining contract off the Mars board — any giver. Top the hold off before you break orbit. Partial loads do not file. Clean close."
       ]
     },
     {
@@ -69,9 +69,9 @@
       "upgradeId": "turretMiningYield",
       "minLevel": 3,
       "creditsReward": 1000,
-      "subject": "OP 5 — FOCUS ARRAY, TIER III",
+      "subject": "OP 5 — FOCUS ARRAY UPGRADE, TIER III",
       "flavor": [
-        "Focus array to tier three. Beam goes where you put it. Belt debris is not a suggestion. Install and prove it."
+        "Engineering bay, U at the terminal. Focus array to tier three. Beam goes where you put it — tighter cone, more yield per shot, less spray on the rock. Belt debris is not a suggestion. Install and prove it."
       ]
     },
     {
@@ -82,7 +82,7 @@
       "creditsReward": 4000,
       "subject": "OP 6 — FOCUS ARRAY, FIELD PROOF",
       "flavor": [
-        "Array is installed. Now earn it. One clean Mars mining closeout with the tuned beam. Hardware is nothing without receipts."
+        "Array is installed. Now earn it. One mining contract off the Mars board, run with the tuned beam. Tight grouping, full hold, clean closeout. Hardware is nothing without receipts."
       ]
     },
     {
@@ -90,9 +90,9 @@
       "upgradeId": "turretMiningCharge",
       "minLevel": 3,
       "creditsReward": 1000,
-      "subject": "OP 7 — COOLING LOOP, TIER III",
+      "subject": "OP 7 — COOLING LOOP UPGRADE, TIER III",
       "flavor": [
-        "Cooling to tier three. Cook your emitter in a hot zone, you are a beacon for every pirate board from here to Kuiper. Install. Test. Fly."
+        "Engineering bay, U. Cooling loop to tier three. Beam stays on the rock longer between heat-outs — uninterrupted fire is the difference between a full hold and a half closeout. Cook your emitter in a hot zone, you are a beacon for every pirate board from here to Kuiper. Install. Test. Fly."
       ]
     },
     {
@@ -103,7 +103,7 @@
       "creditsReward": 4000,
       "subject": "OP 8 — COOLING LOOP, FIELD PROOF",
       "flavor": [
-        "Emitter stays cold under load or it does not count. One Mars mining run. Come back intact."
+        "Emitter stays cold under load or it does not count. One mining contract off the Mars board, sustained beam. Come back intact and with a full hold."
       ]
     },
     {
@@ -111,9 +111,9 @@
       "upgradeId": "turretMiningEfficiency",
       "minLevel": 3,
       "creditsReward": 1000,
-      "subject": "OP 9 — POWER REGULATOR, TIER III",
+      "subject": "OP 9 — POWER REGULATOR UPGRADE, TIER III",
       "flavor": [
-        "Regulator to tier three. Discipline in the bus, discipline in the tank. Last hardware box. Do not get clever."
+        "Engineering bay, U. Power regulator to tier three. Less fuel burned per beam-second, longer trigger pulls between recharges. Discipline in the bus, discipline in the tank. Last hardware box. Do not get clever."
       ]
     },
     {
@@ -124,14 +124,15 @@
       "creditsReward": 4000,
       "subject": "OP 10 — MANIFOLD QUALIFICATION RUN",
       "flavor": [
-        "Final evolution. Full stack. One Mars mining mission, clean close. Deliver and I sign the cohort file. Deploy the lander with F if the target needs surface work."
+        "Final evolution. Full stack — tuned beam, big hold, cold emitter, regulator under control. One mining contract off the Mars board, run from orbit, deliver to the Mars bay. Deploy lander with F only if the target site demands surface work. Clean close, full hold, hull intact. I sign the cohort file when the receipt lands."
       ]
     }
   ],
   "completionSubject": "COHORT FILED — MANIFOLD CERT ISSUED",
   "completionBody": [
     "Pilot. Good work. Cohort is yours.",
-    "MMC ledger shows you cleared every op in sequence. Double pay on Mars-issued work is live. Manifold certification filed — ride the posted corridors, do not guess the line. Phobos is on your map now.",
+    "MMC ledger shows you cleared every op in sequence. Double pay on Mars-issued contracts is live — every Mars-board ticket pays out at twice the listed rate from here on.",
+    "Manifold certification filed. Open the map with M and the posted orbital corridors render along each planet's lane — your shuttle locks to them on approach instead of guessing the line. Faster transfers, lower fuel cost, fewer surprises.",
     "You are a contractor the Corps can use. Keep the hull in one piece.",
     "— Sampaio, MMC"
   ],

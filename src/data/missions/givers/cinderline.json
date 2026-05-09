@@ -8,8 +8,8 @@
   "missions": [
     {
       "id": "cinderline_anvil_substation",
-      "name": "The room has gone quiet",
-      "briefing": "Pilot, an Anvil substation has gone quiet. The wakeful are inside. We do not abandon a sealed room. Take the descent. Walk the work. Return when the room is ours again. A seat will be kept.",
+      "name": "Anvil Substation — Bunker Reclaim",
+      "briefing": "Pilot, an Anvil substation has gone quiet. The wakeful are inside. We do not abandon a sealed room. Drop the lander with F, walk the descent on foot, clear each chamber of the wakeful, and return to the surface when the room is ours again. Take only what is yours. A seat will be kept.",
       "objectiveSlots": [
         {
           "type": "bunker",
@@ -28,8 +28,8 @@
     },
     {
       "id": "cinderline_first_listening",
-      "name": "The body has not yet spoken",
-      "briefing": "Pilot, the body has been listened to before, from a distance. It is time to listen again. Set the pulse into the regolith and gather what reply the body chooses to give. Hold your vigil until the answer is complete. A seat will be kept.",
+      "name": "First Listening — DAN Vigil",
+      "briefing": "Pilot, the body has been listened to before, from a distance. It is time to listen again. Drop the lander with F, set the DAN pulse into the regolith on the surface, and hold the vigil — the body answers in particles, and the count is what we record. The wakeful may stir during the listening; meet them with restraint. A seat will be kept.",
       "objectiveSlots": [
         {
           "type": "dan",
@@ -50,8 +50,8 @@
     },
     {
       "id": "cinderline_stone_reply",
-      "name": "The stone will answer",
-      "briefing": "Pilot, the body will answer in stone before it answers in fire. Set the light into several rocks. Bring the terminal what they say. When it names the piece it needs, cut that piece free. A seat will be kept.",
+      "name": "The Body Answers in Stone — Mineral Analysis",
+      "briefing": "Pilot, the body answers in stone before it answers in fire. Drop the lander with F. Tag rocks with the SCI gun on the surface, return to the field terminal — the terminal will name the piece worth bringing home. Cut that piece free, no other. A seat will be kept.",
       "objectiveSlots": [
         {
           "type": "mineral-analysis",
@@ -74,8 +74,8 @@
     },
     {
       "id": "cinderline_vigil_threshold",
-      "name": "Vigil — the body is close to waking",
-      "briefing": "Pilot, this body is close to waking without our call. We do not require speed. We require attention. What replies will reply. Meet it with restraint, and withdraw cleanly when the listening is done. Walk in the light.",
+      "name": "Threshold Vigil — DAN at the Edge",
+      "briefing": "Pilot, this body is close to waking without our call. We do not require speed. We require attention. Drop the lander with F, set the DAN pulse, hold the vigil to its end. What replies will reply. Withdraw cleanly when the listening is done. Walk in the light.",
       "objectiveSlots": [
         {
           "type": "dan",

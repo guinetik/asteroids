@@ -8,13 +8,13 @@
   "introSubject": "Contract — The Trade Loop",
   "introBody": [
     "Lucas Maverick. Owner, Venusian Zeppelin Exchange. You found us — or the floor found you. Either way, sit down.",
-    "The Exchange is the only real multi-vendor market in the inner system. Everybody else is a kiosk. We are the table. And the table rewards pilots who know how supply and demand move between planets — not pilots who fly in circles hoping the math works out.",
-    "Before we go further. [pause] Tell me you have at least one fast-travel route already open. Open your map — M — and look at it. If those lanes are dark, friend, you are not ready for this. The route I am about to give you runs Venus to Earth to Mars and back. You are doing that on thrusters every leg, you are paying for your education twice — and I do not like watching people pay twice. Go open up some routes. Come back when the map shows you can move.",
+    "The Exchange is the only real multi-vendor market in the inner system. Everybody else is a kiosk. We are the table.",
+    "Before we go further. [pause] Tell me you have at least one fast-travel route already open. Open your map — M — and look at it. If those lanes are dark, friend, you are not ready for this. The route I am about to give you runs Venus to Earth to Mars and back. Three legs, six trades. You fly all that on thrusters and you are paying for your education twice. Go run some Cowboys jobs, get Mars open, then come see me.",
     "Still here? Good. That tells me something.",
-    "Here is how the hand plays. Venus is paying well on industrial goods right now — she always does when the outer-belt rigs are running hot. Earth is sitting on luxury stock she cannot sell fast enough. Mars is hungry for Earth's table scraps and will overpay for them every cycle. You buy low, you sell high, you move fast, you close the loop back here.",
-    "Most haulers buy fuel where they refuel. That tells me everything I need to know about most haulers. You are going to be smarter than that.",
-    "Complete the circuit and I mark you as a house-trusted trader. The Exchange does not hand out lane clearance. You will have earned it.",
-    "House rule: lose your shuttle mid-route, you lose the cargo with it. The Exchange does not insure freight that does not reach a counter. Fly clean.",
+    "Here is how the hand plays. Every spaceport has a shop terminal at the dock — that is where you buy and sell trade goods, and the prices on the rotation are why pilots like me have houses. Venus is paying well on industrial goods this cycle. Earth is sitting on luxury stock she cannot sell fast enough. Mars is hungry for Earth's table scraps and will overpay every cycle. Buy low, sell high, move fast, close the loop back here.",
+    "If a port's rotation is not showing what I named, walk the shop terminal — there is a courtesy stipend for the dock master that forces a fresh roll. House move. The cost doubles each time you use it, so do not get greedy.",
+    "House rule: lose the shuttle mid-route, you lose the cargo with it. The Exchange does not insure freight that does not reach a counter. Fly clean.",
+    "Close the circuit and I mark you as a house-trusted trader. The Exchange does not hand out lane clearance. You will have earned it.",
     "— Maverick"
   ],
   "steps": [
@@ -25,9 +25,9 @@
       "itemId": "acid-resistant-coatings",
       "count": 10,
       "creditsReward": 3000,
-      "subject": "Hand 1 — Read the Floor",
+      "subject": "Hand 1 — Buy 10 Coatings on Venus",
       "flavor": [
-        "Venus is paying. Buy ten units of Acid-Resistant Coatings here. [smooth] The floor always tells you what it wants. Learn to listen."
+        "Dock at any Venus spaceport, walk the shop terminal, find Acid-Resistant Coatings on the trade-goods rotation, and buy ten units. [smooth] The floor always tells you what it wants. Learn to listen."
       ]
     },
     {
@@ -37,9 +37,9 @@
       "itemId": "acid-resistant-coatings",
       "count": 10,
       "creditsReward": 3000,
-      "subject": "Hand 2 — Call the Earth",
+      "subject": "Hand 2 — Sell 10 Coatings on Earth",
       "flavor": [
-        "Earth is dumping water again — predictable — but she is buying coatings this cycle. Move your ten units to Earth and sell. You do not leave chips stranded on the table."
+        "Earth is dumping water again — predictable — but she is buying coatings this cycle. Burn back to Earth, dock, shop terminal, sell your ten units off the cargo manifest. Watch the spread on the sell side; that number is your tuition refund. You do not leave chips stranded on the table."
       ]
     },
     {
@@ -49,9 +49,9 @@
       "itemId": "luxury-foods",
       "count": 10,
       "creditsReward": 3000,
-      "subject": "Hand 3 — Buy the Dip",
+      "subject": "Hand 3 — Buy 10 Luxury Foods on Earth",
       "flavor": [
-        "Earth has luxury stock sitting idle. Buy ten units. Premium goods, steady spread. No hero plays here — just the percentage."
+        "Same Earth shop terminal, different aisle. Luxury Foods sitting idle on the rotation — buy ten units while you are still docked. Premium goods, steady spread. No hero plays here, just the percentage. If the rotation is not showing them, slip the dock master."
       ]
     },
     {
@@ -61,9 +61,9 @@
       "itemId": "luxury-foods",
       "count": 10,
       "creditsReward": 3000,
-      "subject": "Hand 4 — Mars Pays",
+      "subject": "Hand 4 — Sell 10 Luxury Foods on Mars",
       "flavor": [
-        "Mars is hungry. She will always overpay for Earth's comfort. Bring your ten units in and sell clean. Timing and cargo — that is the whole game."
+        "Mars is hungry. She will always overpay for Earth's comfort. Plot the burn on the map — M if you have not already opened it — dock at the Mars spaceport, shop terminal, sell the ten units clean. Timing and cargo. That is the whole game."
       ]
     },
     {
@@ -73,9 +73,9 @@
       "itemId": "drill-bits",
       "count": 10,
       "creditsReward": 3000,
-      "subject": "Hand 5 — The Stable Suit",
+      "subject": "Hand 5 — Buy 10 Drill Bits on Mars",
       "flavor": [
-        "Mars moves drill bits the way Earth moves air — constantly, without thinking about it. Buy ten units. Industrial goods are the steady suit. Not glamorous. Reliable."
+        "Stay at the Mars dock and turn around. Drill Bits should be on the rotation — Mars moves them the way Earth moves air, constantly, without thinking about it. Buy ten units off the same shop terminal. Industrial goods are the steady suit. Not glamorous. Reliable."
       ]
     },
     {
@@ -85,17 +85,17 @@
       "itemId": "drill-bits",
       "count": 10,
       "creditsReward": 3000,
-      "subject": "Final Hand — Close the Table",
+      "subject": "Final Hand — Sell 10 Drill Bits on Venus",
       "flavor": [
-        "Bring those drill bits home to Venus and sell. [smooth] Full circuit. Rake the pot. This is what separates operators from gamblers — the clean close."
+        "Burn home to Venus, dock at the Exchange floor, shop terminal, sell all ten units. [smooth] Full circuit. Rake the pot. This is what separates operators from gamblers — the clean close."
       ]
     }
   ],
   "completionSubject": "Table Cleared — Venus is Yours",
   "completionBody": [
     "You ran it clean. Disciplined buys, no deviation, full loop closure. [laughs softly] I did not expect you to be this good. I am sorry — and not — for saying so.",
-    "Venus is yours after this. The lane, the market, the seat at the table. We do not ceremony it. The map will simply say so.",
-    "The Exchange also files a doubled payout on every contract issued out of this floor. That is not a courtesy. You earned the rate.",
+    "Venus is yours after this. Open the map with M and the lane is lit — click Venus from anywhere and the Exchange handles the slot. We do not ceremony it. The map simply says so.",
+    "The Exchange also files a doubled payout on every contract issued out of this floor — every Venus-issued ticket from here on pays at twice the rate. That is not a courtesy. You earned the rate.",
     "The table is open, friend. Come back when you have more to move.",
     "— Maverick"
   ],

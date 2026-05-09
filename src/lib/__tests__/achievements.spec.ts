@@ -7,6 +7,7 @@ import {
   WELCOME_JOURNEY_ID,
 } from '@/lib/journeys'
 import { ACHIEVEMENT_DEFINITIONS, type AchievementProgress } from '@/data/achievements'
+import { getCosmeticOptions } from '@/lib/cosmetics/catalog'
 import { emptyContractSnapshot } from '@/lib/contracts/contractStorage'
 import type { ContractStoreSnapshot } from '@/lib/contracts/contractTypes'
 import {
@@ -639,5 +640,63 @@ describe('achievements', () => {
     )
     expect(filler).toBeDefined()
     expect(filler?.rewardCredits).toBe(10000)
+  })
+
+  it('unlocks first paid shuttle paint achievement when a premium SKU is owned', () => {
+    const base = createProfile('Pilot')
+    const cosmetics = {
+      ...base.cosmetics!,
+      ownedOptionIds: [...base.cosmetics!.ownedOptionIds, 'shuttle-paintjob-neon-comet'],
+      shuttlePaintjobId: 'shuttle-paintjob-neon-comet',
+    }
+    const profile = { ...base, cosmetics }
+    const unlocked = evaluateAchievementUnlocks(progress(profile), []).newlyUnlocked.map((a) => a.id)
+    expect(unlocked).toContain('cosmetics-shuttle-paint-first-paid')
+  })
+
+  it('unlocks shuttle paint full collection when every catalog row is owned', () => {
+    const base = createProfile('Pilot')
+    const allIds = getCosmeticOptions('shuttle-paintjob').map((row) => row.id)
+    const cosmetics = {
+      ...base.cosmetics!,
+      ownedOptionIds: [...new Set([...base.cosmetics!.ownedOptionIds, ...allIds])],
+    }
+    const profile = { ...base, cosmetics }
+    const unlocked = evaluateAchievementUnlocks(progress(profile), []).newlyUnlocked.map((a) => a.id)
+    expect(unlocked).toContain('cosmetics-shuttle-paint-complete')
+  })
+
+  it('unlocks cargo intake lifetime tiers from achievementStats only', () => {
+    const base = createProfile('Pilot')
+    const at2k = {
+      ...base,
+      achievementStats: { ...base.achievementStats, lifetimeCargoIntakeCreditsEarned: 2000 },
+    }
+    expect(
+      evaluateAchievementUnlocks(progress(at2k), []).newlyUnlocked.some(
+        (a) => a.id === 'cosmetics-cargo-intake-two-thousand',
+      ),
+    ).toBe(true)
+
+    const at25k = {
+      ...base,
+      achievementStats: {
+        ...base.achievementStats,
+        lifetimeCargoIntakeCreditsEarned: 25_000,
+      },
+    }
+    const bulk = evaluateAchievementUnlocks(progress(at25k), []).newlyUnlocked.map((a) => a.id)
+    expect(bulk).toContain('cosmetics-cargo-intake-two-thousand')
+    expect(bulk).toContain('cosmetics-cargo-intake-twenty-five-k')
+
+    const at50k = {
+      ...base,
+      achievementStats: {
+        ...base.achievementStats,
+        lifetimeCargoIntakeCreditsEarned: 50_000,
+      },
+    }
+    const allThree = evaluateAchievementUnlocks(progress(at50k), []).newlyUnlocked.map((a) => a.id)
+    expect(allThree).toContain('cosmetics-cargo-intake-fifty-k')
   })
 })

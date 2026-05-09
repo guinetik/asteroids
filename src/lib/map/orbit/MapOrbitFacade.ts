@@ -156,6 +156,36 @@ export class MapOrbitFacade {
     this._slingshotBuffMultiplier = multiplier
   }
 
+  /**
+   * Planar compass yaw of the shuttle nose (+X in shuttle root space) from the live quaternion.
+   *
+   * @param shuttleController - Active map shuttle.
+   * @returns Heading in radians; same convention as {@link OrbitCaptureSystem.launchSlingshot}.
+   */
+  private planarYawFromShuttle(shuttleController: ShuttleController): number {
+    const fwd = new THREE.Vector3(1, 0, 0).applyQuaternion(shuttleController.group.quaternion)
+    return Math.atan2(-fwd.z, fwd.x)
+  }
+
+  /**
+   * Forces euler pitch/roll to zero so the slingshot hologram arrow matches launch velocity.
+   *
+   * @param shuttleController - Shuttle whose rotation is overwritten.
+   * @param yawRad - New yaw about world Y.
+   */
+  private setShuttlePlanarYaw(shuttleController: ShuttleController, yawRad: number): void {
+    shuttleController.group.rotation.set(0, yawRad, 0)
+  }
+
+  /**
+   * Keeps the current nose direction but clears stray pitch/roll from surfing / euler drift.
+   *
+   * @param shuttleController - Shuttle to canonicalize.
+   */
+  private canonicalizeShuttlePlanarOrientation(shuttleController: ShuttleController): void {
+    this.setShuttlePlanarYaw(shuttleController, this.planarYawFromShuttle(shuttleController))
+  }
+
   beginForcedOrbit(
     bodyWorldX: number,
     bodyWorldZ: number,
@@ -223,6 +253,7 @@ export class MapOrbitFacade {
       if (nearest && this._system.beginCapture(px, pz)) {
         audio.notifyOrbitCapture()
         shuttleController.cancelSlingshotBurst()
+        this.canonicalizeShuttlePlanarOrientation(shuttleController)
         this._approachStartPos = new THREE.Vector3(px, 0, pz)
         this._approachProgress = 0
         shuttleController.freeze()
@@ -267,18 +298,18 @@ export class MapOrbitFacade {
             ? this._system.getProgradeHeading()
             : this._system.getRetrogradeHeading()
           if (targetHeading !== null) {
-            const current = shuttleController.group.rotation.y
+            const current = this.planarYawFromShuttle(shuttleController)
             let delta = targetHeading - current
             delta = ((((delta + Math.PI) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)) - Math.PI
-            shuttleController.group.rotation.y =
+            const next =
               current + delta * Math.min(1, dt * orbitConfig.progradeSnapLerpSpeed)
+            this.setShuttlePlanarYaw(shuttleController, next)
             this.updateLaunchArrow(shuttleController, sceneVisuals)
           }
         }
       }
       if (this._system && sceneVisuals) {
-        const fwd = new THREE.Vector3(1, 0, 0).applyQuaternion(shuttleController.group.quaternion)
-        const heading = Math.atan2(-fwd.z, fwd.x)
+        const heading = this.planarYawFromShuttle(shuttleController)
         const alignment = this._system.getAlignment(heading)
         const trajectoryBlocked = this.isAimingAtPlanet(shuttleController)
         if (trajectoryBlocked) {
@@ -309,8 +340,7 @@ export class MapOrbitFacade {
       return
     }
 
-    const fwd = new THREE.Vector3(1, 0, 0).applyQuaternion(shuttleController.group.quaternion)
-    const heading = Math.atan2(-fwd.z, fwd.x)
+    const heading = this.planarYawFromShuttle(shuttleController)
     const launchedFromName = this._system.target?.name ?? null
     const launchVelocity = this._system.launchSlingshot(heading, dt)
     const vel = new THREE.Vector3(launchVelocity.vx, 0, launchVelocity.vz)
@@ -364,7 +394,7 @@ export class MapOrbitFacade {
         const bodyZ = body.getWorldZ()
         const dx = bodyX - x
         const dz = bodyZ - z
-        shuttleController.group.rotation.y = Math.atan2(-dz, dx)
+        this.setShuttlePlanarYaw(shuttleController, Math.atan2(-dz, dx))
         sceneVisuals?.updateApproachTether(
           shuttleController.group.position,
           new THREE.Vector3(bodyX, bodyY, bodyZ),
@@ -394,7 +424,7 @@ export class MapOrbitFacade {
       const bx = this._system.target.getWorldX()
       const bz = this._system.target.getWorldZ()
       const awayAngle = Math.atan2(-(pz - bz), px - bx)
-      shuttleController.group.rotation.set(0, awayAngle, 0)
+      this.setShuttlePlanarYaw(shuttleController, awayAngle)
     }
   }
 
@@ -497,8 +527,7 @@ export class MapOrbitFacade {
     hudState.chargeLevel = this._slingshotCharge
     hudState.inspectMode = inspectMode
     // Compute live alignment from shuttle heading
-    const fwd = new THREE.Vector3(1, 0, 0).applyQuaternion(shuttleController.group.quaternion)
-    const heading = Math.atan2(-fwd.z, fwd.x)
+    const heading = this.planarYawFromShuttle(shuttleController)
     hudState.progradeAlignment = this._system.getAlignment(heading)
     return hudState
   }

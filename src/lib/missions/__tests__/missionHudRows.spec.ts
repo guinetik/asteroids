@@ -237,11 +237,31 @@ describe('buildMissionTrackerGroups', () => {
     board.activeMiningMissions = [miningActive()]
     const group = buildMissionTrackerGroups(board)[0]!
     expect(group.key).toBe('mining')
-    expect(group.title).toBe('Mining')
+    expect(group.title).toBe('Shuttle Mining')
     const row = group.rows[0]!
     expect(row.title).toBe('Olivine Plating')
     expect(row.objectiveType).toBeUndefined()
     expect(row.focus).toEqual({ kind: 'planet', planetId: 'mars' })
+    expect(row.progress).toBe('0 / 100 kg of Olivine')
+  })
+
+  it('mining row progress reflects inventory quantity, capped at the target', () => {
+    const board = emptyBoard()
+    board.activeMiningMissions = [miningActive()]
+    const inv = {
+      stacks: [{ itemId: 'olivine', quantity: 250 }],
+    } as unknown as import('@/lib/inventory/types').Inventory
+    const row = buildMissionTrackerGroups(board, inv)[0]!.rows[0]!
+    expect(row.progress).toBe('100 / 100 kg of Olivine')
+  })
+
+  it("mining row labels `'any'` ore category as `Any main-belt ore`", () => {
+    const board = emptyBoard()
+    board.activeMiningMissions = [
+      miningActive({ template: miningTemplate({ oreCategory: 'any', targetKg: 350 }) }),
+    ]
+    const row = buildMissionTrackerGroups(board)[0]!.rows[0]!
+    expect(row.progress).toBe('0 / 350 kg of Any main-belt ore')
   })
 
   it('returns groups in fixed order delivery → asteroid → eva → mining', () => {

@@ -77,6 +77,12 @@ function emitFocus(row: MissionTrackerRow): void {
             >
               {{ row.objectiveType }}
             </span>
+            <span
+              v-if="row.progress"
+              class="mission-tracker-panel__row-progress"
+            >
+              {{ row.progress }}
+            </span>
           </button>
         </li>
       </ul>
@@ -215,5 +221,17 @@ function emitFocus(row: MissionTrackerRow): void {
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--tracker-accent);
+}
+
+.mission-tracker-panel__row-progress {
+  font-family: 'Datatype', ui-monospace, monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--tracker-accent);
+}
+
+.mission-tracker-panel__row-btn--selected .mission-tracker-panel__row-progress {
+  color: var(--tracker-selected-soft);
 }
 </style>

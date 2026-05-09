@@ -14,7 +14,11 @@ import { computeSellPrice, getDesirabilityPips } from '@/lib/shop/planetDemand'
 import type { ShopResult } from '@/lib/shop/types'
 import { getTradeGood } from '@/lib/shop/tradeGoods'
 import { removeItem } from '@/lib/inventory/inventory'
-import { addCredits, recordTradeCreditsEarned } from '@/lib/player/profile'
+import {
+  addCredits,
+  recordCargoIntakeCreditsEarned,
+  recordTradeCreditsEarned,
+} from '@/lib/player/profile'
 
 /** Shared five-pip cap with {@link planetDemand}. */
 const MAX_DESIRABILITY_PIPS = 5
@@ -114,6 +118,7 @@ export function sellPremiumTradeGood(
   const totalPayout = pricePerUnit * quantity
   let nextProfile = addCredits(profile, totalPayout)
   nextProfile = recordTradeCreditsEarned(nextProfile, totalPayout)
+  nextProfile = recordCargoIntakeCreditsEarned(nextProfile, totalPayout)
 
   return {
     ok: true,

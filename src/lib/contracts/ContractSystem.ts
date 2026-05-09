@@ -628,11 +628,14 @@ export class ContractSystem {
   }
 
   /**
-   * Notify the system that the player completed the orbital pickup phase of a
-   * planetary shuttle mission. Both the giver (posting station) and target
-   * (orbital body) planet ids are passed so steps can filter on either side.
+   * Notify the system that the player delivered a planetary shuttle mission to
+   * the posting (giver) planet — the full pickup → delivery loop. Both the
+   * giver (posting station) and target (orbital body) planet ids are passed so
+   * steps can filter on either side. Fires on cargo delivery, not on the
+   * orbital pickup minigame, so contract `orbital-mission` steps gate on the
+   * full dispatch loop the way the player narrative implies.
    *
-   * @param event - Giver + target planet ids for the just-completed pickup.
+   * @param event - Giver + target planet ids for the just-delivered run.
    */
   notifyOrbitalMissionCompleted(event: OrbitalMissionCompletedEvent): void {
     let changed = false

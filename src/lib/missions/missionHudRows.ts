@@ -16,7 +16,11 @@ import type {
   ActiveVisitRelayMission,
   EvaMissionPoiType,
   ActiveTurretMiningMission,
+  MiningOreCategory,
 } from '@/lib/missions/types'
+import type { Inventory } from '@/lib/inventory/types'
+import { getItemDefinition } from '@/lib/inventory/catalog'
+import { computeMiningProgressKg } from '@/lib/missions/turretMiningSession'
 
 /** Group key — drives section header and row palette. */
 export type MissionTrackerGroupKey = 'delivery' | 'asteroid' | 'eva' | 'mining'
@@ -34,6 +38,8 @@ export interface MissionTrackerRow {
   title: string
   /** Optional objective-type display label (asteroid/EVA only). */
   objectiveType?: string
+  /** Optional progress line (e.g. mining `"180 / 350 kg of Olivine"`). */
+  progress?: string
   /** Where clicking the row should park the camera. */
   focus: MissionTrackerFocus
 }
@@ -58,7 +64,7 @@ const ASTEROID_GROUP_TITLE = 'Asteroid'
 const EVA_GROUP_TITLE = 'EVA'
 
 /** Section title for the mining group. */
-const MINING_GROUP_TITLE = 'Mining'
+const MINING_GROUP_TITLE = 'Shuttle Mining'
 
 /** Display labels for each EVA POI type. */
 const EVA_POI_LABELS: Record<EvaMissionPoiType, string> = {
@@ -85,10 +91,13 @@ const ASTEROID_OBJECTIVE_LABELS: Record<ObjectiveType, string> = {
  * Build the ordered list of non-empty mission groups for the HUD tracker.
  *
  * @param board - Current shuttle mission board snapshot.
+ * @param inventory - Optional live shuttle inventory; when provided, mining rows
+ *   surface a `progress` line (e.g. `"180 / 350 kg of Olivine"`).
  * @returns Ordered groups (delivery → asteroid → EVA → mining), empty groups omitted.
  */
 export function buildMissionTrackerGroups(
   board: ShuttleMissionBoard,
+  inventory?: Inventory | null,
 ): readonly MissionTrackerGroup[] {
   const groups: MissionTrackerGroup[] = []
 
@@ -110,7 +119,9 @@ export function buildMissionTrackerGroups(
     groups.push({ key: 'eva', title: EVA_GROUP_TITLE, rows: evaRows })
   }
 
-  const miningRows = board.activeMiningMissions.map(buildMiningRow)
+  const miningRows = board.activeMiningMissions.map((mission, index) =>
+    buildMiningRow(mission, index, inventory ?? null),
+  )
   if (miningRows.length > 0) {
     groups.push({ key: 'mining', title: MINING_GROUP_TITLE, rows: miningRows })
   }
@@ -183,10 +194,22 @@ function buildEvaRow(mission: ActiveVisitRelayMission, index: number): MissionTr
 function buildMiningRow(
   mission: ActiveTurretMiningMission,
   index: number,
+  inventory: Inventory | null,
 ): MissionTrackerRow {
+  const target = mission.template.targetKg
+  const ore = oreLabelFor(mission.template.oreCategory)
+  const kg = inventory ? Math.min(computeMiningProgressKg(inventory, mission), target) : 0
   return {
     id: `mining:${mission.template.id}:${index}`,
     title: mission.template.name,
+    progress: `${kg} / ${target} kg of ${ore}`,
     focus: { kind: 'planet', planetId: mission.giverPlanet },
   }
+}
+
+/** Display label for a mining ore category — `'any'` reads as `Any main-belt ore`. */
+function oreLabelFor(category: MiningOreCategory): string {
+  if (category === 'any') return 'Any main-belt ore'
+  const def = getItemDefinition(category)
+  return def ? def.label : category
 }

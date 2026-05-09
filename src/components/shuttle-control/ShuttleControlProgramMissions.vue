@@ -389,10 +389,11 @@ function evaTypeLabel(poiType: EvaMissionPoiType): string {
 
       <!-- Turret Mining Missions (second — bulk ore collection via the map turret) -->
       <div v-if="miningSectionVisible" class="mission-board-section">
-        <h3 class="mission-board-section__heading">Turret Mining Missions</h3>
+        <h3 class="mission-board-section__heading">Shuttle Mining Missions</h3>
         <p class="mission-board-section__descriptor">
-          Dock at a planet with a mining contract to accept it, then extract ore in the asteroid
-          belt using the map turret. Return to deliver when the target quantity is reached.
+          Volume haulage from the shuttle — never the lander. Accept here, then mine the asteroid
+          belt from orbit with the shuttle turret. Return to the giver with the target tonnage in
+          the cargo hold to deliver.
         </p>
 
         <div

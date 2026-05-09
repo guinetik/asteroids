@@ -8,8 +8,8 @@
   "missions": [
     {
       "id": "mmc_forward_bunker_recon",
-      "name": "Reclaim — Forward Position, Asset 88-Mars",
-      "briefing": "Pilot. Forward position on the rock has gone dark. Viroid signature confirmed inside. Objective: descend, neutralize, recover the position. Deploy with F. Standoff distance ninety meters until signature clears. Cohort cannot dispatch hard at this range — that is why you are on contract. Hold the door. Make it ours.\n\n— Sampaio, MMC",
+      "name": "Bunker Reclaim — Forward Position",
+      "briefing": "Pilot. Forward MMC position on the rock has gone dark. Viroid signature confirmed inside the bunker. Objective: deploy lander with F, descend to surface, breach the hatch, neutralize hostiles room by room, walk out with the door still on its hinges. Cohort cannot dispatch hard at this range — that is why you are on contract. Hold the door. Make it ours.\n\n— Sampaio, MMC",
       "objectiveSlots": [
         {
           "type": "bunker",
@@ -28,8 +28,8 @@
     },
     {
       "id": "mmc_field_assay",
-      "name": "Field Assay — Cohort Sample Request",
-      "briefing": "Pilot. Cohort needs field assay on target body. Start terminal. Analyze rocks with SCI tool. Return report. Recover requested sample mass. No speculation, no delay. Make the data usable. — Sampaio, MMC",
+      "name": "Field Assay — Cohort Sample",
+      "briefing": "Pilot. Cohort needs an assay on target rock before the engineers green-light extraction. Deploy lander with F. Start the field terminal. Tag rocks with the SCI gun. Terminal flags the keeper. Return that sample, no other. No speculation, no delay. Make the data usable. — Sampaio, MMC",
       "objectiveSlots": [
         {
           "type": "mineral-analysis",

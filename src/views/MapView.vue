@@ -510,7 +510,7 @@ const activeContractHudRows = computed(() =>
 const missionTrackerGroups = computed(() => {
   const board = missionBoard.value
   if (!board) return []
-  return buildMissionTrackerGroups(board)
+  return buildMissionTrackerGroups(board, shopInventory.value)
 })
 
 /** Mirrors the controller's reactive flag so the ESC prompt can react to it. */
@@ -1065,17 +1065,16 @@ onMounted(async () => {
       if (mission) {
         showMissionNotification(`Mission items collected — return to deliver`)
         syncPersistentProgressFromController()
-        contractSystem.notifyOrbitalMissionCompleted({
-          giverPlanetId: mission.giverPlanet,
-          targetPlanetId: mission.template.targetPlanet,
-        })
-        syncPersistentProgressFromController()
       }
     }
     viewController.onMissionDeliver = (mission) => {
       if (mission) {
         showMissionNotification(`Mission complete — +${mission.template.reward} CR`)
         syncPersistentProgressFromController()
+        contractSystem.notifyOrbitalMissionCompleted({
+          giverPlanetId: mission.giverPlanet,
+          targetPlanetId: mission.template.targetPlanet,
+        })
         contractSystem.notifyMissionCompleted({
           kind: 'shuttle',
           giverPlanetId: mission.giverPlanet,

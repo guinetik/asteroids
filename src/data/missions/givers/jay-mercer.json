@@ -8,8 +8,8 @@
   "missions": [
     {
       "id": "jay_mineral_survey",
-      "name": "Quick Run — Pays Dirt",
-      "briefing": "Hey, you got Jay. Rock out near the belt, tagged for samples. Grab what it has and bring it back. Close to home, not much drama. Good for the ledger, good for the coffee fund. — Jay",
+      "name": "Near-Earth Pickup",
+      "briefing": "Hey, you got Jay. Got a buyer wanting raw ore off a rock close to home, no paperwork, no drama. Land on the surface, pop the cargo bay with F, and shovel until the hold reads its number. Lift off too early and the whole run pays nothing — buyer wants the full quote or nothing. Easy money for a clean burn home. Coffee fund stuff. — Jay",
       "objectiveSlots": [
         {
           "type": "gather",
@@ -23,8 +23,8 @@
     },
     {
       "id": "jay_deep_core_sample",
-      "name": "Belt Loop — Pick Something That Pays",
-      "briefing": "Hey, you got Jay. Science people want a heavy extraction. The rock is further out, the payout is better, and the hold is going to come back full if you fly it right. Open the bay with F when you are on the surface, fill it, and do not leave early. — Jay",
+      "name": "Belt Run — Full Hold",
+      "briefing": "Hey, you got Jay. Bigger contract this one. Rock is deeper into the belt and the buyer is paying for weight, not speed. Land clean, F to crack the cargo bay, and do not lift off until the hold gauge tops out — partial loads bounce on this paperwork. Honest work for honest credits. Try not to crunch the gear on the deceleration burn, I am not the one signing the repair slip. — Jay",
       "objectiveSlots": [
         {
           "type": "gather",
@@ -38,8 +38,8 @@
     },
     {
       "id": "jay_grav_survey",
-      "name": "Surface Read — Science Wants Numbers",
-      "briefing": "Hey, you got Jay. Science division needs gravitometric readings off the surface. Land near the beacon, calibrate the probes as they drop, and bring back the data. Quick job if you fly clean. Habitat is H if you need a minute before the burn back. — Jay",
+      "name": "Probe Drop",
+      "briefing": "Hey, you got Jay. Science crew at the institute wants gravimetric reads off the surface and they want them yesterday. Land near the marker, plant the probes on foot, and beat the timer — the readings only count if they settle while you are still on the rock. Habitat is H if you need a minute between drops. Pays decent for a guy with patient boots. — Jay",
       "objectiveSlots": [
         {
           "type": "survey",
@@ -57,8 +57,8 @@
     },
     {
       "id": "jay_field_assay",
-      "name": "Rock Read — Science Wants Receipts",
-      "briefing": "Hey, you got Jay. Science division wants a composition report before they pay haul rates. Land, wake the terminal, tag a few rocks with SCIENCE, then bring back a sample from whatever the report likes best. Paperwork with a drill bit. Could be worse. — Jay",
+      "name": "Tag and Sample",
+      "briefing": "Hey, you got Jay. Buyer wants composition before they pay haul rates — meaning no sample, no number, no credits. Land, find the field terminal, and tag rocks with the SCI gun. Terminal calls out the keeper. Bring that one home. Paperwork with a drill bit, but it pays better than honest digging. — Jay",
       "objectiveSlots": [
         {
           "type": "mineral-analysis",
@@ -79,8 +79,8 @@
     },
     {
       "id": "jay_jupiter_belt_cycle",
-      "name": "Jupiter Side — Higher Cuts Out Here",
-      "briefing": "Hey, you got Jay. We are running on Jupiter now too. Belt cycle queued up if you are up for it — higher margins than the Earth runs, which honestly was not hard to beat. Hit the Space Cowboys board, grab the job. — Jay",
+      "name": "Jovian Pickup",
+      "briefing": "Hey, you got Jay. Cowboys board has a Jupiter slot now and the margins are better than the inner runs — which, honestly, was not a tall fence to clear. Same job as ever: land on the rock, F to open the bay, fill the hold, fly home. Slingshot windows out here are honest once you learn to read them. Mind the radiation lines on approach. — Jay",
       "requiresFlag": "jovianContractTampered",
       "objectiveSlots": [
         {
@@ -95,8 +95,8 @@
     },
     {
       "id": "jay_jupiter_asteroid_listing",
-      "name": "Jupiter Listing — Rates Jumped",
-      "briefing": "Hey, you got Jay. Picked up a Jupiter listing this week, asteroid-side. Standard gather but the rates are up. No notes on why. I have learned not to ask when the number is good. — Jay",
+      "name": "Jovian Listing",
+      "briefing": "Hey, you got Jay. Another Jovian listing dropped on the board this week — same gather job, the rate is just up. Nobody at the desk can tell me why and I have learned not to ask twice when the number is good. Hold full, F to seal the bay, burn home. Easy day if the weather holds. — Jay",
       "requiresFlag": "jovianContractTampered",
       "objectiveSlots": [
         {
@@ -111,8 +111,8 @@
     },
     {
       "id": "jay_jupiter_grav_sweep",
-      "name": "Jupiter Survey — New Territory, Same Approach",
-      "briefing": "Hey, you got Jay. Jupiter board is open now. Survey work this time — your kind of run. New territory but the slingshot windows out here are honest once you learn to read them. Habitat is H if you need a rest between burns. — Jay",
+      "name": "Jovian Probe Sweep",
+      "briefing": "Hey, you got Jay. Survey work this side of the system this time — gravimetric probes on a Jovian rock before the timer runs out. Same job, new neighborhood. Land near the marker, plant the probes on foot, then bring the data home. Slingshot windows out here actually run on time once you learn the rhythm. H if you need a sandwich between drops. — Jay",
       "requiresFlag": "jovianContractTampered",
       "objectiveSlots": [
         {

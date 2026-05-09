@@ -126,8 +126,8 @@ const SHUTTLE_VELOCITY_ALIGN_EPSILON = 1e-4
 /**
  * Slingshot speed protection compares planar speed to the internal slingshot floor. Without slack,
  * float noise or ordering vs. the settle ramp can drop protection for a frame; map mode then applies
- * {@link ShuttlePhysicsConfig.maxGravitySpeed} (5) and a fast
- * {@link ShuttlePhysicsConfig.speedExcessReturnRate}, collapsing a high burst to the gravity cap.
+ * {@link ShuttlePhysicsConfig.maxGravitySpeed} and a fast
+ * {@link ShuttlePhysicsConfig.speedExcessReturnRate}, collapsing a high burst to the map gravity cap.
  */
 const SLINGSHOT_PROTECT_SPEED_EPSILON = 0.02
 
@@ -1029,8 +1029,12 @@ export class ShuttleController implements Tickable, PortalVehicle {
     return this.velocity.length()
   }
 
+  /**
+   * Planar compass yaw (radians) derived from the nose quaternion — stable even if euler pitch/roll drift.
+   */
   get heading(): number {
-    return this.group.rotation.y
+    const fwd = new THREE.Vector3(1, 0, 0).applyQuaternion(this.group.quaternion)
+    return Math.atan2(-fwd.z, fwd.x)
   }
 
   /** Current signed yaw angular velocity in radians per second. */

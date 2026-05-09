@@ -17,12 +17,20 @@ import { getPlanet } from '@/lib/planets/catalog'
 import { getJourneyDisplay, hasCompletedJourney } from '@/lib/journeys'
 import type { UpgradeLevels } from '@/lib/upgrades'
 import type { ContractMissionType, ContractStoreSnapshot } from '@/lib/contracts/contractTypes'
+import {
+  countOwnedPaidCosmeticSkus,
+  countOwnedCosmeticSkusInCategory,
+  ownsEveryCosmeticSku,
+  totalCosmeticSkuCount,
+} from '@/lib/cosmetics/achievementCriteria'
+import { getPlayerCosmetics } from '@/lib/cosmetics/profileCosmetics'
 
 const ACHIEVEMENTS_STORAGE_KEY = 'asteroid-lander-achievements-v1'
 const EMPTY_ACHIEVEMENT_STATS: PlayerAchievementStats = {
   lifetimeCreditsEarned: 0,
   lifetimeCreditsSpent: 0,
   lifetimeTradeCreditsEarned: 0,
+  lifetimeCargoIntakeCreditsEarned: 0,
   missionObjectivesCompletedByType: {},
   runtimeTipsShownCount: {},
   slingshotLaunches: 0,
@@ -325,6 +333,25 @@ export function isAchievementUnlocked(
         getAchievementStats(progress.profile).sushiBowlRefillCount,
         getRequiredThreshold(definition),
       )
+    case 'cosmetic_paid_owned_count':
+      return definition.cosmeticCategory
+        ? requiredThresholdReached(
+            countOwnedPaidCosmeticSkus(
+              getPlayerCosmetics(progress.profile),
+              definition.cosmeticCategory,
+            ),
+            getRequiredThreshold(definition),
+          )
+        : false
+    case 'cosmetic_full_collection':
+      return definition.cosmeticCategory
+        ? ownsEveryCosmeticSku(getPlayerCosmetics(progress.profile), definition.cosmeticCategory)
+        : false
+    case 'cargo_intake_lifetime_earned':
+      return requiredThresholdReached(
+        getAchievementStats(progress.profile).lifetimeCargoIntakeCreditsEarned,
+        getRequiredThreshold(definition),
+      )
   }
 }
 
@@ -519,6 +546,29 @@ export function getAchievementLockedHint(
       const needed = getRequiredThreshold(definition)
       if (needed === null) return 'Refill the empty bowl the required number of times.'
       return `Refill the empty bowl ${needed} time${needed === 1 ? '' : 's'} (${current}/${needed}).`
+    }
+    case 'cosmetic_paid_owned_count': {
+      if (!definition.cosmeticCategory) return 'Purchase paid cosmetics in this category.'
+      const current = countOwnedPaidCosmeticSkus(
+        getPlayerCosmetics(progress.profile),
+        definition.cosmeticCategory,
+      )
+      const needed = getRequiredThreshold(definition)
+      if (needed === null) return 'Purchase the required paid cosmetics.'
+      return `Own ${needed} paid option${needed === 1 ? '' : 's'} in this category (${current}/${needed}).`
+    }
+    case 'cosmetic_full_collection': {
+      if (!definition.cosmeticCategory) return 'Own every catalog option in this category.'
+      const cosmetics = getPlayerCosmetics(progress.profile)
+      const current = countOwnedCosmeticSkusInCategory(cosmetics, definition.cosmeticCategory)
+      const total = totalCosmeticSkuCount(definition.cosmeticCategory)
+      return `Own every catalog option in this category (${current}/${total}).`
+    }
+    case 'cargo_intake_lifetime_earned': {
+      const current = getAchievementStats(progress.profile).lifetimeCargoIntakeCreditsEarned
+      const needed = getRequiredThreshold(definition)
+      if (needed === null) return 'Earn the required lifetime credits through Cargo Intake.'
+      return `Earn ${needed.toLocaleString()} CR via Cargo Intake (${current.toLocaleString()}/${needed.toLocaleString()} CR).`
     }
   }
 }

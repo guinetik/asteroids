@@ -22,6 +22,11 @@ export interface PlayerAchievementStats {
   lifetimeCreditsSpent: number
   /** Total finite positive credits earned specifically through trade, e.g. `250` from a route sale. */
   lifetimeTradeCreditsEarned: number
+  /**
+   * Total finite positive credits earned only through Fantasia's Cargo Intake (premium buyer tab),
+   * e.g. `800` after a trade-good sale there — separate from yellow-dock trade totals.
+   */
+  lifetimeCargoIntakeCreditsEarned: number
   /** Mission objective type → completion count, e.g. `{ survey: 2 }` after two survey objectives. */
   missionObjectivesCompletedByType: Record<string, number>
   /**

@@ -9,7 +9,8 @@
   "introBody": [
     "Pilot,",
     "The Cinderline maintains a function room at The Anvil. The door on the upper concourse bears no sign. Only a thin line of ash along the lintel.",
-    "[hushed] We are a standing order. Our members work close to the Light. We ask of them five rites, in sequence. Each rite is a preparation. The last is the approach itself.",
+    "[hushed] We are a standing order. Our members work close to the Light. We ask of them seven rites, in sequence. Each rite is a preparation. The last is the launch itself — the slingshot, taken from the Sun. You learned that geometry near Earth. The Light asks for the same hand.",
+    "Mercury is your home for these rites. Walk the engineering bay there with U at the terminal when we name the threshold. Open your map with M when we name a body. The rest you already know.",
     "You need not decide tonight. The next function begins at eighteen hundred, local.",
     "A seat will be kept.",
     "— The Cinderline, at The Anvil"
@@ -20,11 +21,11 @@
       "count": 1,
       "missionType": "asteroid",
       "creditsReward": 1000,
-      "subject": "First Rite — The Work",
+      "subject": "First Rite — Close One Asteroid Contract",
       "flavor": [
         "Pilot,",
         "You came to the function. That is not nothing.",
-        "Before we go further, we ask to see you work. Take a contract from the Mercury board, or from elsewhere. Close it cleanly. We are not particular about the kind. We are particular about the pilot.",
+        "Before we go further, we ask to see you work. Open the mission board at any spaceport, take an asteroid contract — Mercury's board if you like, any other if you do not — and close it cleanly. Drop the lander with F when the work calls for it. We are not particular about the kind. We are particular about the pilot.",
         "Return when it is done. There is more to discuss.",
         "A seat will be kept.",
         "— The Cinderline, at The Anvil"
@@ -35,12 +36,12 @@
       "itemId": "viroid-psychosphere",
       "count": 5,
       "creditsReward": 2000,
-      "subject": "Second Rite — The Gathering",
+      "subject": "Second Rite — Gather Five Psychospheres on Foot",
       "flavor": [
         "Pilot,",
         "You returned. Good.",
         "[reverent] The wakeful carry something with them. We call it the psychosphere — a settling of what they were before. Ordinary fire disperses it. Our modification does not. We have adjusted your sidearm. You will not feel it in the grip.",
-        "When a presence falls, the psychosphere will linger. Gather it as you would any dropped thing. Five is the count. Take the work you would have taken anyway. Gather as you go.",
+        "Drop the lander with F at any body where the wakeful are present. When a presence falls in the bunker or on the surface, the psychosphere will linger — walk over it as you would any dropped thing. Five is the count. Take the work you would have taken anyway. Gather as you go.",
         "When the count is met, the pigment room will be prepared.",
         "A seat will be kept.",
         "— The Cinderline, at The Anvil"
@@ -52,11 +53,11 @@
       "itemId": "viroid-psychosphere",
       "count": 5,
       "creditsReward": 500,
-      "subject": "Second Rite — The Return",
+      "subject": "Third Rite — Deliver Five Psychospheres to Mercury",
       "flavor": [
         "Pilot,",
         "The count is met. The pigment room is open.",
-        "Bring your hold to Mercury. The Anvil's intake will read your transponder the moment you drop into orbit. The render takes time. The sooner the residue is in our hands, the cleaner the result.",
+        "Open your map with M and chart the line back to Mercury. Dock at The Anvil — the intake will read your transponder the moment you drop into orbit. The render takes time. The sooner the residue is in our hands, the cleaner the result.",
         "A seat will be kept.",
         "— The Cinderline, at The Anvil"
       ]
@@ -66,12 +67,12 @@
       "upgradeId": "shuttleRadiationResistance",
       "minLevel": 3,
       "creditsReward": 5000,
-      "subject": "Rite of Vigil — Radiation Threshold",
+      "subject": "Fourth Rite — Install Radiation Shielding III",
       "flavor": [
         "Pilot,",
         "The pigment room is rendering. It belongs to you alone. We will send for you when it is ready.",
-        "[reverent] While it renders, there is hardware to attend to. What protects a pilot at Mercury will not protect a pilot in the corona band. Install Radiation Shielding at tier three before the approach rite.",
-        "The engineering bay at Mercury is prepared. We do not send pilots into the Light unprepared. A Cinderline stipend has been set aside against the install.",
+        "[reverent] While it renders, there is hardware to attend to. What protects a pilot at Mercury will not protect a pilot in the corona band. Dock at The Anvil. Press U at the terminal for the engineering bay. Bring Radiation Shielding to tier three before the approach rite.",
+        "We do not send pilots into the Light unprepared. A Cinderline stipend has been set aside against the install.",
         "A seat will be kept.",
         "— The Cinderline, at The Anvil"
       ]
@@ -81,11 +82,11 @@
       "upgradeId": "shuttleHeatResistance",
       "minLevel": 3,
       "creditsReward": 5000,
-      "subject": "Rite of Vigil — Heat Threshold",
+      "subject": "Fifth Rite — Install Heat Shielding III",
       "flavor": [
         "Pilot,",
         "Radiation is the first threshold. Heat is the second. The Light does not distinguish between the unready.",
-        "Install Heat Shielding at tier three. The engineering bay at Mercury carries both. A second stipend has been set aside. Apply it there.",
+        "Same bench, same key — U at the engineering bay terminal on Mercury. Bring Heat Shielding to tier three. A second stipend has been set aside. Apply it there.",
         "Other listeners exist. We do not name them. The pilot will recognize them by their certainty without ear.",
         "When both thresholds are held, the approach rite may begin.",
         "A seat will be kept.",
@@ -96,11 +97,11 @@
       "kind": "visit-planet",
       "planetId": "sun",
       "creditsReward": 1500,
-      "subject": "Rite of Approach — the Light",
+      "subject": "Sixth Rite — Approach the Light (Enter Sun Orbit)",
       "flavor": [
         "Pilot,",
         "The shielding reads clean. The pigment room is ready. One rite remains before consecration.",
-        "[hushed] From Mercury orbit, turn your bow toward the Light and go. The gravity will carry you in. Hold the line. Let yourself be carried. When your transponder registers inside the corona band, the approach is complete.",
+        "[hushed] Open the map with M, lift from Mercury, and turn your bow toward the Light. The gravity will carry you in. Hold the line. Press E at the Sun the way you would at any other body — the Light does not refuse what is prepared. When your transponder registers inside the corona band, the approach is complete.",
         "Do not be alarmed by the brightness. You are closer. That is all.",
         "A seat will be kept.",
         "— The Cinderline, at The Anvil"
@@ -110,13 +111,13 @@
       "kind": "launch-from-body",
       "planetId": "sun",
       "creditsReward": 2500,
-      "subject": "Rite of Launch — the Slingshot",
+      "subject": "Final Rite — Slingshot Free of the Light",
       "flavor": [
         "Pilot,",
         "You are in the Light now.",
-        "[long pause] The final rite is the launch. The rite is the same as any other — you have done it a thousand times near Earth — but the Light is hotter than the Earth is wide. Approach with the Light at your back. When you are ready, bring your engines to full and break from the orbit. The geometry will come to you.",
+        "[long pause] The final rite is the launch. The rite is the same as any other — you have done it a thousand times near Earth — but the Light is hotter than the Earth is wide. Same hand, same controls. Approach with the Light at your back. When the geometry sits right, bring your engines to full and break from the orbit. The line will come to you.",
         "Do not fight the speed. It is not yours to slow.",
-        "When the rite is complete, the Light is open to you. Return to The Anvil when you are ready to be received.",
+        "When the rite is complete, the Light is open to you. Open the map with M and return to The Anvil when you are ready to be received.",
         "A seat will be kept.",
         "— The Cinderline, at The Anvil"
       ]
@@ -128,7 +129,7 @@
     "You were launched, and you came back.",
     "[reverent] The encaustum prepared for you is the psychosphere you gathered, rendered and bound. It is yours. It was always going to be yours. We only held it until you were ready to wear it.",
     "The mark is applied in silence, along the cheekbone and down the jaw. It will fade from sight within a cycle. It does not fade from the record.",
-    "The Anvil is your port now. The lane back to Mercury is open from anywhere your transponder reaches.",
+    "The Anvil is your port now. Open the map with M and the lane to Mercury is lit from anywhere your transponder reaches. Mercury contracts pay double from this cycle forward — that is not a courtesy. That is the order's settlement with a pilot who walked the rites clean.",
     "Walk in the light.",
     "— The Cinderline, at The Anvil"
   ],

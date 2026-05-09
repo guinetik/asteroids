@@ -44,6 +44,7 @@ function profile(completed: Record<string, number>): PlayerProfile {
       lifetimeCreditsEarned: 0,
       lifetimeCreditsSpent: 0,
       lifetimeTradeCreditsEarned: 0,
+      lifetimeCargoIntakeCreditsEarned: 0,
       missionObjectivesCompletedByType: completed,
       runtimeTipsShownCount: {},
       slingshotLaunches: 0,

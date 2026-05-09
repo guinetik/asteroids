@@ -9,7 +9,7 @@
     {
       "id": "maverick_safehouse_ledger",
       "name": "The Safehouse Hand",
-      "briefing": "Friend — got a private safehouse on a rock that just flipped on me. Viroids in the vault, ledger inside the viroids. Standard hand: descend, clear the floor, walk out with what belongs to me. House rule still applies: lose your shuttle, you lose the cargo with it. Ante up clean and the doubled lane is yours on the close. — Maverick",
+      "briefing": "Friend — private safehouse of mine on a rock just flipped. Viroids in the vault, ledger inside the viroids, and the ledger is what I am paying you for. Standard hand: drop the lander with F, walk the bunker on foot, clear every room, come back up with what belongs to me. House rule applies — lose the shuttle, you lose the cargo with it. The Exchange does not insure freight that does not reach a counter. Ante up clean. — Maverick",
       "objectiveSlots": [
         {
           "type": "bunker",
@@ -29,7 +29,7 @@
     {
       "id": "maverick_table_read",
       "name": "The Table Wants a Tell",
-      "briefing": "Friend, I have a buyer asking what the rock is really holding. Not what the brochure says. Sit at the terminal, read a few tells with the SCI gun, then bring back the sample the table calls for. Clean read, clean hand. — Maverick",
+      "briefing": "Friend, I have a buyer asking what the rock is really holding — not what the brochure says. Drop the lander with F, find the field terminal on the surface, and tag rocks with the SCI gun. Terminal calls the tell — that is the sample the table wants, no other. Bring it home. Clean read, clean hand. — Maverick",
       "objectiveSlots": [
         {
           "type": "mineral-analysis",

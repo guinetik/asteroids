@@ -5,7 +5,7 @@
   "minCaptureRadius": 1.0,
   "approachThrustFactor": 0.8,
   "orbitVisualSpeed": 0.75,
-  "orbitLaunchSpeed": 3.14,
+  "orbitLaunchSpeed": 4.25,
   "slingshotSettleDuration": 3,
   "slingshotLaunchFxDuration": 0.99,
   "slingshotDecayRate": 0.0001,

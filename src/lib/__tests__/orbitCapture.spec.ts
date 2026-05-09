@@ -381,7 +381,7 @@ describe('OrbitCaptureSystem prograde / retrograde', () => {
       const prograde = system.getProgradeHeading()!
       const result = system.launchSlingshot(prograde, 0.016)
       const speed = Math.sqrt(result.vx ** 2 + result.vz ** 2)
-      const baseSpeed = 3.14 // orbitLaunchSpeed from JSON
+      const baseSpeed = orbitConfig.orbitLaunchSpeed
       expect(speed).toBeCloseTo(baseSpeed * 1.4, 1)
     })
 
@@ -392,7 +392,7 @@ describe('OrbitCaptureSystem prograde / retrograde', () => {
       const radialHeading = 0
       const result = system.launchSlingshot(radialHeading, 0.016)
       const speed = Math.sqrt(result.vx ** 2 + result.vz ** 2)
-      const baseSpeed = 3.14
+      const baseSpeed = orbitConfig.orbitLaunchSpeed
       expect(speed).toBeCloseTo(baseSpeed, 1)
     })
 
@@ -403,7 +403,7 @@ describe('OrbitCaptureSystem prograde / retrograde', () => {
       const retro = system.getRetrogradeHeading()!
       const result = system.launchSlingshot(retro, 0.016)
       const speed = Math.sqrt(result.vx ** 2 + result.vz ** 2)
-      const baseSpeed = 3.14
+      const baseSpeed = orbitConfig.orbitLaunchSpeed
       expect(speed).toBeCloseTo(baseSpeed * 1.15, 1)
     })
   })

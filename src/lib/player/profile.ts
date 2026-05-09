@@ -147,6 +147,7 @@ function createDefaultAchievementStats(): PlayerAchievementStats {
     lifetimeCreditsEarned: 0,
     lifetimeCreditsSpent: 0,
     lifetimeTradeCreditsEarned: 0,
+    lifetimeCargoIntakeCreditsEarned: 0,
     missionObjectivesCompletedByType: {},
     runtimeTipsShownCount: {},
     slingshotLaunches: 0,
@@ -182,6 +183,9 @@ function normalizeAchievementStats(raw: unknown): PlayerAchievementStats {
     lifetimeTradeCreditsEarned:
       normalizeNonNegativeNumber(stats['lifetimeTradeCreditsEarned']) ??
       defaults.lifetimeTradeCreditsEarned,
+    lifetimeCargoIntakeCreditsEarned:
+      normalizeNonNegativeNumber(stats['lifetimeCargoIntakeCreditsEarned']) ??
+      defaults.lifetimeCargoIntakeCreditsEarned,
     missionObjectivesCompletedByType: normalizeNumericMap(
       stats['missionObjectivesCompletedByType'],
     ),
@@ -844,6 +848,30 @@ export function recordTradeCreditsEarned(profile: PlayerProfile, amount: number)
     achievementStats: {
       ...achievementStats,
       lifetimeTradeCreditsEarned: achievementStats.lifetimeTradeCreditsEarned + amount,
+    },
+  }
+}
+
+/**
+ * Record credits earned from Fantasia's Cargo Intake tab without changing the balance again
+ * (balance is already updated by {@link addCredits} on the same sale).
+ *
+ * @param profile - Current profile.
+ * @param amount - Premium intake payout total, e.g. `1200` after selling stacked trade goods.
+ * @returns Updated profile, or the same profile when amount is not positive and finite.
+ */
+export function recordCargoIntakeCreditsEarned(
+  profile: PlayerProfile,
+  amount: number,
+): PlayerProfile {
+  if (!isPositiveFiniteAmount(amount)) return profile
+  const achievementStats = getAchievementStats(profile)
+  return {
+    ...profile,
+    achievementStats: {
+      ...achievementStats,
+      lifetimeCargoIntakeCreditsEarned:
+        achievementStats.lifetimeCargoIntakeCreditsEarned + amount,
     },
   }
 }

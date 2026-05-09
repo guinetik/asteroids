@@ -88,6 +88,7 @@ describe('premium trade tuning', () => {
     expect(sale.profile.achievementStats.lifetimeTradeCreditsEarned).toBe(
       startingTradeLifetime + payout,
     )
+    expect(sale.profile.achievementStats.lifetimeCargoIntakeCreditsEarned).toBe(payout)
     expect(sale.inventory.stacks.find((s) => s.itemId === TRADE_SAMPLE_ID)).toBeUndefined()
 
     const rejectsMineral = sellPremiumTradeGood(session, profile, createInventory(), 'olivine', 1)

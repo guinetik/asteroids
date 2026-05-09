@@ -10,12 +10,12 @@
     "Hey, you got Jay.",
     "[warm] Alright. So you went and did the first job. Which means it is time for the paperwork I have been putting off for eleven years.",
     "Space Cowboys, Inc. You and me, fifty-fifty, Mars as the home base. Cheap dust, decent gravity, nobody breathing down our necks. Marta thinks you're ready. I told her she was high. She said she only sells to handsome men with stable orbits, so.",
-    "Here is what we need to do before we drop the pin on the rust planet:",
-    "1) One EVA contract — proves you can suit up and clock out clean.",
-    "2) Two asteroid jobs off my board — lander log reads Mercer twice, which starts to look like a pattern.",
-    "3) Cryo Insulation Lvl 1 fitted at any engineering bay — Mars nights bite and I am not explaining frostbite to your next of kin.",
-    "4) Burn for Mars and dock. I will be standing there looking insufferably pleased with myself.",
-    "5) Pick up one orbital from our new kiosk and run it. First job as a real Cowboys office. The ribbon-cutting.",
+    "Here is the short version of what we have to clear before we drop the pin on the rust planet:",
+    "1) Run one EVA contract. Insurance wants proof you can walk a job in a suit.",
+    "2) Two asteroid jobs off my board — has to be mine, not Lucas's. Co-op only counts if the books say co-op.",
+    "3) Cryo Insulation Lvl 1 fitted at any engineering bay. Mars nights bite and I am not explaining frostbite to your next of kin.",
+    "4) Burn for Mars and dock at the spaceport. I will be standing there looking insufferably pleased with myself.",
+    "5) Run one shuttle job from our brand new Mars kiosk — orbital pickup, cargo delivered, full loop. That is the ribbon-cutting.",
     "Accept and I will walk you through it one step at a time.",
     "— Jay"
   ],
@@ -25,12 +25,12 @@
       "count": 1,
       "missionType": "eva",
       "creditsReward": 500,
-      "subject": "One EVA — Suit Up, Clock Out Clean",
+      "subject": "Step 1 — Run an EVA Contract",
       "flavor": [
         "Hey, you got Jay.",
-        "First one is the suit job. Grab any EVA contract off the board, get out there, and finish it without losing a glove or a tether.",
-        "Easy money for a guy with hands. You are a guy with hands. I have it on good authority.",
-        "Close it out clean and we tick the first box. Go.",
+        "Insurance wants proof of life — meaning proof you can suit up and walk a job without floating off into the dark. So we run one EVA contract. Any EVA listing on the mission board counts; pick whichever pays best.",
+        "Land where the brief says, swap to the suit at the airlock, finish the objective on foot, and come back with the same number of fingers you left with.",
+        "Easy money for a guy with hands. You are a guy with hands — I have it on good authority.",
         "— Jay"
       ]
     },
@@ -40,12 +40,12 @@
       "missionType": "asteroid",
       "giverId": "jay",
       "creditsReward": 500,
-      "subject": "Two Rocks Off My Board — The Mercer Stamp",
+      "subject": "Step 2 — Two Asteroid Jobs Off My Board",
       "flavor": [
         "Hey, you got Jay.",
-        "[laughs] I am the dispatcher and the pilot and the guy who is buying you a beer when this is done. Welcome to early-stage equity.",
-        "Take two asteroid contracts off my list specifically — not anyone else's, mine. Boots on the rock both times. Lander out, cargo bay open with F, bring something home.",
-        "Two of mine and we start reading like a real outfit on paper. The ledger does not lie, even when everything else does.",
+        "[laughs] So here is the thing about a co-op — the books have to show we actually work together. Two asteroid jobs from my listings specifically, not anyone else's. Lucas pays better but Lucas does not put us on paper.",
+        "Open the mission board on the shuttle terminal, filter to asteroid contracts, and pick the ones with my name on the giver line. Run them how you would any rock job: land, F to crack the bay, fill the hold, lift off, deliver.",
+        "Two of mine and we start reading like a real outfit. The ledger does not lie, even when everything else does.",
         "— Jay"
       ]
     },
@@ -54,10 +54,11 @@
       "upgradeId": "shuttleFreezeResistance",
       "minLevel": 1,
       "creditsReward": 500,
-      "subject": "Cryo Insulation Lvl 1 — Mars Nights Bite",
+      "subject": "Step 3 — Fit Cryo Insulation Lvl 1",
       "flavor": [
         "Hey, you got Jay.",
-        "Mars is not Venus, but the long nights have a way of finding every gap in a hull. Get Cryo Insulation Lvl 1 at any spaceport engineering bay before you head out.",
+        "Before you burn for Mars we need to insulate the cabin. Mars is not Venus, but the long nights have a way of finding every gap in a hull, and the docking arm at our spaceport sits in shadow for nine hours at a stretch.",
+        "Park at any spaceport, head to the engineering bay, and have them fit Cryo Insulation Lvl 1. One level is enough for Mars — anything past that is for the colder addresses.",
         "First time cabin frost crawls up the inside of the canopy you will wish you had paid the credits. I paid the credits. Took me two cold nights to learn that. You get to learn it for free.",
         "— Jay"
       ]
@@ -66,11 +67,11 @@
       "kind": "visit-planet",
       "planetId": "mars",
       "creditsReward": 500,
-      "subject": "Come To Mars — I Have Two Coffees",
+      "subject": "Step 4 — Burn For Mars and Dock",
       "flavor": [
         "Hey, you got Jay.",
-        "Burn for Mars. Aim prograde off whatever rock you are near, let gravity do the coasting, and dock at the spaceport when the nav says you are in.",
-        "I will be the guy holding two coffees and a key card. There is a Marines bunker on Phobos — Cmdte. Sampaio runs it. He will find you when he wants you. For now: park, drink the coffee, and welcome to HQ.",
+        "Time to come see the place. Open the star map with M, plot a course for Mars, and burn. Aim prograde off whatever rock you are near, let gravity do most of the coasting, and ease into orbit when the nav says you are in. Dock at the spaceport same as Earth.",
+        "I will be the guy at the kiosk holding two coffees and a key card. Heads up — there is a Marine bunker on Phobos. Cmdte. Sampaio runs it. He will find you when he wants you. For now: park, drink the coffee, welcome to HQ.",
         "— Jay"
       ]
     },
@@ -78,11 +79,11 @@
       "kind": "orbital-mission",
       "giverPlanetId": "mars",
       "creditsReward": 500,
-      "subject": "First Job From The Cowboys Desk",
+      "subject": "Step 5 — Run The First Cowboys Shuttle Job",
       "flavor": [
         "Hey, you got Jay.",
-        "Welcome aboard, partner. Now make it official. Walk into the Mars spaceport, pull up the mission board, grab the planetary shuttle job on offer, and run the orbital pickup.",
-        "The slip says Space Cowboys, Inc. on the giver line. That is the ribbon-cutting. Do not overthink it.",
+        "Ribbon-cutting time. Walk up to the Mars mission board and grab the planetary shuttle contract with Space Cowboys, Inc. on the giver line — that is the one we just put out.",
+        "Run the full loop: burn to the orbital body the slip names, do the pickup minigame in orbit, then haul the cargo back here and dock to deliver. Pickup alone does not close the contract — it has to land in the Mars bay.",
         "[sighs] Eleven years I have been out here. Would have done this a lot sooner if I had known the partner was just sitting on the Moon.",
         "— Jay"
       ]
@@ -92,7 +93,7 @@
   "completionBody": [
     "Hey, you got Jay.",
     "Space Cowboys, Inc. has a permanent kiosk in the Mars spaceport. Your name is on the door. I wrote it in marker — should outlast the hull plating, definitely outlasts the warranty.",
-    "From here on, Mars is home base. Open your star map and click the planet anytime you want to fast-travel back. The orbital traffic controllers will pretend they slotted you in legitimately.",
+    "From here on, Mars is home base. Pop the tactical map with M and click the rust planet anytime you want to fast-travel back. The orbital traffic controllers will pretend they slotted you in legitimately.",
     "Drinks at the kiosk. On me. I have been waiting eleven years for an excuse to say that.",
     "— Jay"
   ],
