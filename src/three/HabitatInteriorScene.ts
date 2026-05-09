@@ -52,7 +52,10 @@ import type { PlayerProfile } from '@/lib/player/types'
 
 /** Radius of the habitat cylinder in world units. */
 const CYLINDER_RADIUS = 5
-/** Length of the habitat cylinder along the Z axis. */
+/**
+ * Length of the habitat cylinder along the Z axis.
+ * Keep in sync with {@link HABITAT_BACKDROP_DEFAULT_FOOTPRINT} in `habitatBackdropSunHorizon.ts`.
+ */
 const CYLINDER_LENGTH = 16
 /** Number of radial segments on the cylinder mesh. */
 const CYLINDER_RADIAL_SEGMENTS = 24

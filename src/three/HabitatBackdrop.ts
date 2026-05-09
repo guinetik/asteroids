@@ -5,9 +5,10 @@
  * fixed offsets outside the cylinder. The sun is always rendered (the player always
  * has a star to see); the orbited planet is added on the opposite side when the ship
  * is captured around one. Both meshes scale from real ship-to-body distance × an
- * artistic boost, so:
- *   - Sun looms huge when parked at Mercury, shrinks to a bright disk at Pluto.
- *   - Gas giants render visibly larger than rocky planets.
+ * artistic boost. The sun boost also falls off past Mercury reference distance so
+ * Mars-class orbits read smaller than inner-planet disks instead of sharing one cap.
+ * Out at Neptune-class distances the sun still resolves as a small bright disk (angular floor).
+ * Gas giants in frame render visibly larger than rocky planets.
  *
  * Lighting trick: the rocky/gas-giant fragment shaders bake "sun at world origin"
  * into their lighting math. Placing the sun mesh on the **opposite** side of origin
@@ -20,20 +21,37 @@
  */
 import * as THREE from 'three'
 import type { Planet, SunData } from '@/lib/planets/types'
-import { SIZE_SCALE, ROTATION_SPEED_DIVISOR } from '@/lib/planets/constants'
+import { ORBIT_SCALE, SIZE_SCALE, ROTATION_SPEED_DIVISOR } from '@/lib/planets/constants'
+import {
+  computeSunDistanceWeightedAngularBoost,
+  computeSunYOffsetForDeckHorizon,
+  HABITAT_BACKDROP_DEFAULT_FOOTPRINT,
+  HABITAT_BACKDROP_SUN_ALIGNMENT_EYE_HEIGHT,
+  HABITAT_BACKDROP_SUN_ALIGNMENT_EYE_XZ,
+  HABITAT_BACKDROP_SUN_EXTRA_UP_BIAS_WORLD_UNITS,
+} from '@/lib/habitat/habitatBackdropSunHorizon'
 import { createPlanetMesh, type PlanetMeshResult } from '@/three/meshes/createPlanetMesh'
 import { createSunMesh, type SunMeshResult } from '@/three/meshes/createSunMesh'
 
 /** Scene-space distance from cabin centre at which both backdrop bodies sit. */
 const PLACEMENT_DISTANCE = 90
 /**
- * Direction vector from cabin centre to the planet body, normalised. Up and to the
- * +X side so it reads through the top + starboard glass. The sun is mounted on the
- * exact opposite side so the cabin centre lies on the sun-planet line — that keeps
- * the planet shader's "sun at origin" lighting consistent with where the visible
- * sun actually is.
+ * Direction vector from cabin centre to the planet body, normalised. Framing note: the
+ * sun sits on the opposite vector, so **larger +X here moves the sun toward world −X**
+ * (not +X). If the disk reads too far screen-right / +X, increase
+ * {@link BACKDROP_PLANET_DIR_X}; decreasing it shifts the sun the other way.
+ *
+ * Mounting the sun opposite the planet keeps the cabin centre on the sun–planet line so
+ * planet shaders stay consistent with “sun at origin” lighting.
  */
-const PLANET_DIRECTION = new THREE.Vector3(0.65, 0.5, 0.4).normalize()
+const BACKDROP_PLANET_DIR_X = 0.88
+const BACKDROP_PLANET_DIR_Y = 0.4
+const BACKDROP_PLANET_DIR_Z = 0.36
+const PLANET_DIRECTION = new THREE.Vector3(
+  BACKDROP_PLANET_DIR_X,
+  BACKDROP_PLANET_DIR_Y,
+  BACKDROP_PLANET_DIR_Z,
+).normalize()
 /** Direction from cabin centre to the sun mesh — antiparallel to {@link PLANET_DIRECTION}. */
 const SUN_DIRECTION = PLANET_DIRECTION.clone().multiplyScalar(-1)
 
@@ -48,9 +66,9 @@ const PLANET_ANGULAR_BOOST = 6
  * boost because at outer planets the sun's real angular size is tiny — without a
  * boost it would render as a faint dot at Saturn / Neptune.
  */
-const SUN_ANGULAR_BOOST = 7
+const SUN_ANGULAR_BOOST = 2
 /** Hard cap on sun angular diameter (rad) — keeps the inner-planet sun from filling the canopy. */
-const SUN_MAX_ANGULAR_DIAMETER = (30 * Math.PI) / 180
+const SUN_MAX_ANGULAR_DIAMETER = (20 * Math.PI) / 180
 /** Hard cap on planet angular diameter (rad) — gas giants can read large but not engulf the canopy. */
 const PLANET_MAX_ANGULAR_DIAMETER = (60 * Math.PI) / 180
 /** Floor on angular diameter (rad) so distant bodies stay a recognisable disk. */
@@ -192,14 +210,29 @@ export class HabitatBackdrop {
   private mountSun(sun: SunData, shipToSunDistance: number): void {
     const result = createSunMesh(sun)
     const baseRadius = sun.displayRadius * SIZE_SCALE
+    const effectiveSunBoost = computeSunDistanceWeightedAngularBoost({
+      shipToSunDistance,
+      orbitScale: ORBIT_SCALE,
+      baseAngularBoost: SUN_ANGULAR_BOOST,
+    })
     const scale = computeBackdropScale(
       baseRadius,
       shipToSunDistance,
-      SUN_ANGULAR_BOOST,
+      effectiveSunBoost,
       SUN_MAX_ANGULAR_DIAMETER,
     )
     result.group.scale.setScalar(scale)
     result.group.position.copy(SUN_DIRECTION).multiplyScalar(PLACEMENT_DISTANCE)
+    const horizonBias = computeSunYOffsetForDeckHorizon({
+      sunPosition: result.group.position,
+      referenceEye: {
+        x: HABITAT_BACKDROP_SUN_ALIGNMENT_EYE_XZ.x,
+        y: HABITAT_BACKDROP_SUN_ALIGNMENT_EYE_HEIGHT,
+        z: HABITAT_BACKDROP_SUN_ALIGNMENT_EYE_XZ.z,
+      },
+      footprint: HABITAT_BACKDROP_DEFAULT_FOOTPRINT,
+    })
+    result.group.position.y += horizonBias + HABITAT_BACKDROP_SUN_EXTRA_UP_BIAS_WORLD_UNITS
     // The factory's bundled point light would wash the cabin out — we keep cabin
     // lighting from the original interior fixtures.
     result.light.intensity = 0
