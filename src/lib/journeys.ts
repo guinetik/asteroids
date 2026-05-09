@@ -87,6 +87,13 @@ interface JourneyDefinition {
    * complete.
    */
   startTrigger?: JourneyTriggerId
+  /**
+   * Journeys that must appear in {@link PlayerProfile.completedJourneyIds} before this
+   * journey can surface in the HUD or complete. Persistence still records matching
+   * `startTrigger` in `journeyStartReadyIds` (e.g. first orbit at Jupiter) so the arc
+   * opens immediately once prerequisites finish — without revisiting that body.
+   */
+  prerequisiteJourneyIds?: readonly JourneyId[]
   steps: readonly JourneyStepDefinition[]
 }
 
@@ -222,6 +229,7 @@ const JOURNEY_DEFINITIONS: readonly JourneyDefinition[] = [
     objectiveLabel: 'Close the belts before Jupiter forgets your name',
     unlocks: [],
     startTrigger: 'first_orbit:jupiter',
+    prerequisiteJourneyIds: [ACT_1_JOURNEY_ID],
     steps: [
       {
         id: `contract-${ACT_2_CONTRACT_IDS[0]}`,
@@ -248,6 +256,7 @@ const JOURNEY_DEFINITIONS: readonly JourneyDefinition[] = [
     unlocks: [],
     /** Opens once Saturn orbit is newly persisted — capstone beats are authored later. */
     startTrigger: 'first_orbit:saturn',
+    prerequisiteJourneyIds: [ACT_1_JOURNEY_ID, ACT_2_JOURNEY_ID],
     steps: [],
   },
 ]
@@ -258,7 +267,7 @@ export interface ApplyJourneyTriggerResult {
   changed: boolean
   completedJourneyIds: JourneyId[]
   unlockedFeatureIds: JourneyFeatureId[]
-  /** Journey ids whose `startTrigger` gate was just satisfied by this call. */
+  /** Journey ids whose visible start-ready state flipped false → true during this apply. */
   newlyStartReadyJourneyIds: JourneyId[]
 }
 
@@ -278,13 +287,27 @@ function isJourneyComplete(profile: PlayerProfile, journeyId: JourneyId): boolea
 }
 
 /**
+ * Check whether every journey prerequisite is complete so the gated journey may appear
+ * in the HUD / finish.
+ */
+function areJourneyPrerequisitesComplete(
+  profile: PlayerProfile,
+  definition: JourneyDefinition,
+): boolean {
+  const prerequisites = definition.prerequisiteJourneyIds
+  if (prerequisites === undefined) return true
+  return prerequisites.every((id) => isJourneyComplete(profile, id))
+}
+
+/**
  * Check whether a journey is start-ready on the profile. Journeys without a
  * `startTrigger` are always ready; journeys with one require the trigger to
- * have fired (recorded in `journeyStartReadyIds`).
+ * have fired (recorded in `journeyStartReadyIds`) and any `prerequisiteJourneyIds`.
  */
 function isJourneyStartReady(profile: PlayerProfile, definition: JourneyDefinition): boolean {
   if (definition.startTrigger === undefined) return true
-  return profile.journeyStartReadyIds.includes(definition.id)
+  if (!profile.journeyStartReadyIds.includes(definition.id)) return false
+  return areJourneyPrerequisitesComplete(profile, definition)
 }
 
 /** Public completion check used by onboarding gates elsewhere in the map flow. */
@@ -358,8 +381,15 @@ export function applyJourneyTrigger(
   const completedJourneyIds: JourneyId[] = []
   const unlockedFeatureIds: JourneyFeatureId[] = []
   const newlyStartReadyJourneyIds: JourneyId[] = []
+  /** Snapshots HUD start readiness (`startTrigger` + prerequisites) before mutations. */
+  const beforeHudStartReady = new Map<JourneyId, boolean>(
+    JOURNEY_DEFINITIONS.filter((j) => j.startTrigger !== undefined).map((j) => [
+      j.id,
+      isJourneyStartReady(profile, j),
+    ]),
+  )
 
-  // Pass 1: start-trigger matches — open any gates this trigger opens.
+  // Pass 1: start-trigger matches — persist orbital/contract gate ids so later completion
   for (const journey of JOURNEY_DEFINITIONS) {
     if (journey.startTrigger !== trigger) continue
     if (nextProfile.journeyStartReadyIds.includes(journey.id)) continue
@@ -367,7 +397,6 @@ export function applyJourneyTrigger(
       ...nextProfile,
       journeyStartReadyIds: uniqueStrings([...nextProfile.journeyStartReadyIds, journey.id]),
     }
-    newlyStartReadyJourneyIds.push(journey.id)
     changed = true
   }
 
@@ -419,6 +448,15 @@ export function applyJourneyTrigger(
     }
     unlockedFeatureIds.push(...journey.unlocks)
     changed = true
+  }
+
+  for (const journey of JOURNEY_DEFINITIONS) {
+    if (journey.startTrigger === undefined) continue
+    if (isJourneyComplete(nextProfile, journey.id)) continue
+    const wasHudStartReady = beforeHudStartReady.get(journey.id) ?? false
+    if (!wasHudStartReady && isJourneyStartReady(nextProfile, journey)) {
+      newlyStartReadyJourneyIds.push(journey.id)
+    }
   }
 
   return {
