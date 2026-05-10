@@ -104,8 +104,6 @@ export interface MapHabitatCallbacks {
   onShuttleControl?: (visible: boolean) => void
   /** Open/close the observatory dialog (refractor telescope F-prompt). */
   onObservatory?: (visible: boolean) => void
-  /** Open/close the arcade Asteroids dialog (arcade cabinet F-prompt). */
-  onArcade?: (visible: boolean) => void
   /** Prompt text shown while the player is looking at an interactable. */
   onHabitatPrompt?: (prompt: string | null) => void
   /**
@@ -228,11 +226,6 @@ export class MapHabitatFacade {
       } else if (target === 'observatory') {
         deps?.callbacks.onObservatory?.(true)
         // Release pointer lock so the observatory overlay can receive clicks
-        // and the FPS controller stops consuming WASD / mouse input.
-        this.pointerLock.releaseLock()
-      } else if (target === 'arcade') {
-        deps?.callbacks.onArcade?.(true)
-        // Release pointer lock so the arcade canvas can receive keyboard focus
         // and the FPS controller stops consuming WASD / mouse input.
         this.pointerLock.releaseLock()
       }
@@ -576,7 +569,6 @@ export class MapHabitatFacade {
     this.detachPointerLock()
     deps.callbacks.onShuttleControl?.(false)
     deps.callbacks.onObservatory?.(false)
-    deps.callbacks.onArcade?.(false)
     deps.callbacks.onHabitatActive?.(false)
     deps.callbacks.onHabitatPrompt?.(null)
     deps.setEarthStartupOrbitHudSuppressed(false)

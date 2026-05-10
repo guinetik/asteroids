@@ -635,8 +635,6 @@ export class MapViewController implements Tickable {
   onShuttleControl: ((visible: boolean) => void) | null = null
   /** Fired when the observatory dialog should open/close. */
   onObservatory: ((visible: boolean) => void) | null = null
-  /** Fired when the arcade Asteroids dialog should open/close. */
-  onArcade: ((visible: boolean) => void) | null = null
   /** Fired when the habitat interaction prompt changes. */
   onHabitatPrompt: ((prompt: string | null) => void) | null = null
   /**
@@ -1022,7 +1020,6 @@ export class MapViewController implements Tickable {
         onHabitatActive: (active) => this.onHabitatActive?.(active),
         onShuttleControl: (visible) => this.onShuttleControl?.(visible),
         onObservatory: (visible) => this.onObservatory?.(visible),
-        onArcade: (visible) => this.onArcade?.(visible),
         onHabitatPrompt: (prompt) => this.onHabitatPrompt?.(prompt),
         onHatchExit: () => {
           if (this.canLeaveHabitatJourney()) {

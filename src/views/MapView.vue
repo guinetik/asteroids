@@ -17,7 +17,6 @@ import FastTravelConfirmDialog from '@/components/FastTravelConfirmDialog.vue'
 import ShipMessageDialog from '@/components/ShipMessageDialog.vue'
 import ShuttleControlOverlay from '@/components/ShuttleControlOverlay.vue'
 import ObservatoryOverlay from '@/components/ObservatoryOverlay.vue'
-import ArcadeAsteroidsOverlay from '@/components/ArcadeAsteroidsOverlay.vue'
 import PlanetShopDialog from '@/components/shop/PlanetShopDialog.vue'
 import PimpMyShuttleDialog from '@/components/shop/PimpMyShuttleDialog.vue'
 import CreditsBadge from '@/components/hud/CreditsBadge.vue'
@@ -363,7 +362,6 @@ const habitatActive = ref(false)
 const earthStartupOrbitHudSuppressed = ref(false)
 const shuttleControlVisible = ref(false)
 const observatoryVisible = ref(false)
-const arcadeVisible = ref(false)
 /** Programs the map nav bar can deep-link the shuttle terminal into. */
 type ShuttleControlInitialProgram = 'mail' | 'missions' | 'inventory' | 'upgrades'
 
@@ -973,9 +971,6 @@ onMounted(async () => {
     viewController.onObservatory = (visible) => {
       observatoryVisible.value = visible
     }
-    viewController.onArcade = (visible) => {
-      arcadeVisible.value = visible
-    }
     viewController.onHabitatPrompt = (prompt) => {
       habitatPrompt.value = prompt
     }
@@ -1297,14 +1292,6 @@ async function closeShuttleControl() {
   // Wait for Vue to remove the overlay DOM before requesting lock — prevents a race
   // between the dialog unmount and the async pointer-lock acquisition.
   // nextTick runs as a microtask so the browser user-gesture activation is still valid.
-  if (habitatActive.value) {
-    await nextTick()
-    viewController.reRequestHabitatPointerLock()
-  }
-}
-
-async function closeArcadeAsteroids(): Promise<void> {
-  arcadeVisible.value = false
   if (habitatActive.value) {
     await nextTick()
     viewController.reRequestHabitatPointerLock()
@@ -2038,10 +2025,6 @@ watch(
       :visible="observatoryVisible"
       @close="observatoryVisible = false"
     />
-    <ArcadeAsteroidsOverlay
-      :visible="arcadeVisible"
-      @close="closeArcadeAsteroids"
-    />
     <UpgradeInstalledAnnouncement
       :visible="upgradeInstalledVisible"
       :headline="upgradeInstalledHeadline"
@@ -2254,13 +2237,13 @@ watch(
       position="bottom"
     />
     <SushiMetersOverlay
-      :visible="habitatActive && sushiPromptActive && !shuttleControlVisible && !arcadeVisible"
+      :visible="habitatActive && sushiPromptActive && !shuttleControlVisible"
       :love="playerProfileSnapshot.sushiLove"
       :hunger="playerProfileSnapshot.sushiHunger"
       :tired="playerProfileSnapshot.sushiTired"
     />
     <KeyPrompt
-      v-if="habitatActive && habitatPromptParsed && !shuttleControlVisible && !arcadeVisible"
+      v-if="habitatActive && habitatPromptParsed && !shuttleControlVisible"
       :key-label="habitatPromptParsed.key"
       :action="habitatPromptParsed.label"
       tone="cyan"
