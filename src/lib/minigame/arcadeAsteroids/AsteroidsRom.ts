@@ -6,13 +6,23 @@
  * @date 2026-05-10
  * @spec docs/superpowers/specs/2026-05-09-arcade-cabinet-projection-design.md
  */
-import type { ArcadeRom, ArcadeRomDeps, ArcadeRomFactory, ArcadeInputs, RomHudSnapshot } from '@/lib/minigame/cabinet/types'
+import type {
+  ArcadeRom,
+  ArcadeRomDeps,
+  ArcadeRomFactory,
+  ArcadeInputs,
+  ArcadeRomEvent,
+  RomHudSnapshot,
+} from '@/lib/minigame/cabinet/types'
 import { ASTEROIDS_IDLE_INPUTS, AsteroidsGame } from './AsteroidsGame'
 import { drawAsteroidsScene } from './render'
 import type { AsteroidsInputs } from './types'
 
 /** Maximum score value that can be written to persistent storage. */
 const MAX_STORED_SCORE = 9999990
+
+/** Minimum score delta in one tick that counts as a saucer kill (= small-saucer score). */
+const SAUCER_KILL_SCORE_MIN = 200
 
 /**
  * Map cabinet inputs → asteroids inputs.
@@ -71,6 +81,10 @@ export const createAsteroidsRom: ArcadeRomFactory = (deps: ArcadeRomDeps): Arcad
   const storage = deps.storage
   let highScore = loadHighScore(storage, deps.meta.highScoreKey)
   let lastThrust = false
+  let prevSaucerPresent = false
+  let prevScore = 0
+  let prevPhase: string = 'attract'
+  const queue: ArcadeRomEvent[] = []
 
   /** Construct a fresh AsteroidsGame using cabinet-provided dimensions and RNG. */
   function buildGame(): AsteroidsGame {
@@ -94,12 +108,41 @@ export const createAsteroidsRom: ArcadeRomFactory = (deps: ArcadeRomDeps): Arcad
     }
   }
 
+  /**
+   * Diff the latest snapshot against the previous tick's state and push any
+   * observable events ({@link ArcadeRomEvent}) onto the internal queue.
+   *
+   * Detection rules:
+   * - `saucerKill` — previous tick had a saucer, this tick has none, AND the
+   *   score rose by at least {@link SAUCER_KILL_SCORE_MIN} points.
+   * - `runEnded` — phase transitions to `'gameOver'` for the first time (once
+   *   per run).
+   */
+  function detectAndEnqueueEvents(): void {
+    const s = game.snapshot()
+    const saucerNow = s.saucer !== null && s.saucer !== undefined
+    const scoreDelta = s.score - prevScore
+
+    if (prevSaucerPresent && !saucerNow && scoreDelta >= SAUCER_KILL_SCORE_MIN) {
+      queue.push({ type: 'event', eventId: 'saucerKill', score: s.score, wave: s.wave })
+    }
+
+    if (prevPhase !== 'gameOver' && s.phase === 'gameOver') {
+      queue.push({ type: 'runEnded', score: s.score, wave: s.wave })
+    }
+
+    prevSaucerPresent = saucerNow
+    prevScore = s.score
+    prevPhase = s.phase
+  }
+
   return {
     tick(dt: number, inputs: ArcadeInputs): void {
       const mapped = toAsteroidsInputs(inputs)
       lastThrust = mapped.thrust
       game.tick(dt, mapped)
       persistIfBeaten()
+      detectAndEnqueueEvents()
     },
     render(ctx: CanvasRenderingContext2D, width: number, height: number): void {
       drawAsteroidsScene(ctx, game.snapshot(), { width, height, thrust: lastThrust })
@@ -108,18 +151,31 @@ export const createAsteroidsRom: ArcadeRomFactory = (deps: ArcadeRomDeps): Arcad
       game.tick(dt, ASTEROIDS_IDLE_INPUTS)
       lastThrust = false
       persistIfBeaten()
+      detectAndEnqueueEvents()
     },
     attractRender(ctx: CanvasRenderingContext2D, width: number, height: number): void {
       drawAsteroidsScene(ctx, game.snapshot(), { width, height, thrust: false })
     },
     start(): void {
       game.startRun()
+      // Reset diff trackers so a freshly started run doesn't re-fire saucerKill
+      // from leftover state, then enqueue runStarted with current snapshot stats.
+      const s = game.snapshot()
+      prevSaucerPresent = s.saucer !== null && s.saucer !== undefined
+      prevScore = s.score
+      prevPhase = s.phase
+      queue.push({ type: 'runStarted', score: s.score, wave: s.wave })
     },
     reset(): void {
       // Rebuild the game from scratch — matches the existing
       // ArcadeAsteroidsOverlayController.resetHighScore() pattern.
       game = buildGame()
       lastThrust = false
+      const s = game.snapshot()
+      prevSaucerPresent = s.saucer !== null && s.saucer !== undefined
+      prevScore = s.score
+      prevPhase = s.phase
+      queue.length = 0
     },
     isRunComplete(): boolean {
       return game.snapshot().phase === 'gameOver'
@@ -135,7 +191,9 @@ export const createAsteroidsRom: ArcadeRomFactory = (deps: ArcadeRomDeps): Arcad
       }
     },
     consumeEvents() {
-      return []
+      const out = queue.slice()
+      queue.length = 0
+      return out
     },
   }
 }
