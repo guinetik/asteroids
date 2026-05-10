@@ -2,7 +2,7 @@
   "id": "martian-marines-bunker",
   "name": "Martian Marine Corps",
   "title": "Cohort Operations, Phobos Desk",
-  "objectiveTypes": ["bunker", "mineral-analysis"],
+  "objectiveTypes": ["bunker", "mineral-analysis", "gather"],
   "minDifficulty": 1,
   "maxDifficulty": 10,
   "missions": [
@@ -48,6 +48,22 @@
         "asteroid-belt": [4, 7],
         "kuiper-belt": [7, 10]
       },
+      "planetIds": ["mars"]
+    },
+    {
+      "id": "mmc_foundry_haul",
+      "name": "Foundry Haul — Cohort Supply",
+      "briefing": "Pilot. Phobos foundry is running hot and the ore queue is shorter than I like. Deploy the lander with F, set down on the rock, open the cargo bay, and load until the gauge tops out. Foundry quote is by weight — partial holds bounce on the paperwork and I am not the one signing for a half-empty run. Bring it home clean. — Sampaio, MMC",
+      "objectiveSlots": [
+        {
+          "type": "gather",
+          "weight": 1,
+          "params": { "type": "gather", "resourceAmount": { "min": 100, "max": 250 } },
+          "reward": { "min": 900, "max": 2200 }
+        }
+      ],
+      "completionBonus": { "min": 400, "max": 1200 },
+      "regionByDifficulty": { "near-earth": [1, 4], "asteroid-belt": [4, 7] },
       "planetIds": ["mars"]
     }
   ]
