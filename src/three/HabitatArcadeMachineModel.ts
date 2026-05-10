@@ -28,6 +28,15 @@ const ARCADE_MACHINE_ROUGHNESS_CLAMP = 0.55
 /** Maximum emissive intensity allowed on imported materials (CRT glow / marquee). */
 const ARCADE_MACHINE_EMISSIVE_CLAMP = 0.6
 
+/** Regex used to pick the cabinet screen submesh by name when binding the live texture. */
+const ARCADE_SCREEN_MESH_NAME_PATTERN = /screen|display|crt|monitor/i
+
+/** Emissive intensity for the screen submesh once a live texture is bound. */
+const ARCADE_SCREEN_EMISSIVE_INTENSITY = 1.0
+
+/** Forward offset (world units) from the screen center for the close-use camera eye. */
+const ARCADE_SCREEN_CLOSE_USE_FORWARD = 1.1
+
 /**
  * Arcade machine model wrapper. Drops the inner GLB so its base sits at
  * group-local Y=0; callers place {@link group} at the desired floor spot.
@@ -38,6 +47,9 @@ export class HabitatArcadeMachineModel {
 
   /** Inner GLB scene root once loaded. */
   private inner: THREE.Group | null = null
+
+  /** The screen submesh located inside the cabinet GLB, or null until load() finds one. */
+  private screenMesh: THREE.Mesh | null = null
 
   /** Cached world-space bbox used for player obstacle collision. */
   private readonly worldAabb = new THREE.Box3()
@@ -78,6 +90,20 @@ export class HabitatArcadeMachineModel {
 
     this.group.add(inner)
     this.inner = inner
+
+    this.screenMesh = this.findScreenMesh(inner)
+    if (!this.screenMesh && import.meta.env.DEV) {
+      const names: string[] = []
+      inner.traverse((c) => {
+        if (c instanceof THREE.Mesh) names.push(c.name || '<unnamed>')
+      })
+      console.warn(
+        '[HabitatArcadeMachineModel] No screen submesh matched',
+        ARCADE_SCREEN_MESH_NAME_PATTERN,
+        '— available mesh names:',
+        names,
+      )
+    }
   }
 
   /**
@@ -115,6 +141,62 @@ export class HabitatArcadeMachineModel {
     })
     this.group.remove(this.inner)
     this.inner = null
+    this.screenMesh = null
+  }
+
+  /**
+   * Walk the GLB scene graph and return the first mesh whose name matches
+   * {@link ARCADE_SCREEN_MESH_NAME_PATTERN}.
+   *
+   * @param root - Loaded GLB scene group.
+   * @returns The matching mesh, or null if none was found.
+   */
+  private findScreenMesh(root: THREE.Object3D): THREE.Mesh | null {
+    let found: THREE.Mesh | null = null
+    root.traverse((child) => {
+      if (found || !(child instanceof THREE.Mesh)) return
+      if (ARCADE_SCREEN_MESH_NAME_PATTERN.test(child.name)) found = child
+    })
+    return found
+  }
+
+  /**
+   * Replace the screen submesh's material map with the supplied texture and wire
+   * it as a self-emissive map so it reads under cabin lighting.
+   *
+   * @param texture - Texture supplied by the cabinet's screen renderer.
+   * @returns true if the texture was bound, false if no screen submesh was located.
+   */
+  setScreenTexture(texture: THREE.Texture): boolean {
+    const mesh = this.screenMesh
+    if (!mesh) return false
+    const mat = mesh.material as THREE.MeshStandardMaterial
+    mat.map = texture
+    mat.emissiveMap = texture
+    mat.emissive = new THREE.Color(0xffffff)
+    mat.emissiveIntensity = ARCADE_SCREEN_EMISSIVE_INTENSITY
+    mat.needsUpdate = true
+    return true
+  }
+
+  /**
+   * Eye + target poses suitable for a close-use camera lerp. The target is the
+   * world-space center of the screen submesh; the eye is offset
+   * {@link ARCADE_SCREEN_CLOSE_USE_FORWARD} world units along the cabinet's local
+   * +Z axis.
+   *
+   * @returns Eye and target vectors, or null until the GLB has loaded with a
+   *   recognized screen submesh.
+   */
+  screenWorldPose(): { eye: THREE.Vector3; target: THREE.Vector3 } | null {
+    const mesh = this.screenMesh
+    if (!mesh) return null
+    mesh.updateMatrixWorld(true)
+    const target = new THREE.Vector3()
+    mesh.getWorldPosition(target)
+    const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(this.group.quaternion)
+    const eye = target.clone().add(forward.multiplyScalar(ARCADE_SCREEN_CLOSE_USE_FORWARD))
+    return { eye, target }
   }
 
   /**
