@@ -7,7 +7,7 @@
  * @spec docs/superpowers/specs/2026-05-09-arcade-cabinet-projection-design.md
  */
 import type { ArcadeRomRegistry } from './ArcadeRomRegistry'
-import type { ArcadeInputs, ArcadeRom, ArcadeRomStorage, RomMeta } from './types'
+import type { ArcadeInputs, ArcadeRom, ArcadeRomEvent, ArcadeRomStorage, RomMeta } from './types'
 import { ARCADE_IDLE_INPUTS } from './types'
 
 /** Cabinet states. See spec §Architecture for transitions. */
@@ -35,6 +35,8 @@ export interface ArcadeCabinetSessionOptions {
   storage: ArcadeRomStorage | null
   /** Renderer surface (cabinet screen). */
   renderer: ArcadeRendererSurface
+  /** Optional sink for events drained from the active ROM each tick. */
+  onRomEvent?: (romId: string, event: ArcadeRomEvent) => void
 }
 
 /**
@@ -52,6 +54,7 @@ export class ArcadeCabinetSession {
   private readonly options: ArcadeCabinetSessionOptions
   private readonly catalog: ReadonlyArray<RomMeta>
   private rom: ArcadeRom
+  private activeRomId: string
 
   /**
    * Build a session, instantiating the first catalog entry as the default ROM.
@@ -65,6 +68,7 @@ export class ArcadeCabinetSession {
       throw new Error('ArcadeCabinetSession: registry has no ROMs')
     }
     const first = this.catalog[0]!
+    this.activeRomId = first.id
     this.rom = options.registry.create(first.id, {
       width: options.width,
       height: options.height,
@@ -78,11 +82,23 @@ export class ArcadeCabinetSession {
     return this.state !== 'idle'
   }
 
+  /** Drain the ROM's event queue and forward to callback if present. */
+  private drainEvents(): void {
+    const cb = this.options.onRomEvent
+    if (!cb) {
+      this.rom.consumeEvents()
+      return
+    }
+    const events = this.rom.consumeEvents()
+    for (const event of events) cb(this.activeRomId, event)
+  }
+
   /** Per-frame update. Routes to the right ROM hook + draw call. */
   tick(dt: number): void {
     if (this.state === 'idle' || this.state === 'engaging' || this.state === 'disengaging') {
       this.rom.attractTick(dt)
       this.options.renderer.drawAttract(this.rom)
+      this.drainEvents()
       return
     }
     if (this.state === 'menu') {
@@ -91,11 +107,13 @@ export class ArcadeCabinetSession {
         entries: this.catalog,
         selectedIndex: this.menuIndex,
       })
+      this.drainEvents()
       return
     }
     // playing
     this.rom.tick(dt, this.inputs)
     this.options.renderer.drawPlay(this.rom)
+    this.drainEvents()
   }
 
   /** Begin the camera engage; caller drives the camera tween + completeEngage(). */
@@ -127,6 +145,7 @@ export class ArcadeCabinetSession {
   menuConfirm(): void {
     if (this.state !== 'menu') return
     const meta = this.catalog[this.menuIndex]!
+    this.activeRomId = meta.id
     this.rom = this.options.registry.create(meta.id, {
       width: this.options.width,
       height: this.options.height,
