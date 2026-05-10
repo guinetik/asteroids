@@ -1,0 +1,9 @@
+[
+  {
+    "id": "asteroids",
+    "title": "ASTEROIDS",
+    "year": "1979",
+    "blurb": "DESTROY THE ROCKS · AVOID THE SAUCER",
+    "highScoreKey": "asteroid-lander-arcade-asteroids-high-score-v1"
+  }
+]
