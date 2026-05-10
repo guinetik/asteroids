@@ -45,6 +45,7 @@ import { ArcadeCabinetInput } from '@/lib/minigame/cabinet/ArcadeCabinetInput'
 import { ArcadeCabinetSession } from '@/lib/minigame/cabinet/ArcadeCabinetSession'
 import { ArcadeRomRegistry } from '@/lib/minigame/cabinet/ArcadeRomRegistry'
 import { ArcadeScreenRenderer } from '@/lib/minigame/cabinet/ArcadeScreenRenderer'
+import type { ArcadeRomEvent } from '@/lib/minigame/cabinet/types'
 import { createAsteroidsRom } from '@/lib/minigame/arcadeAsteroids/AsteroidsRom'
 import arcadeRomCatalog from '@/data/arcade-roms.json'
 import { HabitatBackdrop, type HabitatBackdropContext } from '@/three/HabitatBackdrop'
@@ -922,6 +923,9 @@ const HABITAT_CAMERA_CONFIG: FpsCameraConfig = {
   fov: HABITAT_FOV,
 }
 
+/** Listener invoked once per ROM event drained from the cabinet session. */
+export type ArcadeRomEventListener = (romId: string, event: ArcadeRomEvent) => void
+
 /**
  * Host-supplied callbacks that bridge the {@link HabitatInteriorScene} to Pinia-backed
  * profile state. The scene never reads stores directly; the facade owns persistence and
@@ -1305,6 +1309,9 @@ export class HabitatInteriorScene {
 
   /** Optional sushi care callbacks installed via {@link setSushiBridgeCallbacks}. */
   private sushiCallbacks: SushiBridgeCallbacks | null = null
+
+  /** Optional cabinet-event listener installed via {@link setArcadeRomEventListener}. */
+  private arcadeRomEventListener: ArcadeRomEventListener | null = null
 
   /** Red dot drawn on the floor while the player holds LMB to drive Sushi's chase. */
   private laserDot: THREE.Mesh | null = null
@@ -1871,6 +1878,7 @@ export class HabitatInteriorScene {
         height: ARCADE_SCREEN_HEIGHT,
         storage: typeof window === 'undefined' ? null : window.localStorage,
         renderer: this.arcadeRenderer,
+        onRomEvent: (romId, event) => this.arcadeRomEventListener?.(romId, event),
       })
       this.arcadeMachine.setScreenTexture(this.arcadeRenderer.texture)
       this.arcadeInput.attach(this.arcadeSession)
@@ -2268,6 +2276,16 @@ export class HabitatInteriorScene {
   setSushiBridgeCallbacks(callbacks: SushiBridgeCallbacks | null): void {
     this.sushiCallbacks = callbacks
     this.applySushiBridgeToCat()
+  }
+
+  /**
+   * Install (or replace) the cabinet ROM event listener. Forwarded by the
+   * cabinet session each tick. Pass `null` to detach.
+   *
+   * @param listener - Host-supplied callback. Pass `null` to detach.
+   */
+  setArcadeRomEventListener(listener: ArcadeRomEventListener | null): void {
+    this.arcadeRomEventListener = listener
   }
 
   /**

@@ -36,6 +36,8 @@ import {
   setLitterPollution,
   SUSHI_NEEDS_MAX,
 } from '@/lib/player/profile'
+import { recordArcadeRomEvent } from '@/lib/player/arcadeStatsRecorder'
+import type { ArcadeRomEvent } from '@/lib/minigame/cabinet/types'
 import { removeItem } from '@/lib/inventory/inventory'
 import { STARTER_CAT_FOOD_ID } from '@/lib/map/player/playerInventoryHelpers'
 import type { HabitatPhase } from '@/lib/habitatState'
@@ -265,6 +267,7 @@ export class MapHabitatFacade {
       onEmptyLitter: () => this.handleEmptyLitter(),
       onFillBowl: () => this.handleSushiFillBowl(),
     })
+    next.setArcadeRomEventListener((romId, event) => this.handleArcadeRomEvent(romId, event))
     this.scene = next
     return next
   }
@@ -295,6 +298,25 @@ export class MapHabitatFacade {
     let next = deps.getProfile()
     next = addSushiLove(next, SUSHI_LOVE_PER_PET)
     next = recordSushiPet(next)
+    deps.setProfile(next)
+    saveProfile(next)
+    deps.evaluateAchievements()
+  }
+
+  /**
+   * Apply a cabinet ROM event to the player profile and re-evaluate achievements.
+   * Mirrors {@link handleSushiPetted}: read profile, mutate via recorder, save,
+   * fire the existing achievement-eval entrypoint.
+   *
+   * @param romId - Cabinet ROM id (e.g. `'asteroids'`).
+   * @param event - Event drained from the cabinet session.
+   */
+  private handleArcadeRomEvent(romId: string, event: ArcadeRomEvent): void {
+    const deps = this.deps
+    if (!deps) return
+    const current = deps.getProfile()
+    const updatedStats = recordArcadeRomEvent(current.achievementStats, romId, event)
+    const next: PlayerProfile = { ...current, achievementStats: updatedStats }
     deps.setProfile(next)
     saveProfile(next)
     deps.evaluateAchievements()
