@@ -59,7 +59,8 @@ export class ArcadeScreenRenderer {
     this.texture.magFilter = THREE.NearestFilter
     this.texture.generateMipmaps = false
     this.texture.colorSpace = THREE.SRGBColorSpace
-    this.texture.flipY = false
+    // Default flipY (true) maps canvas top-left → UV (0, 0), matching
+    // standard Blender/GLTF UV authoring on a flat screen quad.
   }
 
   /** Render the ROM's ATTRACT loop. */

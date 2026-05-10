@@ -38,6 +38,40 @@ const ARCADE_SCREEN_EMISSIVE_INTENSITY = 1.0
 const ARCADE_SCREEN_CLOSE_USE_FORWARD = 1.1
 
 /**
+ * Width of the fallback screen plane in cabinet-local units. Tune by trial
+ * along with {@link ARCADE_FALLBACK_SCREEN_HEIGHT} until it matches the
+ * authored bezel.
+ */
+const ARCADE_FALLBACK_SCREEN_WIDTH = 0.55
+
+/** Height of the fallback screen plane in cabinet-local units. */
+const ARCADE_FALLBACK_SCREEN_HEIGHT = 0.42
+
+/** Local-X offset of the fallback screen plane's center, relative to the cabinet origin. */
+const ARCADE_FALLBACK_SCREEN_LOCAL_X = 0
+
+/**
+ * Local-Y offset of the fallback screen plane's center. The cabinet is normalized
+ * so its base sits at local Y = 0; the screen is roughly at eye height.
+ */
+const ARCADE_FALLBACK_SCREEN_LOCAL_Y = 1.15
+
+/**
+ * Local-Z offset of the fallback screen plane's center. Pushes slightly forward
+ * of the cabinet body so the plane doesn't z-fight with the bezel mesh.
+ */
+const ARCADE_FALLBACK_SCREEN_LOCAL_Z = 0.32
+
+/**
+ * Pitch (radians) of the fallback screen plane around its local X axis. A small
+ * negative tilt mimics a cabinet screen recessed into a slight angle.
+ */
+const ARCADE_FALLBACK_SCREEN_PITCH = -0.18
+
+/** Yaw (radians) of the fallback screen plane around its local Y axis. */
+const ARCADE_FALLBACK_SCREEN_YAW = 0
+
+/**
  * Arcade machine model wrapper. Drops the inner GLB so its base sits at
  * group-local Y=0; callers place {@link group} at the desired floor spot.
  */
@@ -92,15 +126,23 @@ export class HabitatArcadeMachineModel {
     this.inner = inner
 
     this.screenMesh = this.findScreenMesh(inner)
-    if (!this.screenMesh && import.meta.env.DEV) {
+    if (!this.screenMesh) {
+      this.screenMesh = this.buildFallbackScreenPlane()
+      this.group.add(this.screenMesh)
+    }
+    if (import.meta.env.DEV) {
       const names: string[] = []
       inner.traverse((c) => {
         if (c instanceof THREE.Mesh) names.push(c.name || '<unnamed>')
       })
-      console.warn(
-        '[HabitatArcadeMachineModel] No screen submesh matched',
+      // Always log so we can see which mesh got picked (or that nothing did).
+       
+      console.info(
+        '[HabitatArcadeMachineModel] screen submesh:',
+        this.screenMesh ? this.screenMesh.name || '<unnamed>' : 'NOT FOUND',
+        '/ pattern:',
         ARCADE_SCREEN_MESH_NAME_PATTERN,
-        '— available mesh names:',
+        '/ available names:',
         names,
       )
     }
@@ -141,6 +183,14 @@ export class HabitatArcadeMachineModel {
     })
     this.group.remove(this.inner)
     this.inner = null
+    if (this.screenMesh && this.screenMesh.parent === this.group) {
+      this.group.remove(this.screenMesh)
+      this.screenMesh.geometry.dispose()
+      const mats = Array.isArray(this.screenMesh.material)
+        ? this.screenMesh.material
+        : [this.screenMesh.material]
+      for (const mat of mats) mat.dispose()
+    }
     this.screenMesh = null
   }
 
@@ -161,6 +211,37 @@ export class HabitatArcadeMachineModel {
   }
 
   /**
+   * Build an authored screen plane positioned in cabinet-local space. Used when
+   * the loaded GLB has no separate screen submesh — the cabinet ships as a
+   * single merged mesh today, so we overlay a plane in front of the bezel and
+   * paint our texture onto that.
+   *
+   * Tune position/rotation/size via the `ARCADE_FALLBACK_SCREEN_*` constants.
+   *
+   * @returns A plane mesh ready to be parented to {@link group} and bound by
+   *   {@link setScreenTexture}.
+   */
+  private buildFallbackScreenPlane(): THREE.Mesh {
+    const geometry = new THREE.PlaneGeometry(
+      ARCADE_FALLBACK_SCREEN_WIDTH,
+      ARCADE_FALLBACK_SCREEN_HEIGHT,
+    )
+    const material = new THREE.MeshBasicMaterial({
+      color: 0x000000,
+      toneMapped: false,
+    })
+    const mesh = new THREE.Mesh(geometry, material)
+    mesh.name = 'habitatArcadeScreenFallback'
+    mesh.position.set(
+      ARCADE_FALLBACK_SCREEN_LOCAL_X,
+      ARCADE_FALLBACK_SCREEN_LOCAL_Y,
+      ARCADE_FALLBACK_SCREEN_LOCAL_Z,
+    )
+    mesh.rotation.set(ARCADE_FALLBACK_SCREEN_PITCH, ARCADE_FALLBACK_SCREEN_YAW, 0)
+    return mesh
+  }
+
+  /**
    * Replace the screen submesh's material map with the supplied texture and wire
    * it as a self-emissive map so it reads under cabin lighting.
    *
@@ -170,13 +251,22 @@ export class HabitatArcadeMachineModel {
   setScreenTexture(texture: THREE.Texture): boolean {
     const mesh = this.screenMesh
     if (!mesh) return false
-    const mat = mesh.material as THREE.MeshStandardMaterial
-    mat.map = texture
-    mat.emissiveMap = texture
-    mat.emissive = new THREE.Color(0xffffff)
-    mat.emissiveIntensity = ARCADE_SCREEN_EMISSIVE_INTENSITY
-    mat.needsUpdate = true
-    return true
+    const mat = mesh.material as THREE.Material
+    if (mat instanceof THREE.MeshStandardMaterial) {
+      mat.map = texture
+      mat.emissiveMap = texture
+      mat.emissive = new THREE.Color(0xffffff)
+      mat.emissiveIntensity = ARCADE_SCREEN_EMISSIVE_INTENSITY
+      mat.needsUpdate = true
+      return true
+    }
+    if (mat instanceof THREE.MeshBasicMaterial) {
+      mat.map = texture
+      mat.color = new THREE.Color(0xffffff)
+      mat.needsUpdate = true
+      return true
+    }
+    return false
   }
 
   /**
