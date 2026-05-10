@@ -356,6 +356,36 @@ export function isAchievementUnlocked(
         getAchievementStats(progress.profile).lifetimeCargoIntakeCreditsEarned,
         getRequiredThreshold(definition),
       )
+    case 'arcade_runs_started':
+      return hasRequiredString(definition.romId)
+        ? requiredThresholdReached(
+            getAchievementStats(progress.profile).arcadeRunsByRom[definition.romId] ?? 0,
+            getRequiredThreshold(definition),
+          )
+        : false
+    case 'arcade_best_score':
+      return hasRequiredString(definition.romId)
+        ? requiredThresholdReached(
+            getAchievementStats(progress.profile).arcadeBestScoreByRom[definition.romId] ?? 0,
+            getRequiredThreshold(definition),
+          )
+        : false
+    case 'arcade_best_wave':
+      return hasRequiredString(definition.romId)
+        ? requiredThresholdReached(
+            getAchievementStats(progress.profile).arcadeBestWaveByRom[definition.romId] ?? 0,
+            getRequiredThreshold(definition),
+          )
+        : false
+    case 'arcade_event_count':
+      return hasRequiredString(definition.romId) && hasRequiredString(definition.arcadeEventId)
+        ? requiredThresholdReached(
+            getAchievementStats(progress.profile).arcadeEventCountsByRom[definition.romId]?.[
+              definition.arcadeEventId
+            ] ?? 0,
+            getRequiredThreshold(definition),
+          )
+        : false
   }
 }
 
@@ -573,6 +603,43 @@ export function getAchievementLockedHint(
       const needed = getRequiredThreshold(definition)
       if (needed === null) return 'Earn the required lifetime credits through Cargo Intake.'
       return `Earn ${needed.toLocaleString()} CR via Cargo Intake (${current.toLocaleString()}/${needed.toLocaleString()} CR).`
+    }
+    case 'arcade_runs_started': {
+      if (!hasRequiredString(definition.romId)) return 'Play the cabinet ROM.'
+      const current =
+        getAchievementStats(progress.profile).arcadeRunsByRom[definition.romId] ?? 0
+      const needed = getRequiredThreshold(definition)
+      if (needed === null) return 'Play the cabinet ROM.'
+      return `Start ${needed} ${definition.romId} run${needed === 1 ? '' : 's'} (${current}/${needed}).`
+    }
+    case 'arcade_best_score': {
+      if (!hasRequiredString(definition.romId)) return 'Reach the required score.'
+      const current =
+        getAchievementStats(progress.profile).arcadeBestScoreByRom[definition.romId] ?? 0
+      const needed = getRequiredThreshold(definition)
+      if (needed === null) return 'Reach the required score.'
+      return `Score ${needed.toLocaleString()} in one run (best ${current.toLocaleString()}).`
+    }
+    case 'arcade_best_wave': {
+      if (!hasRequiredString(definition.romId)) return 'Reach the required wave.'
+      const current =
+        getAchievementStats(progress.profile).arcadeBestWaveByRom[definition.romId] ?? 0
+      const needed = getRequiredThreshold(definition)
+      if (needed === null) return 'Reach the required wave.'
+      return `Reach wave ${needed} (best ${current}).`
+    }
+    case 'arcade_event_count': {
+      if (!hasRequiredString(definition.romId) || !hasRequiredString(definition.arcadeEventId)) {
+        return 'Hit the required event count.'
+      }
+      const eventId = definition.arcadeEventId
+      const current =
+        getAchievementStats(progress.profile).arcadeEventCountsByRom[definition.romId]?.[
+          eventId
+        ] ?? 0
+      const needed = getRequiredThreshold(definition)
+      if (needed === null) return 'Hit the required event count.'
+      return `Count ${eventId}: ${current}/${needed}.`
     }
   }
 }

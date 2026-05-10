@@ -27,6 +27,7 @@ export type AchievementCategory =
   | 'contracts'
   | 'upgrades'
   | 'cat'
+  | 'arcade'
   | 'cosmetics'
 
 /** Rule discriminator used by the achievement evaluator. */
@@ -61,6 +62,10 @@ export type AchievementKind =
   | 'cosmetic_paid_owned_count'
   | 'cosmetic_full_collection'
   | 'cargo_intake_lifetime_earned'
+  | 'arcade_runs_started'
+  | 'arcade_best_score'
+  | 'arcade_best_wave'
+  | 'arcade_event_count'
 
 /** Static row from `ACHIEVEMENT_DEFINITIONS` — copy, rule kind, and optional thresholds. */
 export interface AchievementDefinition {
@@ -114,6 +119,10 @@ export interface AchievementDefinition {
   bodyAccessState?: BodyAccessState
   /** Cosmetic shop category for `cosmetic_paid_owned_count` / `cosmetic_full_collection`. */
   cosmeticCategory?: CosmeticCategory
+  /** ROM id (cabinet) used by `arcade_*` achievements, e.g. `'asteroids'`. */
+  romId?: string
+  /** Event id used by `arcade_event_count`, e.g. `'saucerKill'`. */
+  arcadeEventId?: string
 }
 
 /** Snapshot of profile + upgrades passed into unlock evaluation. */
@@ -1451,6 +1460,19 @@ function getAchievementDefinitionError(definition: AchievementDefinition): strin
       return definition.bodyAccessState ? null : 'missing bodyAccessState'
     case 'cosmetic_full_collection':
       return definition.cosmeticCategory ? null : 'missing cosmeticCategory'
+    case 'arcade_runs_started':
+      if (!hasNonEmptyString(definition.romId)) return 'missing romId'
+      return hasPositiveThreshold(definition) ? null : 'missing positive threshold'
+    case 'arcade_best_score':
+      if (!hasNonEmptyString(definition.romId)) return 'missing romId'
+      return hasPositiveThreshold(definition) ? null : 'missing positive threshold'
+    case 'arcade_best_wave':
+      if (!hasNonEmptyString(definition.romId)) return 'missing romId'
+      return hasPositiveThreshold(definition) ? null : 'missing positive threshold'
+    case 'arcade_event_count':
+      if (!hasNonEmptyString(definition.romId)) return 'missing romId'
+      if (!hasNonEmptyString(definition.arcadeEventId)) return 'missing arcadeEventId'
+      return hasPositiveThreshold(definition) ? null : 'missing positive threshold'
   }
 }
 
@@ -1476,5 +1498,6 @@ export const ACHIEVEMENT_CATEGORY_LABELS: Record<AchievementCategory, string> = 
   contracts: 'Contracts',
   upgrades: 'Engineering',
   cat: 'Habitat Cat',
+  arcade: 'Arcade',
   cosmetics: 'Pimp My Shuttle',
 }
