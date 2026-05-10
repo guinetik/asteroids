@@ -1726,6 +1726,15 @@ export class LevelViewController implements Tickable {
     this.enemyVisualWarmup.stageForCamera(camera)
     stageVisible(this.enemyVisualWarmup.group)
 
+    // Each pooled disturbance controller has its own MutableTubeGeometry
+    // instances (legs / spikes / tentacles), so each (program, geometry)
+    // VAO is unique. The visual warmup only covers ONE of each archetype —
+    // the pool's other 4 controllers per archetype still build their VAOs
+    // lazily on first draw, freezing the frame the first time disturbance
+    // enemies appear. Stage them in front of the camera here so the
+    // prewarm render pays that cost under the loading overlay.
+    this.disturbanceDirector?.stageForPrewarm(camera)
+
     // ── Thruster wash prewarm ────────────────────────────────────
     // `compileAsync` only links shader programs — it does not actually
     // render anything, so per-(material, geometry) WebGL VAOs and any
@@ -1842,6 +1851,7 @@ export class LevelViewController implements Tickable {
         this.enemyVisualWarmup.restoreFrustumCulling()
         this.enemyVisualWarmup.group.visible = false
       }
+      this.disturbanceDirector?.unstageFromPrewarm()
       this.multiTool?.setVisible(multiToolWasVisible)
       if (washStaged) {
         washStaged.scorchMesh.material.uniforms['intensity']!.value = 0

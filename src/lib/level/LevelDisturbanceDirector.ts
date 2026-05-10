@@ -77,6 +77,10 @@ const IDLE_PLAYER_FOCUS_XZ = 99999
 const ENEMY_PROJECTILE_MESH_PREWARM = 24
 /** Treat nearly-zero directional vectors from aim math as degenerate aim. */
 const PROJECTILE_DIRECTION_EPSILON_SQ = 0.000_1
+/** Distance ahead of the prewarm camera to anchor staged pool controllers. */
+const PREWARM_CAMERA_FORWARD_DISTANCE = 24
+/** Lateral spacing between staged pool controllers during prewarm. */
+const PREWARM_CONTROLLER_SPACING = 6
 
 /**
  * Dependencies required by the runtime disturbance director.
@@ -191,6 +195,16 @@ export class LevelDisturbanceDirector {
   private readonly allPooledControllers: Array<
     BacteriophageController | SpireController | ChimeraWalkerController
   > = []
+  /** Saved positions during prewarm staging — populated by {@link stageForPrewarm}. */
+  private readonly prewarmRestoreEntries: Array<{
+    ctrl: BacteriophageController | SpireController | ChimeraWalkerController
+    position: THREE.Vector3
+  }> = []
+  /** Saved per-mesh frustum-culled flags during prewarm staging. */
+  private readonly prewarmFrustumCullState: Array<{
+    obj: THREE.Object3D
+    frustumCulled: boolean
+  }> = []
   private readonly chimeraLaserMuzzleScratch = new THREE.Vector3()
   /** Unsubscribe handles for ambient kill-relief observers (cleared with enemies). */
   private readonly ambientDeathUnsubs = new Map<number, () => void>()
@@ -314,6 +328,63 @@ export class LevelDisturbanceDirector {
         }
       }
     }
+  }
+
+  /**
+   * Stage every pooled controller in front of the given camera with frustum
+   * culling disabled so a one-shot prewarm render builds their per-instance
+   * VAOs and any other lazy first-draw GPU state. Each pooled controller
+   * has its own {@link MutableTubeGeometry} instances; without a real draw,
+   * those VAOs are deferred until the first time an enemy enters the
+   * camera's frustum during gameplay — the freeze the player sees when
+   * disturbance enemies appear.
+   *
+   * Caller must invoke {@link unstageFromPrewarm} after rendering.
+   *
+   * @param camera - Camera the prewarm render uses.
+   */
+  stageForPrewarm(camera: THREE.Camera): void {
+    if (this.allPooledControllers.length === 0) return
+    const cameraPosition = new THREE.Vector3()
+    const cameraDirection = new THREE.Vector3()
+    camera.getWorldPosition(cameraPosition)
+    camera.getWorldDirection(cameraDirection)
+
+    const baseAnchor = cameraPosition
+      .clone()
+      .addScaledVector(cameraDirection, PREWARM_CAMERA_FORWARD_DISTANCE)
+
+    this.prewarmRestoreEntries.length = 0
+    this.prewarmFrustumCullState.length = 0
+
+    const total = this.allPooledControllers.length
+    for (let i = 0; i < total; i++) {
+      const ctrl = this.allPooledControllers[i]!
+      const xOff = (i - (total - 1) / 2) * PREWARM_CONTROLLER_SPACING
+      this.prewarmRestoreEntries.push({
+        ctrl,
+        position: ctrl.group.position.clone(),
+      })
+      ctrl.group.position.set(baseAnchor.x + xOff, baseAnchor.y, baseAnchor.z)
+      ctrl.group.traverse((obj) => {
+        const mesh = obj as THREE.Mesh
+        if (!mesh.isMesh) return
+        this.prewarmFrustumCullState.push({ obj, frustumCulled: obj.frustumCulled })
+        obj.frustumCulled = false
+      })
+    }
+  }
+
+  /** Restore pooled controllers to their parked positions after prewarm. */
+  unstageFromPrewarm(): void {
+    for (const entry of this.prewarmRestoreEntries) {
+      entry.ctrl.group.position.copy(entry.position)
+    }
+    this.prewarmRestoreEntries.length = 0
+    for (const entry of this.prewarmFrustumCullState) {
+      entry.obj.frustumCulled = entry.frustumCulled
+    }
+    this.prewarmFrustumCullState.length = 0
   }
 
   /**
