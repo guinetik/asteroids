@@ -164,6 +164,10 @@ function createDefaultAchievementStats(): PlayerAchievementStats {
     maxSingleRunWorldLineDistance: 0,
     sushiPetCount: 0,
     sushiBowlRefillCount: 0,
+    arcadeRunsByRom: {},
+    arcadeBestScoreByRom: {},
+    arcadeBestWaveByRom: {},
+    arcadeEventCountsByRom: {},
   }
 }
 
@@ -213,6 +217,10 @@ function normalizeAchievementStats(raw: unknown): PlayerAchievementStats {
       normalizeNonNegativeNumber(stats['sushiPetCount']) ?? defaults.sushiPetCount,
     sushiBowlRefillCount:
       normalizeNonNegativeNumber(stats['sushiBowlRefillCount']) ?? defaults.sushiBowlRefillCount,
+    arcadeRunsByRom: normalizeNumericMap(stats['arcadeRunsByRom']),
+    arcadeBestScoreByRom: normalizeNumericMap(stats['arcadeBestScoreByRom']),
+    arcadeBestWaveByRom: normalizeNumericMap(stats['arcadeBestWaveByRom']),
+    arcadeEventCountsByRom: normalizeNestedNumericMap(stats['arcadeEventCountsByRom']),
   }
 }
 
@@ -242,6 +250,31 @@ function normalizeNumericMap(raw: unknown): Record<string, number> {
     if (typeof value === 'number' && Number.isFinite(value) && value >= 0) {
       result[key] = value
     }
+  }
+  return result
+}
+
+/**
+ * Copy a persisted nested string-keyed numeric map, excluding malformed entries.
+ *
+ * @param raw - Unknown save field from localStorage.
+ * @returns A new map of maps containing only finite non-negative numeric values.
+ */
+function normalizeNestedNumericMap(raw: unknown): Record<string, Record<string, number>> {
+  const result: Record<string, Record<string, number>> = {}
+  if (raw === undefined || raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    return result
+  }
+
+  for (const [outerKey, inner] of Object.entries(raw as Record<string, unknown>)) {
+    if (inner === null || typeof inner !== 'object' || Array.isArray(inner)) continue
+    const innerResult: Record<string, number> = {}
+    for (const [innerKey, value] of Object.entries(inner as Record<string, unknown>)) {
+      if (typeof value === 'number' && Number.isFinite(value) && value >= 0) {
+        innerResult[innerKey] = value
+      }
+    }
+    result[outerKey] = innerResult
   }
   return result
 }

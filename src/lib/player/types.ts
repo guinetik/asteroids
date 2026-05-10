@@ -61,6 +61,17 @@ export interface PlayerAchievementStats {
    * empty-bowl rescues.
    */
   sushiBowlRefillCount: number
+  /** Total runs started for each cabinet ROM, keyed by ROM id (e.g. `'asteroids': 4`). */
+  arcadeRunsByRom: Record<string, number>
+  /** Best single-run score reached on each cabinet ROM. */
+  arcadeBestScoreByRom: Record<string, number>
+  /** Best wave reached in a single run on each cabinet ROM. */
+  arcadeBestWaveByRom: Record<string, number>
+  /**
+   * Lifetime counts of named in-ROM events, keyed first by ROM id and then by
+   * event id (e.g. `arcadeEventCountsByRom.asteroids.saucerKill = 7`).
+   */
+  arcadeEventCountsByRom: Record<string, Record<string, number>>
 }
 
 /** Owned + active cosmetic selections for Pimp My Shuttle! (persisted on {@link PlayerProfile}). */

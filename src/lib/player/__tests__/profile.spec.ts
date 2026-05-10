@@ -90,6 +90,10 @@ describe('createProfile', () => {
       maxSingleRunWorldLineDistance: 0,
       sushiPetCount: 0,
       sushiBowlRefillCount: 0,
+      arcadeRunsByRom: {},
+      arcadeBestScoreByRom: {},
+      arcadeBestWaveByRom: {},
+      arcadeEventCountsByRom: {},
     })
   })
 
