@@ -40,6 +40,17 @@ export interface MessagePersistence {
 /** Max characters for inbox list preview text (single line / first paragraph). */
 const SHIP_MESSAGE_INBOX_PREVIEW_MAX_CHARS = 100
 
+/**
+ * ISO instant used when migrating legacy saves that omit {@link ShipMessageRecord.receivedAt}.
+ *
+ * Exported for tests that assert upgrade behavior.
+ *
+ * @author guinetik
+ * @date 2026-05-10
+ * @spec docs/superpowers/specs/2026-04-05-startup-message-system-design.md
+ */
+export const SHIP_MESSAGE_LEGACY_RECEIVED_AT_FALLBACK_ISO = '1970-01-01T00:00:00.000Z'
+
 /** Default persistence using `loadMessageRecords` / `saveMessageRecords` and localStorage. */
 const defaultPersistence: MessagePersistence = {
   load: () => loadMessageRecords(),
@@ -88,7 +99,51 @@ export class MessageSystem {
     this.definitions = new Map(definitions.map((definition) => [definition.id, definition]))
     this.persistence = persistence
     this.hooks = hooks
-    this.records = persistence.load()
+    this.records = MessageSystem.bootstrapRecords(persistence.load(), persistence)
+  }
+
+  /**
+   * Ensures each record has a usable {@link ShipMessageRecord.receivedAt} and persists when the
+   * snapshot was upgraded from older storage.
+   *
+   * @param raw - Map loaded from persistence (may omit `receivedAt`)
+   * @param persistence - Same adapter used to write back migrations
+   */
+  private static bootstrapRecords(
+    raw: Record<string, ShipMessageRecord>,
+    persistence: MessagePersistence,
+  ): Record<string, ShipMessageRecord> {
+    let mutated = false
+    const next: Record<string, ShipMessageRecord> = { ...raw }
+    for (const [id, record] of Object.entries(next)) {
+      const existing = record.receivedAt
+      if (
+        typeof existing === 'string' &&
+        existing.length > 0 &&
+        !Number.isNaN(Date.parse(existing))
+      ) {
+        continue
+      }
+      next[id] = {
+        ...record,
+        receivedAt: record.shownAt ?? record.dismissedAt ?? SHIP_MESSAGE_LEGACY_RECEIVED_AT_FALLBACK_ISO,
+      }
+      mutated = true
+    }
+    if (mutated) persistence.save(next)
+    return next
+  }
+
+  /**
+   * Parses {@link ShipMessageRecord.receivedAt} for inbox ordering (newest first).
+   *
+   * @param record - Persisted row to sort
+   * @returns Milliseconds since Unix epoch for the receive instant
+   */
+  private static receivedAtEpochMillis(record: ShipMessageRecord): number {
+    const iso = record.receivedAt ?? SHIP_MESSAGE_LEGACY_RECEIVED_AT_FALLBACK_ISO
+    const millis = Date.parse(iso)
+    return Number.isNaN(millis) ? Date.parse(SHIP_MESSAGE_LEGACY_RECEIVED_AT_FALLBACK_ISO) : millis
   }
 
   /**
@@ -127,6 +182,7 @@ export class MessageSystem {
       this.records[definition.id] = {
         id: definition.id,
         status: 'pending',
+        receivedAt: new Date().toISOString(),
         shownAt: null,
         dismissedAt: null,
       }
@@ -156,6 +212,7 @@ export class MessageSystem {
     this.records[id] = {
       id,
       status: 'pending',
+      receivedAt: new Date().toISOString(),
       shownAt: null,
       dismissedAt: null,
     }
@@ -291,7 +348,8 @@ export class MessageSystem {
   /**
    * Inbox rows for messages that have actually been delivered (a persisted record exists).
    * Undelivered catalog entries are omitted so the list does not show “locked” placeholders.
-   * Order: priority high → low, then id.
+   * Order: pinned first (within the folder), then newest {@link ShipMessageRecord.receivedAt}
+   * first, then stable id tie-break.
    *
    * @param folderId - When provided, only rows belonging to this folder are returned.
    *                   Use {@link DEFAULT_INBOX_FOLDER_ID} for the standard inbox.
@@ -305,7 +363,11 @@ export class MessageSystem {
     defs.sort((a, b) => {
       const pinnedDelta = (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0)
       if (pinnedDelta !== 0) return pinnedDelta
-      if (b.priority !== a.priority) return b.priority - a.priority
+      const recA = this.records[a.id]!
+      const recB = this.records[b.id]!
+      const timeDelta =
+        MessageSystem.receivedAtEpochMillis(recB) - MessageSystem.receivedAtEpochMillis(recA)
+      if (timeDelta !== 0) return timeDelta
       return a.id.localeCompare(b.id)
     })
 
@@ -442,6 +504,7 @@ export class MessageSystem {
       this.records[nextId] = {
         id: nextId,
         status: 'pending',
+        receivedAt: new Date().toISOString(),
         shownAt: null,
         dismissedAt: null,
       }

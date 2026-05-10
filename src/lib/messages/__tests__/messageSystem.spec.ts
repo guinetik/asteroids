@@ -1,6 +1,6 @@
 import { Timer } from '@/lib/Timer'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { MessageSystem } from '../messageSystem'
+import { MessageSystem, SHIP_MESSAGE_LEGACY_RECEIVED_AT_FALLBACK_ISO } from '../messageSystem'
 import type { ShipMessageDefinition, ShipMessageRecord } from '../messageTypes'
 
 const definitions: ShipMessageDefinition[] = [
@@ -321,6 +321,72 @@ describe('MessageSystem.listInboxRows', () => {
     expect(rows).toHaveLength(2)
     const ids = rows.map((r) => r.id).sort()
     expect(ids).toEqual(['fuel-tip', 'high-priority'])
+  })
+
+  it('orders rows by newest received first (pinned still above)', () => {
+    const system = createSystem({
+      'high-priority': {
+        id: 'high-priority',
+        status: 'pending',
+        receivedAt: '2306-04-05T09:00:00.000Z',
+        shownAt: null,
+        dismissedAt: null,
+      },
+      'fuel-tip': {
+        id: 'fuel-tip',
+        status: 'pending',
+        receivedAt: '2306-04-05T10:00:00.000Z',
+        shownAt: null,
+        dismissedAt: null,
+      },
+    })
+    expect(system.listInboxRows().map((r) => r.id)).toEqual(['fuel-tip', 'high-priority'])
+  })
+
+  it('pins rows above chronological order inside the inbox', () => {
+    const withPinnedFuel = definitions.map((definition) =>
+      definition.id === 'fuel-tip' ? { ...definition, pinned: true } : definition,
+    )
+    const system = new MessageSystem(withPinnedFuel, {
+      load: () => ({
+        'fuel-tip': {
+          id: 'fuel-tip',
+          status: 'pending',
+          receivedAt: '2306-04-05T09:00:00.000Z',
+          shownAt: null,
+          dismissedAt: null,
+        },
+        'high-priority': {
+          id: 'high-priority',
+          status: 'pending',
+          receivedAt: '2306-04-05T10:00:00.000Z',
+          shownAt: null,
+          dismissedAt: null,
+        },
+      }),
+      save: (records) => {
+        savedRecords = structuredClone(records)
+      },
+    })
+    expect(system.listInboxRows().map((row) => row.id)).toEqual(['fuel-tip', 'high-priority'])
+  })
+
+  it('fills missing legacy receivedAt on load and persists once', () => {
+    savedRecords = {}
+    new MessageSystem(definitions, {
+      load: () => ({
+        'fuel-tip': {
+          id: 'fuel-tip',
+          status: 'pending',
+          shownAt: null,
+          dismissedAt: null,
+        },
+      }),
+      save: (records) => {
+        savedRecords = structuredClone(records)
+      },
+    })
+    expect(savedRecords['fuel-tip']?.receivedAt).toBe(SHIP_MESSAGE_LEGACY_RECEIVED_AT_FALLBACK_ISO)
   })
 })
 

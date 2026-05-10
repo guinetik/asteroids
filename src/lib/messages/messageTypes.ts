@@ -102,6 +102,11 @@ export interface ShipMessageRecord {
   id: string
   /** Current lifecycle state. */
   status: ShipMessageStatus
+  /**
+   * ISO timestamp when this message first arrived in the inbox (record created).
+   * Omitted on saves from older builds until {@link MessageSystem} fills it during load migration.
+   */
+  receivedAt?: string
   /** ISO timestamp for first time shown, or null when never shown. */
   shownAt: string | null
   /** ISO timestamp for dismissal, or null when still active. */
