@@ -342,6 +342,8 @@ const DOCK_PROXIMITY_M = 20
  * @spec docs/superpowers/specs/2026-04-05-map-shuttle-player-design.md
  */
 export class MapViewController implements Tickable {
+  /** Latches once the shuttle clears Earth's launch threshold so the journey trigger fires only once per session. */
+  private didNotifyLaunchedFromEarth = false
   private gameLoop: GameLoop | null = null
   private tickHandler: TickHandler | null = null
   private debugMetricsTracker: DebugMetricsTracker | null = null
@@ -2350,11 +2352,21 @@ export class MapViewController implements Tickable {
     tickDemandTimer(dt)
 
     this.recordWorldLinePoint()
+    const earthDistance = this.getDistanceToPlanet('earth')
+    if (
+      !this.didNotifyLaunchedFromEarth &&
+      this.overlayProjector.worldLineLength >= MAP_CONFIG.EARTH_DEPARTURE_MIN_HISTORY_POINTS &&
+      earthDistance !== null &&
+      earthDistance >= MAP_CONFIG.EARTH_DEPARTURE_MESSAGE_DISTANCE
+    ) {
+      this.didNotifyLaunchedFromEarth = true
+      this.notifyJourneyTrigger('launched_from_earth')
+    }
     this.messageFacade.triggerRuntimeMessages({
       tutorialMessagesUnlocked: hasCompletedJourney(this.playerProfile, WELCOME_JOURNEY_ID),
       worldLineHistoryLength: this.overlayProjector.worldLineLength,
       earthDepartureMinHistoryPoints: MAP_CONFIG.EARTH_DEPARTURE_MIN_HISTORY_POINTS,
-      earthDistance: this.getDistanceToPlanet('earth'),
+      earthDistance,
       earthDepartureDistance: MAP_CONFIG.EARTH_DEPARTURE_MESSAGE_DISTANCE,
       isBraking: this.shuttleController?.isBraking ?? false,
       thrustState: this.shuttleController?.thrusterSystem.getState('thrust') ?? null,
@@ -3624,7 +3636,14 @@ export class MapViewController implements Tickable {
       onMissionDeliver: this.onMissionDeliver,
     })
     if (result.creditsChanged) {
-      this.playerProfile = result.profile
+      // The onMissionDeliver callback (above) ran synchronously and may have
+      // notified contract events that wrote reward effects (fast-travel, body
+      // access, story flags, etc.) to storage. Rebase on the stored profile
+      // so persisting our credits/inventory delta does not clobber those writes.
+      const fromStorage = loadProfile()
+      this.playerProfile = fromStorage
+        ? { ...fromStorage, credits: result.profile.credits }
+        : result.profile
       this.playerInventory = result.inventory
       this.persistPlayerProfile()
       this.onCreditsUpdate?.(this.playerProfile.credits)

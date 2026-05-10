@@ -26,6 +26,15 @@ export type JourneyTriggerId =
   | 'accepted_eva_mission'
   | 'left_habitat'
   /**
+   * Shuttle has cleared Earth's local space for the first time this session — emitted from
+   * the map controller when worldspace distance from Earth exceeds the launch threshold.
+   */
+  | 'launched_from_earth'
+  /** A shuttle EVA mission has been completed (kind: 'eva'). */
+  | 'completed_eva_mission'
+  /** Any asteroid mission has been completed in the level scene (kind: 'asteroid'). */
+  | 'completed_asteroid_mission'
+  /**
    * One manifold highway run finished: orbital surf coupling/dive completed and destination orbit
    * engaged. Pairs with the same code path that increments profile achievement stats `manifoldRides`.
    */
@@ -187,6 +196,21 @@ const JOURNEY_DEFINITIONS: readonly JourneyDefinition[] = [
         id: 'leave-habitat',
         label: 'Leave the Habitat',
         trigger: 'left_habitat',
+      },
+      {
+        id: 'launch-from-earth',
+        label: 'Launch off Earth',
+        trigger: 'launched_from_earth',
+      },
+      {
+        id: 'first-eva-mission',
+        label: 'Complete your first EVA mission',
+        trigger: 'completed_eva_mission',
+      },
+      {
+        id: 'first-asteroid-mission',
+        label: 'Complete your first Asteroid mission',
+        trigger: 'completed_asteroid_mission',
       },
     ],
   },

@@ -890,6 +890,7 @@ onMounted(async () => {
         objectiveType: '',
         specialMissionId: mission.template.id,
       })
+      viewController.notifyJourneyTrigger('completed_eva_mission')
       syncPersistentProgressFromController()
     }
     viewController.onMapIntro = (state) => {
@@ -1155,6 +1156,16 @@ onMounted(async () => {
       })
     })
     syncPersistentProgressFromController()
+    // Retroactive welcome-journey triggers: if the player already finished an EVA or asteroid
+    // mission in a prior session (or in /level before returning to /map), fire the matching
+    // trigger now so the journey step ticks. applyJourneyTrigger is idempotent.
+    const completionsByKind = contractSystem.getSnapshot().missionCompletionsByKind ?? {}
+    if ((completionsByKind.eva ?? 0) >= 1) {
+      viewController.notifyJourneyTrigger('completed_eva_mission')
+    }
+    if ((completionsByKind.asteroid ?? 0) >= 1) {
+      viewController.notifyJourneyTrigger('completed_asteroid_mission')
+    }
     shopProfile.value = viewController.getPlayerProfileSnapshot()
     shopInventory.value = viewController.getPlayerInventorySnapshot()
     refreshActiveMessage()

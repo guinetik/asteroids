@@ -21,7 +21,10 @@ function profileAfterWelcomeComplete(profile: PlayerProfile = createProfile('Pil
   p = applyJourneyTrigger(p, 'accepted_asteroid_mission').profile
   p = applyJourneyTrigger(p, 'accepted_eva_mission').profile
   p = applyJourneyTrigger(p, 'bought_shuttle_fuel').profile
-  return applyJourneyTrigger(p, 'left_habitat').profile
+  p = applyJourneyTrigger(p, 'left_habitat').profile
+  p = applyJourneyTrigger(p, 'launched_from_earth').profile
+  p = applyJourneyTrigger(p, 'completed_eva_mission').profile
+  return applyJourneyTrigger(p, 'completed_asteroid_mission').profile
 }
 
 /** Act I is visible (`usc` accepted) but its contracts + manifold step are unfinished. */
@@ -50,6 +53,9 @@ function profileAfterAct1Complete(profile: PlayerProfile = createProfile('Pilot'
   p = applyJourneyTrigger(p, 'accepted_eva_mission').profile
   p = applyJourneyTrigger(p, 'bought_shuttle_fuel').profile
   p = applyJourneyTrigger(p, 'left_habitat').profile
+  p = applyJourneyTrigger(p, 'launched_from_earth').profile
+  p = applyJourneyTrigger(p, 'completed_eva_mission').profile
+  p = applyJourneyTrigger(p, 'completed_asteroid_mission').profile
   p = applyJourneyTrigger(p, 'contract_accepted:usc-venus-certification').profile
   p = applyJourneyTrigger(p, 'contract_completed:usc-venus-certification').profile
   p = applyJourneyTrigger(p, 'contract_completed:space-cowboys-mars-hq').profile
@@ -71,13 +77,16 @@ describe('journeys', () => {
     profile = applyJourneyTrigger(profile, 'accepted_asteroid_mission').profile
     profile = applyJourneyTrigger(profile, 'accepted_eva_mission').profile
     profile = applyJourneyTrigger(profile, 'bought_shuttle_fuel').profile
+    profile = applyJourneyTrigger(profile, 'left_habitat').profile
+    profile = applyJourneyTrigger(profile, 'launched_from_earth').profile
+    profile = applyJourneyTrigger(profile, 'completed_eva_mission').profile
 
     const beforeExitTracker = buildActiveJourneyTracker(profile)
     const steps = beforeExitTracker?.objectives[0]?.steps ?? []
     expect(steps[steps.length - 1]?.active).toBe(true)
     expect(isJourneyFeatureUnlocked(profile, 'slingshot')).toBe(false)
 
-    profile = applyJourneyTrigger(profile, 'left_habitat').profile
+    profile = applyJourneyTrigger(profile, 'completed_asteroid_mission').profile
 
     expect(profile.completedJourneyIds).toContain('welcome')
     expect(isJourneyFeatureUnlocked(profile, 'slingshot')).toBe(true)
@@ -124,6 +133,9 @@ describe('act-1-inner-system journey', () => {
     profile = applyJourneyTrigger(profile, 'accepted_eva_mission').profile
     profile = applyJourneyTrigger(profile, 'bought_shuttle_fuel').profile
     profile = applyJourneyTrigger(profile, 'left_habitat').profile
+    profile = applyJourneyTrigger(profile, 'launched_from_earth').profile
+    profile = applyJourneyTrigger(profile, 'completed_eva_mission').profile
+    profile = applyJourneyTrigger(profile, 'completed_asteroid_mission').profile
 
     // Tracker must be null — Act 1 is gated behind the USC accept trigger.
     expect(buildActiveJourneyTracker(profile)).toBeNull()
@@ -150,6 +162,9 @@ describe('act-1-inner-system journey', () => {
     profile = applyJourneyTrigger(profile, 'accepted_eva_mission').profile
     profile = applyJourneyTrigger(profile, 'bought_shuttle_fuel').profile
     profile = applyJourneyTrigger(profile, 'left_habitat').profile
+    profile = applyJourneyTrigger(profile, 'launched_from_earth').profile
+    profile = applyJourneyTrigger(profile, 'completed_eva_mission').profile
+    profile = applyJourneyTrigger(profile, 'completed_asteroid_mission').profile
 
     // Player completes Jay's contract before ever accepting USC.
     const jayCompletion = applyJourneyTrigger(profile, 'contract_completed:space-cowboys-mars-hq')
@@ -202,6 +217,9 @@ describe('act-1-inner-system journey', () => {
     profile = applyJourneyTrigger(profile, 'accepted_eva_mission').profile
     profile = applyJourneyTrigger(profile, 'bought_shuttle_fuel').profile
     profile = applyJourneyTrigger(profile, 'left_habitat').profile
+    profile = applyJourneyTrigger(profile, 'launched_from_earth').profile
+    profile = applyJourneyTrigger(profile, 'completed_eva_mission').profile
+    profile = applyJourneyTrigger(profile, 'completed_asteroid_mission').profile
 
     profile = applyJourneyTrigger(profile, 'contract_accepted:usc-venus-certification').profile
 
