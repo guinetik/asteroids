@@ -2743,6 +2743,32 @@ body,
   }
 }
 
+/* Cat-needs prompt — surfaces the most-urgent Sushi need while piloting the shuttle. */
+.cat-needs-prompt {
+  @apply fixed left-1/2 top-24 z-40 flex -translate-x-1/2 flex-col items-center gap-1
+         rounded border border-amber-400/40 bg-slate-900/85 px-6 py-3
+         font-mono text-amber-200 tracking-wider pointer-events-none;
+  animation: cat-needs-pulse 2.4s ease-in-out infinite;
+}
+
+.cat-needs-prompt__title {
+  @apply text-xs uppercase;
+}
+
+.cat-needs-prompt__detail {
+  @apply text-[11px] uppercase text-amber-300/80;
+}
+
+@keyframes cat-needs-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 rgba(251, 191, 36, 0);
+  }
+  50% {
+    box-shadow: 0 0 18px rgba(251, 191, 36, 0.35);
+  }
+}
+
 /* Inventory Table */
 .inventory-table {
   @apply flex flex-col gap-1;

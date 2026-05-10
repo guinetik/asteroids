@@ -887,8 +887,12 @@ export class MapViewController implements Tickable {
       callbacks: {
         onJourneyTracker: (state) => this.onJourneyTracker?.(state),
         onJourneyTrackerVisible: (visible) => this.onJourneyTrackerVisible?.(visible),
-        onJourneyCompletedAnnouncement: (eyebrow, title, meta) =>
-          this.onJourneyCompletedAnnouncement?.(eyebrow, title, meta),
+        onJourneyCompletedAnnouncement: (eyebrow, title, meta, journeyId) => {
+          if (journeyId === WELCOME_JOURNEY_ID) {
+            this.messageFacade.enqueueById('marta-cat-care-checkin', this.onMessageUpdate)
+          }
+          this.onJourneyCompletedAnnouncement?.(eyebrow, title, meta)
+        },
         onJourneyStartedAnnouncement: (eyebrow, title, meta) =>
           this.onJourneyStartedAnnouncement?.(eyebrow, title, meta),
       },

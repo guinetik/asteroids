@@ -1,6 +1,9 @@
 [
   { "asteroidId": "itokawa", "minDifficulty": 1, "maxDifficulty": 2 },
+  { "asteroidId": "itokawa", "minDifficulty": 1, "maxDifficulty": 2, "planetIds": ["earth"] },
   { "asteroidId": "bennu", "minDifficulty": 2, "maxDifficulty": 4 },
+  { "asteroidId": "bennu", "minDifficulty": 1, "maxDifficulty": 3, "planetIds": ["earth"] },
+  { "asteroidId": "xg7", "minDifficulty": 1, "maxDifficulty": 3, "planetIds": ["earth"] },
   { "asteroidId": "eros", "minDifficulty": 2, "maxDifficulty": 4, "planetIds": ["earth", "mars"] },
   {
     "asteroidId": "vesta",

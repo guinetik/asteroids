@@ -28,6 +28,7 @@ import {
   hasCompletedJourney,
   markJourneyStartAnnounced,
   WELCOME_JOURNEY_ID,
+  type JourneyId,
   type JourneyTrackerState,
   type JourneyTriggerId,
 } from '@/lib/journeys'
@@ -45,7 +46,12 @@ export interface MapJourneyCallbacks {
   /** Tracker card visibility toggle (separate from state so interludes can hide without clearing). */
   onJourneyTrackerVisible?: (visible: boolean) => void
   /** Fired when a journey completes; amber completion banner. */
-  onJourneyCompletedAnnouncement?: (eyebrow: string, title: string, metaText: string) => void
+  onJourneyCompletedAnnouncement?: (
+    eyebrow: string,
+    title: string,
+    metaText: string,
+    journeyId: JourneyId,
+  ) => void
   /** Fired when a new journey begins; amber "BEGINS" banner. */
   onJourneyStartedAnnouncement?: (eyebrow: string, title: string, metaText: string) => void
 }
@@ -105,6 +111,7 @@ export class MapJourneyFacade {
         display.eyebrow,
         display.title,
         display.objectiveLabel,
+        journeyId,
       )
     }
     this.emitTracker()

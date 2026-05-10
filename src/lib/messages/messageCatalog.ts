@@ -268,6 +268,29 @@ export const JAY_GRAVITY_SURFING_HEADS_UP: ShipMessageDefinition = {
   ],
 }
 
+/**
+ * Marta's check-in after the player finishes the onboarding journey — she never names the cat,
+ * just calls in the promise the player made before she'd hand over the keys.
+ */
+export const MARTA_CAT_CARE_CHECKIN: ShipMessageDefinition = {
+  id: 'marta-cat-care-checkin',
+  from: 'Marta Vale, Vale Orbital Refurb',
+  subject: "How's My Little Guy Doing?",
+  sentAt: '2306-04-12 09:30 UTC',
+  trigger: 'welcome_journey_completed_scripted',
+  delivery: 'inbox_prompt',
+  priority: STARTUP_MESSAGE_PRIORITY,
+  body: [
+    'Hey handsome, Marta here.',
+    "Quick check-in. I'm not asking about the shuttle — I'm asking about him. You remember the deal. I don't sell hulls to people who can't be trusted with a cat. You looked me in the eye and promised. So.",
+    "Three meters to watch on him: love, hunger, and tired. Pet him and play with him so the love bar stays up. Keep his bowl filled or hunger drops and he gets cranky. And don't forget the litterbox — clean it out before it overflows or he'll boycott the thing and follow you around the habitat trying to make a point.",
+    "When he's happy, he keeps to himself in the habitat — naps, wanders, does cat business. When something's off, he'll start trailing you wherever you go. That's him telling you, not asking.",
+    "Cat food only sells reliably at Earth orbit at sane prices. Stock up before you push out. And listen — if you Rewind, your cargo is gone. Hull comes back, fuel comes back, the bags in your hold do not. So don't push your luck on a half-empty pantry.",
+    "Take care of him and he'll take care of you. That's how it works.",
+    '— Marta',
+  ],
+}
+
 /** Jay's celebration delivered the moment the player presses INSTALL on the module. */
 export const JAY_GRAVITY_SURFING_INSTALLED: ShipMessageDefinition = {
   id: 'jay-gravity-surfing-installed',
@@ -724,6 +747,7 @@ export const SHIP_MESSAGE_CATALOG: ShipMessageDefinition[] = [
   MARTA_GRAVITY_SURFING_HEADS_UP,
   JAY_GRAVITY_SURFING_HEADS_UP,
   JAY_GRAVITY_SURFING_INSTALLED,
+  MARTA_CAT_CARE_CHECKIN,
   JOVIAN_HEKTOR_PHOTOMETRY_OFFER,
   JOVIAN_SATURN_PHOTOMETRY_OFFER,
   JOVIAN_HEKTOR_DAN_OFFER,

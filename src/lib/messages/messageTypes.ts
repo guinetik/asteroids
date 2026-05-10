@@ -25,6 +25,8 @@ export type ShipMessageTrigger =
   | 'gravity_surfing_offer_followup_scripted'
   /** Reserved scripted delivery — Jay's celebration after the player installs the Gravity Surfing Module; `enqueueById` only. */
   | 'gravity_surfing_installed_scripted'
+  /** Reserved scripted delivery — Marta's cat-care check-in after the welcome journey completes; `enqueueById` only. */
+  | 'welcome_journey_completed_scripted'
   | 'contract'
 
 /** Built-in inbox folder id used by all general ship comms (default sidebar entry). */

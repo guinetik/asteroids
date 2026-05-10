@@ -25,6 +25,7 @@ import type { PlayerProfile } from '@/lib/player/types'
 import { GLOBAL_MISSION_PAY_MULTIPLIER } from '../missionEconomy'
 const SELECT_FIRST_ASTEROID_RANDOM = 0.25
 const SELECT_SECOND_ASTEROID_RANDOM = 0.5
+const SELECT_LAST_ASTEROID_RANDOM = 0.99
 
 const RESTRICTED_HOST_OBJECTIVE_TYPES = new Set([
   'exterminate',
@@ -231,7 +232,9 @@ describe('rollObjective', () => {
 
 describe('pickAsteroidForDifficulty', () => {
   it('allows Eros for Earth-hosted early/mid missions', () => {
-    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(SELECT_SECOND_ASTEROID_RANDOM)
+    // Earth at difficulty 3 has multiple host-tagged entries (bennu, xg7, eros);
+    // SELECT_LAST_ASTEROID_RANDOM lands on the last one declared (eros).
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(SELECT_LAST_ASTEROID_RANDOM)
 
     expect(pickAsteroidForDifficulty(3, 'earth')).toBe('eros')
     randomSpy.mockRestore()

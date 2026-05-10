@@ -358,6 +358,11 @@ const evaTelemetry = reactive<FpsTelemetry>({
   objectives: [],
 })
 const habitatActive = ref(false)
+/** Cat needs prompt thresholds — mirror CatController state machine semantics (100=full, 0=empty). */
+const CAT_LOVE_NEEDY_THRESHOLD = 30
+const CAT_HUNGER_NEEDY_THRESHOLD = 30
+const CAT_BLADDER_FULL_THRESHOLD = 70
+const CAT_LITTER_FULL_THRESHOLD = 6
 /** Hides orbit shuttle chrome during Earth first-mail cinematic → habitat (not used when intro is skipped). */
 const earthStartupOrbitHudSuppressed = ref(false)
 const shuttleControlVisible = ref(false)
@@ -626,6 +631,23 @@ function clearPickupUi(): void {
 const fastTravelablePlanetIds = computed<Set<string>>(
   () => new Set(playerProfileSnapshot.value.unlockedFastTravelPlanets ?? []),
 )
+
+/**
+ * Single string surfacing the most-urgent cat need while piloting the shuttle, or null when
+ * every meter is fine. Hidden whenever the player is inside the habitat (the SushiMetersOverlay
+ * already covers that case). Marta's onboarding check-in gates the prompt — no nag before the
+ * player has been told the meters exist.
+ */
+const catNeedsAttentionPrompt = computed<string | null>(() => {
+  if (habitatActive.value) return null
+  const profile = playerProfileSnapshot.value
+  if (!profile.completedJourneyIds?.includes('welcome')) return null
+  if (profile.sushiBladder >= CAT_BLADDER_FULL_THRESHOLD) return 'litterbox is full'
+  if (profile.litterPollution >= CAT_LITTER_FULL_THRESHOLD) return 'litterbox needs cleaning'
+  if (profile.sushiHunger <= CAT_HUNGER_NEEDY_THRESHOLD) return 'food bowl is empty'
+  if (profile.sushiLove <= CAT_LOVE_NEEDY_THRESHOLD) return 'wants attention'
+  return null
+})
 
 const fastTravelDialogVisible = ref(false)
 const fastTravelTargetPlanetId = ref<string>('')
@@ -2181,6 +2203,10 @@ watch(
     </button>
     <div v-if="missionNotification" class="mission-notification">
       {{ missionNotification }}
+    </div>
+    <div v-if="catNeedsAttentionPrompt" class="cat-needs-prompt">
+      <span class="cat-needs-prompt__title">YOUR CAT NEEDS ATTENTION</span>
+      <span class="cat-needs-prompt__detail">PRESS H TO GO TO HABITAT</span>
     </div>
     <div v-if="missionApproachHud.visible" class="mission-approach-prompt">
       <span class="mission-approach-prompt__name">{{ missionApproachHud.name }}</span>
