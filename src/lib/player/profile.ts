@@ -1191,6 +1191,33 @@ export function setLastDockedPlanet(profile: PlayerProfile, planetId: string): P
 }
 
 /**
+ * Overlay the fields the contract runtime writes directly to storage onto a
+ * controller-side in-memory profile. Used at save time so periodic mutators
+ * (sushi tick, hull persist) don't clobber fast-travel unlocks, mission pay
+ * multipliers, body-access transitions, story flags, etc. that the runtime
+ * `applyRewardToProfile` path wrote between the controller's last refresh and
+ * its next persist.
+ *
+ * @param inMemory - Profile the controller is about to save.
+ * @param stored - Latest profile read from storage; pass `null` to no-op.
+ */
+export function mergeExternallyWrittenRewardFields(
+  inMemory: PlayerProfile,
+  stored: PlayerProfile | null,
+): PlayerProfile {
+  if (!stored) return inMemory
+  return {
+    ...inMemory,
+    unlockedFastTravelPlanets: stored.unlockedFastTravelPlanets,
+    missionPayMultipliers: stored.missionPayMultipliers,
+    shuttleBuffs: stored.shuttleBuffs,
+    disabledGiverIds: stored.disabledGiverIds,
+    bodyAccess: stored.bodyAccess,
+    activeStoryFlags: stored.activeStoryFlags,
+  }
+}
+
+/**
  * Return a copy of the profile with `planetId` added to the fast-travel unlock list.
  * No-op when the planet is already unlocked.
  *

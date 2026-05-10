@@ -108,6 +108,7 @@ import {
   loadProfile,
   markMapIntroSeen,
   markPlayerNameConfirmed,
+  mergeExternallyWrittenRewardFields,
   saveProfile,
   addCredits,
   recordGravitySurfStart,
@@ -2731,8 +2732,15 @@ export class MapViewController implements Tickable {
     return this.labelsVisible
   }
 
-  /** Write current profile and shuttle inventory to localStorage. */
+  /**
+   * Write current profile and shuttle inventory to localStorage. Before saving,
+   * rebase the externally-written contract-reward fields (fast-travel unlocks,
+   * pay multipliers, body access, story flags, etc.) from storage so a stale
+   * in-memory copy can't clobber rewards applied by the contract runtime since
+   * the controller's last refresh.
+   */
   private persistPlayerProfile(): void {
+    this.playerProfile = mergeExternallyWrittenRewardFields(this.playerProfile, loadProfile())
     saveProfile(this.playerProfile)
     saveInventory(this.playerInventory)
   }
@@ -2753,6 +2761,7 @@ export class MapViewController implements Tickable {
     this.sushiNeedsSaveAccumS += dt
     if (this.sushiNeedsSaveAccumS >= SUSHI_NEEDS_SAVE_INTERVAL_S) {
       this.sushiNeedsSaveAccumS = 0
+      this.playerProfile = mergeExternallyWrittenRewardFields(this.playerProfile, loadProfile())
       saveProfile(this.playerProfile)
     }
   }
@@ -2801,6 +2810,7 @@ export class MapViewController implements Tickable {
     const hp = health.hp
     if (this.playerProfile.shuttleHullHp === hp) return
     this.playerProfile = { ...this.playerProfile, shuttleHullHp: hp }
+    this.playerProfile = mergeExternallyWrittenRewardFields(this.playerProfile, loadProfile())
     saveProfile(this.playerProfile)
   }
 
