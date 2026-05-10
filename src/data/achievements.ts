@@ -220,6 +220,25 @@ const SUSHI_BOWL_REFILL_THRESHOLD = 3
 const REWARD_SUSHI_BELOVED = 2_000
 /** Credits granted for unlocking the "Bowl-Filler" Sushi achievement. */
 const REWARD_SUSHI_BOWL_FILLER = 10_000
+/** Reward credits for early-tier arcade achievements (Insert Coin, score gates, wave 5, UFO Hunter). */
+const REWARD_ARCADE_EARLY = 3_000
+/** Reward credits for late-tier arcade achievements (Wave 10, Marathon). */
+const REWARD_ARCADE_LATE = 5_000
+
+/** Run count for the INSERT COIN unlock. */
+const ARCADE_INSERT_COIN_RUNS = 1
+/** Single-run score threshold for LITTLE LEAGUE. */
+const ARCADE_SCORE_LITTLE_LEAGUE = 5_000
+/** Single-run score threshold for KILOMETRIC. */
+const ARCADE_SCORE_KILOMETRIC = 10_000
+/** Wave threshold for WAVE FIVE. */
+const ARCADE_WAVE_FIVE = 5
+/** Wave threshold for DECA-CLEAR. */
+const ARCADE_WAVE_DECA = 10
+/** Wave threshold for MARATHON. */
+const ARCADE_WAVE_MARATHON = 15
+/** Lifetime saucer-kill threshold for UFO HUNTER. */
+const ARCADE_SAUCER_KILLS_HUNTER = 15
 
 /**
  * Creative title + subtitle for first orbit around each catalog body (Sun + planets).
@@ -1368,6 +1387,98 @@ export const ACHIEVEMENT_DEFINITIONS: readonly AchievementDefinition[] = [
     rewardCredits: REWARD_CAPSTONE,
     kind: 'cargo_intake_lifetime_earned',
     threshold: CARGO_INTAKE_LIFETIME_THIRD_TIER,
+  },
+  {
+    id: 'arcade-asteroids-insert-coin',
+    category: 'arcade',
+    icon: '\u{1FA99}',
+    title: 'INSERT COIN',
+    subtitle: 'First quarter dropped — welcome to the cabinet',
+    description: "Start your first run on the cabinet's Asteroids ROM.",
+    type: 'ARCADE',
+    rewardCredits: REWARD_ARCADE_EARLY,
+    kind: 'arcade_runs_started',
+    romId: 'asteroids',
+    threshold: ARCADE_INSERT_COIN_RUNS,
+  },
+  {
+    id: 'arcade-asteroids-score-5k',
+    category: 'arcade',
+    icon: '\u{1F3AF}',
+    title: 'LITTLE LEAGUE',
+    subtitle: 'Five thousand points in a single run',
+    description: 'Reach a single-run score of 5,000 in Asteroids.',
+    type: 'ARCADE',
+    rewardCredits: REWARD_ARCADE_EARLY,
+    kind: 'arcade_best_score',
+    romId: 'asteroids',
+    threshold: ARCADE_SCORE_LITTLE_LEAGUE,
+  },
+  {
+    id: 'arcade-asteroids-score-10k',
+    category: 'arcade',
+    icon: '\u{1F3C6}',
+    title: 'KILOMETRIC',
+    subtitle: 'Ten thousand points in a single run',
+    description: 'Reach a single-run score of 10,000 in Asteroids.',
+    type: 'ARCADE',
+    rewardCredits: REWARD_ARCADE_EARLY,
+    kind: 'arcade_best_score',
+    romId: 'asteroids',
+    threshold: ARCADE_SCORE_KILOMETRIC,
+  },
+  {
+    id: 'arcade-asteroids-wave-5',
+    category: 'arcade',
+    icon: '\u{1F30A}',
+    title: 'WAVE FIVE',
+    subtitle: 'Cleared five waves of rocks',
+    description: 'Reach wave 5 in Asteroids.',
+    type: 'ARCADE',
+    rewardCredits: REWARD_ARCADE_EARLY,
+    kind: 'arcade_best_wave',
+    romId: 'asteroids',
+    threshold: ARCADE_WAVE_FIVE,
+  },
+  {
+    id: 'arcade-asteroids-wave-10',
+    category: 'arcade',
+    icon: '\u{1F525}',
+    title: 'DECA-CLEAR',
+    subtitle: 'Cleared ten waves — the hand has memory now',
+    description: 'Reach wave 10 in Asteroids.',
+    type: 'ARCADE',
+    rewardCredits: REWARD_ARCADE_LATE,
+    kind: 'arcade_best_wave',
+    romId: 'asteroids',
+    threshold: ARCADE_WAVE_DECA,
+  },
+  {
+    id: 'arcade-asteroids-wave-15',
+    category: 'arcade',
+    icon: '\u{1F3C3}',
+    title: 'MARATHON',
+    subtitle: 'Reach wave 15 in one run — pure endurance',
+    description: 'Reach wave 15 in Asteroids.',
+    type: 'ARCADE',
+    rewardCredits: REWARD_ARCADE_LATE,
+    kind: 'arcade_best_wave',
+    romId: 'asteroids',
+    threshold: ARCADE_WAVE_MARATHON,
+  },
+  {
+    id: 'arcade-asteroids-ufo-hunter',
+    category: 'arcade',
+    icon: '\u{1F6F8}',
+    title: 'UFO HUNTER',
+    subtitle: "Fifteen saucers down — pilot's vendetta",
+    description: 'Destroy 15 saucers in Asteroids across all runs.',
+    type: 'ARCADE',
+    rewardCredits: REWARD_ARCADE_EARLY,
+    kind: 'arcade_event_count',
+    romId: 'asteroids',
+    arcadeEventId: 'saucerKill',
+    threshold: ARCADE_SAUCER_KILLS_HUNTER,
   },
 ]
 
