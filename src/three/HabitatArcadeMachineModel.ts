@@ -42,10 +42,10 @@ const ARCADE_SCREEN_CLOSE_USE_FORWARD = 1.1
  * along with {@link ARCADE_FALLBACK_SCREEN_HEIGHT} until it matches the
  * authored bezel.
  */
-const ARCADE_FALLBACK_SCREEN_WIDTH = 0.55
+const ARCADE_FALLBACK_SCREEN_WIDTH = 0.6
 
 /** Height of the fallback screen plane in cabinet-local units. */
-const ARCADE_FALLBACK_SCREEN_HEIGHT = 0.42
+const ARCADE_FALLBACK_SCREEN_HEIGHT = 0.45
 
 /** Local-X offset of the fallback screen plane's center, relative to the cabinet origin. */
 const ARCADE_FALLBACK_SCREEN_LOCAL_X = 0
@@ -54,22 +54,22 @@ const ARCADE_FALLBACK_SCREEN_LOCAL_X = 0
  * Local-Y offset of the fallback screen plane's center. The cabinet is normalized
  * so its base sits at local Y = 0; the screen is roughly at eye height.
  */
-const ARCADE_FALLBACK_SCREEN_LOCAL_Y = 1.15
+const ARCADE_FALLBACK_SCREEN_LOCAL_Y = 1.3
 
 /**
  * Local-Z offset of the fallback screen plane's center. Pushes slightly forward
  * of the cabinet body so the plane doesn't z-fight with the bezel mesh.
  */
-const ARCADE_FALLBACK_SCREEN_LOCAL_Z = 0.32
+const ARCADE_FALLBACK_SCREEN_LOCAL_Z = 0
 
 /**
  * Pitch (radians) of the fallback screen plane around its local X axis. A small
  * negative tilt mimics a cabinet screen recessed into a slight angle.
  */
-const ARCADE_FALLBACK_SCREEN_PITCH = -0.18
+const ARCADE_FALLBACK_SCREEN_PITCH = 0
 
 /** Yaw (radians) of the fallback screen plane around its local Y axis. */
-const ARCADE_FALLBACK_SCREEN_YAW = 0
+const ARCADE_FALLBACK_SCREEN_YAW = -Math.PI / 2
 
 /**
  * Arcade machine model wrapper. Drops the inner GLB so its base sits at
@@ -136,7 +136,7 @@ export class HabitatArcadeMachineModel {
         if (c instanceof THREE.Mesh) names.push(c.name || '<unnamed>')
       })
       // Always log so we can see which mesh got picked (or that nothing did).
-       
+
       console.info(
         '[HabitatArcadeMachineModel] screen submesh:',
         this.screenMesh ? this.screenMesh.name || '<unnamed>' : 'NOT FOUND',
@@ -229,6 +229,7 @@ export class HabitatArcadeMachineModel {
     const material = new THREE.MeshBasicMaterial({
       color: 0x000000,
       toneMapped: false,
+      side: THREE.DoubleSide,
     })
     const mesh = new THREE.Mesh(geometry, material)
     mesh.name = 'habitatArcadeScreenFallback'
