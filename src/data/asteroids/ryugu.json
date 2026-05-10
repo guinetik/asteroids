@@ -1,0 +1,59 @@
+{
+  "id": "ryugu",
+  "name": "Ryugu",
+  "designation": "162173 Ryugu",
+  "type": "Carbonaceous (Cb-type)",
+  "biome": "rocky",
+  "description": "A near-Earth carbonaceous asteroid visited by JAXA's Hayabusa2 mission. Its spinning-top profile carries a pronounced equatorial ridge, and its dark, dry-looking surface is rich in hydrated minerals and primitive organics — a sibling rock to Bennu, slightly larger and warmer in tone.",
+  "composition": [
+    { "name": "Hydrated Silicates", "formula": "Mg3Si2O5(OH)4", "percentage": 50 },
+    { "name": "Magnetite", "formula": "Fe3O4", "percentage": 14 },
+    { "name": "Organic Compounds", "percentage": 12 },
+    { "name": "Iron Sulfides", "formula": "FeS", "percentage": 9 },
+    { "name": "Carbonates", "formula": "CaCO3", "percentage": 8 },
+    { "name": "Olivine", "formula": "(Mg,Fe)2SiO4", "percentage": 7 }
+  ],
+  "shape": {
+    "dimensions": [450, 450, 440],
+    "elongation": 1.05,
+    "lobeCount": 1,
+    "irregularity": 0.5
+  },
+  "surface": {
+    "craterDensity": 0.55,
+    "craterMaxScale": 0.35,
+    "boulderDensity": 0.95,
+    "ridgeFrequency": 0.55,
+    "roughness": 0.85,
+    "dustCoverage": 0.35,
+    "modelPath": "/models/asteroids/ryugu.glb",
+    "modelScale": 1300,
+    "surfaceTextures": "/textures/asteroids/rocky",
+    "surfaceTextureRepeat": 13,
+    "surfaceModulatorStrength": 1.0,
+    "surfaceModulatorColorBlend": 0.1,
+    "surfaceAOStrength": 0.5,
+    "surfaceEmissionStrength": 0.5
+  },
+  "visual": {
+    "albedo": 0.045,
+    "baseColor": [0.28, 0.26, 0.24],
+    "valleyTone": 0.1,
+    "peakTone": 2.05
+  },
+  "physical": {
+    "mass": 4.5e11,
+    "density": 1190,
+    "surfaceGravity": 1.2e-4,
+    "rotationPeriod": 7.6,
+    "surfaceTemperature": 300,
+    "meanDiameterKm": 0.9
+  },
+  "lighting": {
+    "sunAzimuth": 45,
+    "sunElevation": 35,
+    "sunColor": [1.0, 0.93, 0.82],
+    "sunIntensity": 1,
+    "ambientIntensity": 2
+  }
+}
