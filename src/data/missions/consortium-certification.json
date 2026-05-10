@@ -5,8 +5,8 @@
   "giverId": "space-consortium",
   "giverName": "Space Consortium",
   "templateId": "consortium-certification",
-  "name": "Consortium Certification",
-  "briefing": "Retrieve the sealed Consortium package from the staged asteroid container.",
+  "name": "USC Hardware Drop — Gravity Surfing Module",
+  "briefing": "USC has staged a Gravity Surfing Module on a marked asteroid. Fly the waypoint, drop the lander with F, walk to the container, and collect the package on foot. Bring it home — the module sits in your shuttle inventory until you press INSTALL on it. Until then, your nav cannot see the spacetime grid that's been there the whole time.",
   "difficulty": 3,
   "region": "asteroid-belt",
   "objectives": [
@@ -15,8 +15,8 @@
       "x": 0,
       "z": 0,
       "collectItemId": "grid-coupling-module",
-      "collectItemLabel": "Grid Coupling Module",
-      "interactionLabel": "[E] COLLECT CONSORTIUM PACKAGE",
+      "collectItemLabel": "Gravity Surfing Module",
+      "interactionLabel": "[E] COLLECT GRAVITY SURFING MODULE",
       "reward": 0
     }
   ],

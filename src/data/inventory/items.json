@@ -272,8 +272,8 @@
   {
     "id": "grid-coupling-module",
     "category": "consumable",
-    "label": "Grid Coupling Module",
-    "description": "A sealed consortium hardware package containing the coupling assembly needed to project and stabilize a local gravity surf grid.",
+    "label": "Gravity Surfing Module",
+    "description": "USC-issued shuttle hardware. Once installed from inventory, the Space Fabric overlay lights up on the tactical map (M) and the shuttle can ride the spacetime grid lines — approach a line and press Q to lock on, WASD to pick the rail, Q again to drop free. Fast travel that costs you nothing but a moment of motion sickness.",
     "icon": "grid-coupling-module.png",
     "weightPerUnit": 12,
     "maxStack": 1,

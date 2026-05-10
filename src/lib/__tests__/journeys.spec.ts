@@ -213,7 +213,9 @@ describe('act-1-inner-system journey', () => {
     const beforeInstall = buildActiveJourneyTracker(profile)
     expect(beforeInstall?.title).toBe('Inner System')
     const step4 = beforeInstall?.objectives[0]?.steps[3]
-    expect(step4?.label).toBe('Complete an orbital surf (manifold highway)')
+    expect(step4?.label).toBe(
+      'Ride a manifold highway with the Gravity Surfing Module (Q on any orbit line)',
+    )
     expect(step4?.active).toBe(true)
     expect(step4?.complete).toBe(false)
 

@@ -217,7 +217,7 @@ const JOURNEY_DEFINITIONS: readonly JourneyDefinition[] = [
       },
       {
         id: 'grid-coupling',
-        label: 'Complete an orbital surf (manifold highway)',
+        label: 'Ride a manifold highway with the Gravity Surfing Module (Q on any orbit line)',
         trigger: 'orbital_surf_completed',
       },
     ],

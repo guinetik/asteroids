@@ -212,18 +212,79 @@ export const JAY_MISSION_START_MESSAGE: ShipMessageDefinition = {
 export const CONSORTIUM_CERTIFICATION_MESSAGE: ShipMessageDefinition = {
   id: 'consortium-certification-offer',
   from: 'United Space Consortium — Logistics Division',
-  subject: 'REQUISITION PACKAGE — FIELD OPERATOR CERTIFICATION 2207-R-887',
+  subject: 'USC HARDWARE DROP — GRAVITY SURFING MODULE 2207-R-887',
   sentAt: '2306-04-09 12:10 UTC',
   trigger: 'mission_start',
   delivery: 'inbox_prompt',
   priority: CONSORTIUM_MESSAGE_PRIORITY,
+  enqueueOnDismiss: ['marta-gravity-surfing-heads-up', 'jay-gravity-surfing-heads-up'],
+  enqueueOnDismissDelaySeconds: 6,
   body: [
     'OPERATOR,',
-    'Pursuant to recent activity logs flagged on your file by an associate of record (J. MERCER), the Consortium notes sustained deep-field operation against a Class-C orbital frame.',
-    'Retrofitted hulls are not typically certified for relativistic grid coupling. In this case, an exception package has been staged and attached to your active mission ledger under CONSORTIUM CERTIFICATION.',
-    'Proceed to the marked asteroid, retrieve the sealed Grid Coupling Module per Form 4471-G-12, and install from shuttle inventory after recovery. Field tampering with the package is non-permitted and will void the exception.',
-    'The assignment has been entered into your active mission ledger. Track the waypoint and complete the pickup at the operator\'s discretion. The Consortium thanks you for your cooperation.',
+    'Pursuant to activity logs flagged on your file by an associate of record (J. MERCER), the Consortium has approved one (1) GRAVITY SURFING MODULE for issue against your hull. Package is staged on a Class-C asteroid in the main belt; waypoint added to your active mission ledger.',
+    'PICKUP PROCEDURE: fly the waypoint, drop the lander (F), walk to the marked container, and collect the sealed module on foot. Return to the shuttle.',
+    'INSTALL PROCEDURE: open the shuttle inventory, locate GRAVITY SURFING MODULE, and press INSTALL. The module is non-functional in storage. Once installed, the SPACE FABRIC overlay will populate on the tactical map (M) — these grid lines have always existed; your hardware could not see them. Approach any line and press Q to couple, WASD to select rail, Q again to decouple.',
+    'Field tampering with the package is non-permitted and will void the exception. The Consortium thanks you for your cooperation.',
     '— USC Logistics, Sol Sector',
+  ],
+}
+
+/** Marta's warm follow-up after the USC hardware drop offer hits the inbox. */
+export const MARTA_GRAVITY_SURFING_HEADS_UP: ShipMessageDefinition = {
+  id: 'marta-gravity-surfing-heads-up',
+  from: 'Marta Vale, Vale Orbital Refurb',
+  subject: 'Baby — That USC Letter Is A Big Deal',
+  sentAt: '2306-04-09 12:18 UTC',
+  trigger: 'gravity_surfing_offer_followup_scripted',
+  delivery: 'inbox_prompt',
+  priority: CONSORTIUM_MESSAGE_PRIORITY,
+  body: [
+    'Hey handsome, Marta here.',
+    "I saw the USC notice come through the relay. I'm proud of you. Pilots wait years for one of those modules and you got one your second month out. Jay must've put your name forward the day you signed the shuttle papers.",
+    "Here's what they didn't say in plain words, because Logistics never does: the Gravity Surfing Module is how you stop fighting the map. Right now you're burning fuel like every shuttle does. After you install it, you ride the spacetime grid for free. I can't sell you a fuel tank that competes with that.",
+    "Go pick it up. Drop the lander on the asteroid, walk over, grab the box, fly it home. Then OPEN INVENTORY and press INSTALL. Don't leave it sitting in your hold like the boys who came through here last spring. They thought it was a souvenir.",
+    "Stop by Earth when you're done. I'll have the latte ready.",
+    '— Marta',
+  ],
+}
+
+/** Jay's translation of the USC bureaucratese, chained off the offer dismiss. */
+export const JAY_GRAVITY_SURFING_HEADS_UP: ShipMessageDefinition = {
+  id: 'jay-gravity-surfing-heads-up',
+  from: 'Jay Mercer',
+  subject: 'I Vouched For You. Don\'t Sit On That Box.',
+  sentAt: '2306-04-09 12:21 UTC',
+  trigger: 'gravity_surfing_offer_followup_scripted',
+  delivery: 'inbox_prompt',
+  priority: JAY_MESSAGE_PRIORITY,
+  body: [
+    'Hey, you got Jay.',
+    "USC writes letters like they're paid by the form number. Here's the human version: I put your name in months ago. They almost laughed me off the call — Class-C shuttle, retrofitted hull, indie operator. Then they pulled your contract numbers and stopped laughing.",
+    "What they sent you is the GRAVITY SURFING MODULE. Milspec. It lights up the spacetime grid lines on your tactical map (M). Those lines have been there the whole time — your nav couldn't see them without the hardware. Once it's in, you stop burning fuel to cross the system. You ride the rails.",
+    "Pickup is the easy part — drop the lander on the asteroid, EVA over, grab the box. The part people screw up is the install. It is NOT automatic. Open your shuttle inventory, find the module, press INSTALL. Until you do that, your map looks the same as it did yesterday.",
+    "Press Q near a glowing grid line to couple. WASD picks the rail. Q again drops you off, anywhere. Costs nothing. The grid does the work.",
+    "Don't make me regret the referral.",
+    '— Jay',
+  ],
+}
+
+/** Jay's celebration delivered the moment the player presses INSTALL on the module. */
+export const JAY_GRAVITY_SURFING_INSTALLED: ShipMessageDefinition = {
+  id: 'jay-gravity-surfing-installed',
+  from: 'Jay Mercer',
+  subject: 'You Got The Grid License',
+  sentAt: '2306-04-10 07:02 UTC',
+  trigger: 'gravity_surfing_installed_scripted',
+  delivery: 'inbox_prompt',
+  priority: JAY_MESSAGE_PRIORITY,
+  body: [
+    'Hey, you got Jay.',
+    "So the Consortium actually signed off on your hull. I put your name in months ago and figured they'd laugh at the application. A Class-C shuttle running field contracts — most of those certification officers haven't seen one outside a museum.",
+    "The module they sent is milspec. It locks onto the spacetime fabric lines your nav system already projects — except your nav couldn't project them before the coupler was installed. You've been flying blind this whole time. Welcome to the grid.",
+    "Open your tactical map (M). The SPACE FABRIC overlay is live now. Press Q near a glowing grid line to couple. WASD to pick your rail. Q again to decouple — fast stop, wherever you are. It drinks no fuel. The grid does the work.",
+    "The heat and cryo kits bundled in are USC's way of saying 'do not immediately die trying to reach Saturn.' You're welcome.",
+    'Don\'t make me regret the referral.',
+    '— Jay',
   ],
 }
 
@@ -660,6 +721,9 @@ export const CERES_INSTITUTE_ARCHIVE_BUNKER_OFFER: ShipMessageDefinition = {
 export const SHIP_MESSAGE_CATALOG: ShipMessageDefinition[] = [
   STARTUP_SELLER_MESSAGE,
   CONSORTIUM_CERTIFICATION_MESSAGE,
+  MARTA_GRAVITY_SURFING_HEADS_UP,
+  JAY_GRAVITY_SURFING_HEADS_UP,
+  JAY_GRAVITY_SURFING_INSTALLED,
   JOVIAN_HEKTOR_PHOTOMETRY_OFFER,
   JOVIAN_SATURN_PHOTOMETRY_OFFER,
   JOVIAN_HEKTOR_DAN_OFFER,

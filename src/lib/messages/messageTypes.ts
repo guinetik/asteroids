@@ -21,6 +21,10 @@ export type ShipMessageTrigger =
   | 'map_cosmetic_shop_intro_scripted'
   /** Reserved scripted delivery — Carmen's first letter after the Finch contract closes; `enqueueById` only. */
   | 'carmen_finch_followup_scripted'
+  /** Reserved scripted delivery — Marta + Jay heads-ups chained off the USC gravity surfing offer; `enqueueOnDismiss` only. */
+  | 'gravity_surfing_offer_followup_scripted'
+  /** Reserved scripted delivery — Jay's celebration after the player installs the Gravity Surfing Module; `enqueueById` only. */
+  | 'gravity_surfing_installed_scripted'
   | 'contract'
 
 /** Built-in inbox folder id used by all general ship comms (default sidebar entry). */

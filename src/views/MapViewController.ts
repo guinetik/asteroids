@@ -3869,6 +3869,7 @@ export class MapViewController implements Tickable {
     if (upgradeId === 'gravitySurfing') {
       this.applyGridVisible(true)
       this.emitMapViewLayerToggles()
+      this.messageFacade.enqueueById('jay-gravity-surfing-installed', this.onMessageUpdate)
     }
     this.onUpgradeHudRefresh?.()
     const definition = UPGRADE_DEFINITIONS[upgradeId]
