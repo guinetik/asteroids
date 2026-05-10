@@ -41,6 +41,12 @@ import { HabitatRefractorTelescopeModel } from '@/three/HabitatRefractorTelescop
 import { HabitatLoungeChairModel } from '@/three/HabitatLoungeChairModel'
 import { HabitatArcadeMachineModel } from '@/three/HabitatArcadeMachineModel'
 import { HabitatCatTowerModel } from '@/three/HabitatCatTowerModel'
+import { ArcadeCabinetInput } from '@/lib/minigame/cabinet/ArcadeCabinetInput'
+import { ArcadeCabinetSession } from '@/lib/minigame/cabinet/ArcadeCabinetSession'
+import { ArcadeRomRegistry } from '@/lib/minigame/cabinet/ArcadeRomRegistry'
+import { ArcadeScreenRenderer } from '@/lib/minigame/cabinet/ArcadeScreenRenderer'
+import { createAsteroidsRom } from '@/lib/minigame/arcadeAsteroids/AsteroidsRom'
+import arcadeRomCatalog from '@/data/arcade-roms.json'
 import { HabitatBackdrop, type HabitatBackdropContext } from '@/three/HabitatBackdrop'
 import { findCosmeticOptionById } from '@/lib/cosmetics/catalog'
 import { getPlayerCosmetics } from '@/lib/cosmetics/profileCosmetics'
@@ -871,6 +877,14 @@ const PET_COOLDOWN_S = 5
 const TABLE_CAMERA_TURN_RATE = 5
 /** Total seconds the shuttle-controls camera-turn sequence lasts. */
 const TABLE_CAMERA_TURN_DURATION_S = 0.65
+/** Lerp factor (per second) for the camera turn when engaging the arcade cabinet. */
+const ARCADE_CAMERA_TURN_RATE = 7.5
+/** Total seconds the arcade engage camera-turn sequence lasts. */
+const ARCADE_CAMERA_TURN_DURATION_S = 0.55
+/** Logical pixel width of the arcade screen offscreen canvas. */
+const ARCADE_SCREEN_WIDTH = 640
+/** Logical pixel height of the arcade screen offscreen canvas. */
+const ARCADE_SCREEN_HEIGHT = 480
 /**
  * Vertical offset above {@link FLOOR_Y} used as the Y component of the table look-at target
  * so the camera tilts down toward the console surface rather than the floor beneath it.
@@ -1324,6 +1338,17 @@ export class HabitatInteriorScene {
   private tableSequenceActive = false
   /** Seconds elapsed in the current shuttle-controls camera-turn sequence. */
   private tableSequenceTime = 0
+
+  /** Offscreen canvas + texture renderer for the cabinet screen. */
+  private arcadeRenderer: ArcadeScreenRenderer | null = null
+  /** Owned cabinet state machine. Null until the GLB has loaded. */
+  private arcadeSession: ArcadeCabinetSession | null = null
+  /** Window-level keyboard subscriber for cabinet input. */
+  private readonly arcadeInput = new ArcadeCabinetInput()
+  /** True while the camera is lerping toward the cabinet on engage. */
+  private arcadeSequenceActive = false
+  /** Seconds elapsed in the current arcade engage camera-turn sequence. */
+  private arcadeSequenceTime = 0
 
   /**
    * The sub-group containing the hatch wheel-knob ring and crossed spokes. Parented inside
@@ -1831,6 +1856,24 @@ export class HabitatInteriorScene {
       this.arcadeMachine.group.rotation.y = ARCADE_MACHINE_ROTATION_Y
       this.arcadeMachine.refreshAabb()
       this.scene.add(this.arcadeMachine.group)
+      this.arcadeRenderer = new ArcadeScreenRenderer()
+      const catalog = arcadeRomCatalog as Array<{
+        id: string
+        title: string
+        year: string
+        blurb: string
+        highScoreKey: string
+      }>
+      const registry = new ArcadeRomRegistry(catalog, { asteroids: createAsteroidsRom })
+      this.arcadeSession = new ArcadeCabinetSession({
+        registry,
+        width: ARCADE_SCREEN_WIDTH,
+        height: ARCADE_SCREEN_HEIGHT,
+        storage: typeof window === 'undefined' ? null : window.localStorage,
+        renderer: this.arcadeRenderer,
+      })
+      this.arcadeMachine.setScreenTexture(this.arcadeRenderer.texture)
+      this.arcadeInput.attach(this.arcadeSession)
       this.playerObstacles.push(this.arcadeMachine.getCollisionAabb().clone())
       this.computeArcadeJumpWaypoints()
     } catch (err) {
@@ -1985,11 +2028,22 @@ export class HabitatInteriorScene {
    */
   tick(dt: number): void {
     this.inputManager.tick(dt)
-    if (!this.tickPetSequence(dt) && !this.tickTableLookSequence(dt) && !this.hatchExitActive) {
+    const arcadeEngaged = this.arcadeSession?.isEngaged() === true
+    if (
+      !this.tickPetSequence(dt) &&
+      !this.tickTableLookSequence(dt) &&
+      !this.tickArcadeLookSequence(dt) &&
+      !this.hatchExitActive &&
+      !arcadeEngaged
+    ) {
       this.tickMovement(dt)
     }
     this.tickInteraction()
     this.fpsCamera.tick(dt)
+    this.arcadeSession?.tick(dt)
+    if (this.arcadeSession?.state === 'disengaging') {
+      this.arcadeSession.completeDisengage()
+    }
     this.tickTablePlacementHold()
     this.tickLaserPointer()
     this.cat?.tick(dt)
@@ -2153,6 +2207,10 @@ export class HabitatInteriorScene {
     this.loungeChair.dispose()
     this.scene.remove(this.arcadeMachine.group)
     this.arcadeMachine.dispose()
+    this.arcadeInput.detach()
+    this.arcadeRenderer?.dispose()
+    this.arcadeRenderer = null
+    this.arcadeSession = null
     this.scene.remove(this.catTower.group)
     this.catTower.dispose()
     this.playerObstacles.length = 0
@@ -3439,6 +3497,57 @@ export class HabitatInteriorScene {
   }
 
   /**
+   * Begin the arcade-cabinet engage cinematic: smoothly turn the FPS camera to
+   * face the cabinet screen over {@link ARCADE_CAMERA_TURN_DURATION_S} seconds.
+   * Player movement is suppressed while this sequence is active.
+   */
+  private startArcadeLookSequence(): void {
+    this.arcadeSequenceActive = true
+    this.arcadeSequenceTime = 0
+    this.arcadeSession?.engage()
+  }
+
+  /**
+   * Advance the arcade engage camera-turn sequence. Lerps yaw + pitch toward the
+   * cabinet's screen world pose. Returns true while the sequence is active to
+   * let {@link tick} suppress normal WASD input.
+   *
+   * @param dt - Delta time in seconds.
+   * @returns Whether the sequence consumed control this frame.
+   */
+  private tickArcadeLookSequence(dt: number): boolean {
+    if (!this.arcadeSequenceActive) return false
+    this.arcadeSequenceTime += dt
+    const pose = this.arcadeMachine.screenWorldPose()
+    if (pose) {
+      const cam = this.fpsCamera.camera
+      const dx = pose.target.x - cam.position.x
+      const dy = pose.target.y - cam.position.y
+      const dz = pose.target.z - cam.position.z
+      const horiz = Math.hypot(dx, dz)
+      if (horiz > 1e-4) {
+        const desiredYaw = Math.atan2(-dx, -dz)
+        const desiredPitch = Math.atan2(dy, horiz)
+        const k = Math.min(1, ARCADE_CAMERA_TURN_RATE * dt)
+        let yawErr = desiredYaw - this.fpsCamera.yaw
+        while (yawErr > Math.PI) yawErr -= Math.PI * 2
+        while (yawErr < -Math.PI) yawErr += Math.PI * 2
+        this.fpsCamera.yaw += yawErr * k
+        this.fpsCamera.pitch += (desiredPitch - this.fpsCamera.pitch) * k
+        this.fpsCamera.pitch = Math.max(
+          -HABITAT_PITCH_CLAMP,
+          Math.min(HABITAT_PITCH_CLAMP, this.fpsCamera.pitch),
+        )
+      }
+    }
+    if (this.arcadeSequenceTime >= ARCADE_CAMERA_TURN_DURATION_S) {
+      this.arcadeSequenceActive = false
+      this.arcadeSession?.completeEngage()
+    }
+    return true
+  }
+
+  /**
    * Begin the hatch exit sequence: start spinning the wheel-knob. Movement and
    * interaction are suppressed for the duration so the player can't walk away
    * mid-animation. {@link tickHatchKnob} fires {@link onInteract} with `'hatch'`
@@ -3475,6 +3584,9 @@ export class HabitatInteriorScene {
       this.onPrompt?.(null)
       return
     }
+
+    // Suppress all prompts + input while the player is engaged with the arcade cabinet.
+    if (this.arcadeSession?.isEngaged()) return
 
     if (this.tablePlacementGrabbed) {
       this.onPrompt?.('LMB place table → devtools console')
@@ -3589,7 +3701,7 @@ export class HabitatInteriorScene {
       if (arcadeDist < ARCADE_PROMPT_RADIUS) {
         this.onPrompt?.('F  Play Asteroids')
         if (this.inputManager.wasActionPressed('interact')) {
-          this.onInteract?.('arcade')
+          this.startArcadeLookSequence()
         }
         return
       }
