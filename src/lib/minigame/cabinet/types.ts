@@ -111,6 +111,26 @@ export interface ArcadeRom {
   isRunComplete(): boolean
   /** HUD snapshot for cabinet chrome. */
   hudSnapshot(): RomHudSnapshot
+  /**
+   * Drain queued events accumulated since the last call. The cabinet session
+   * calls this every tick. ROMs that don't track events return `[]`.
+   */
+  consumeEvents(): ArcadeRomEvent[]
+}
+
+/**
+ * One observable thing that happened inside a ROM. Drained by the cabinet
+ * session each tick via {@link ArcadeRom.consumeEvents}.
+ */
+export interface ArcadeRomEvent {
+  /** Event family. `'runStarted'` and `'runEnded'` are framework-recognized; `'event'` is ROM-specific and uses `eventId` to disambiguate. */
+  type: 'runStarted' | 'runEnded' | 'event'
+  /** For `type: 'event'`: the event id (e.g. `'saucerKill'`). Required for that type, ignored otherwise. */
+  eventId?: string
+  /** Score at the moment the event fired. */
+  score: number
+  /** Wave at the moment the event fired. */
+  wave: number
 }
 
 /** Factory that constructs a ROM from cabinet-provided dependencies. */

@@ -20,6 +20,7 @@ function stubRom(): ArcadeRom {
     reset: () => {},
     isRunComplete: () => true,
     hudSnapshot: () => ({ score: 0, highScore: 0, lives: 0, wave: 0, phaseLabel: 'ATTRACT' }),
+    consumeEvents: () => [],
   }
 }
 

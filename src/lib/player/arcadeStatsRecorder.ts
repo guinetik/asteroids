@@ -7,25 +7,9 @@
  * @spec docs/superpowers/specs/2026-05-09-arcade-asteroids-design.md
  */
 import type { PlayerAchievementStats } from './types'
+import type { ArcadeRomEvent } from '@/lib/minigame/cabinet/types'
 
-/**
- * One observable thing that happened inside a ROM. The cabinet drains a queue
- * of these every tick.
- *
- * Note: the canonical definition will be moved to
- * `src/lib/minigame/cabinet/types.ts` in a follow-up task; this duplicate
- * exists temporarily so this module can land before the cabinet types update.
- */
-export interface ArcadeRomEvent {
-  /** Event family. */
-  type: 'runStarted' | 'runEnded' | 'event'
-  /** For type='event': the event id (e.g. 'saucerKill'). */
-  eventId?: string
-  /** Score at the moment the event fired. */
-  score: number
-  /** Wave at the moment the event fired. */
-  wave: number
-}
+export type { ArcadeRomEvent }
 
 /** Increment used when bumping a counter for a single event. */
 const ARCADE_COUNTER_INCREMENT = 1

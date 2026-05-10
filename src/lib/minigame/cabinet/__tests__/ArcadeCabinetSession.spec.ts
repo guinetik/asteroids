@@ -44,6 +44,7 @@ function makeRom(): ArcadeRom & { calls: RomCalls } {
     reset: () => void calls.reset++,
     isRunComplete: () => false,
     hudSnapshot: () => ({ score: 0, highScore: 0, lives: 3, wave: 1, phaseLabel: 'ATTRACT' }),
+    consumeEvents: () => [],
   }
 }
 

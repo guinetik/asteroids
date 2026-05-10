@@ -134,6 +134,9 @@ export const createAsteroidsRom: ArcadeRomFactory = (deps: ArcadeRomDeps): Arcad
         phaseLabel: phaseLabel(s.phase),
       }
     },
+    consumeEvents() {
+      return []
+    },
   }
 }
 
