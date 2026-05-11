@@ -12,6 +12,7 @@
  */
 
 import type { RestockTimer } from '@/lib/shop/tradeTypes'
+import type { YamadaMissionState } from './yamadaArchetype'
 
 /** The asteroid objective types a mission can contain. */
 export type ObjectiveType =
@@ -667,4 +668,13 @@ export interface GeneratedAsteroidMission {
     /** When true, applies the dedup + close-on-deliver-advance rules. */
     replenishWhileStepOpen?: boolean
   }
+  /**
+   * Archetype-specific runtime state for Yamada Farms missions. Stamped at
+   * acceptance time when the giver template's `archetype` is one of
+   * `'bunker-protect'`, `'bunker-extract'`, or `'patient-rescue'`. Omitted for
+   * all non-Yamada missions.
+   *
+   * @see {@link YamadaMissionState}
+   */
+  yamada?: YamadaMissionState
 }
