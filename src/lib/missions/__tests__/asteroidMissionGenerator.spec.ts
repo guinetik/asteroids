@@ -1,4 +1,6 @@
 import { afterEach, describe, it, expect, vi } from 'vitest'
+import { stampYamadaState } from '../yamadaArchetype'
+import yamadaGiver from '@/data/missions/givers/yamada-farms.json'
 import { ORBIT_SCALE, SIZE_SCALE } from '@/lib/planets/constants'
 import { getPlanet } from '@/lib/planets/catalog'
 import shipHealthData from '@/data/shuttle/ship-health.json'
@@ -1125,5 +1127,18 @@ describe('Hektor liberated pool integration', () => {
     spy.mockRestore()
     // Result must be either kr3 (non-jupiter-only) or hektor (jupiter + liberated).
     expect(['kr3', 'hektor']).toContain(result)
+  })
+})
+
+describe('Yamada archetype stamping in generator', () => {
+  it('stamps bunker-protect state on Yamada bunker-protect archetype', () => {
+    expect(stampYamadaState({ archetype: 'bunker-protect', difficulty: 5 })).toBeDefined()
+  })
+
+  it('every Yamada giver mission has a recognised archetype string', () => {
+    const archetypes = yamadaGiver.missions.map((m) => m.archetype)
+    for (const a of archetypes) {
+      expect(['bunker-protect', 'bunker-extract', 'patient-rescue']).toContain(a)
+    }
   })
 })

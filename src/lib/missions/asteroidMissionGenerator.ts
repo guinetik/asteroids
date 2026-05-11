@@ -29,6 +29,8 @@ import difficultyMap from '@/data/asteroids/difficulty-map.json'
 import shipHealthData from '@/data/shuttle/ship-health.json'
 import hostGiverOverridesData from '@/data/missions/host-giver-overrides.json'
 import { GLOBAL_MISSION_PAY_MULTIPLIER, MIN_ASTEROID_MISSION_REWARD } from './missionEconomy'
+import { stampYamadaState } from './yamadaArchetype'
+import { pickYamadaBunkerExtractDestination } from './yamadaDestinations'
 
 /** Simple string hash to derive a numeric seed. */
 export function hashSeed(str: string): number {
@@ -926,6 +928,20 @@ export function generateAsteroidMission(
   const asteroidId = pickAsteroidForDifficulty(difficulty, anchor.planetId, profile)
   const hostGiverOverride = getHostGiverOverride(anchor.planetId)
 
+  const rescueObjective = objectives.find((o) => o.type === 'rescue')
+  const extractDestination =
+    pick.template.archetype === 'bunker-extract'
+      ? pickYamadaBunkerExtractDestination(anchor.planetId, difficulty, rand)
+      : undefined
+  const yamadaState = stampYamadaState({
+    archetype: pick.template.archetype,
+    difficulty,
+    operatorCount: rescueObjective?.colonistCount,
+    destinationPlanetId: extractDestination?.destinationPlanetId,
+    deliveryTimerSeconds: extractDestination?.deliveryTimerSeconds,
+    rand,
+  })
+
   return {
     kind: 'standard',
     id: missionId,
@@ -942,5 +958,6 @@ export function generateAsteroidMission(
     totalReward,
     waypoint,
     status: 'available',
+    ...(yamadaState !== undefined ? { yamada: yamadaState } : {}),
   }
 }
