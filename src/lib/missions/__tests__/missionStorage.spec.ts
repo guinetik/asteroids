@@ -198,6 +198,111 @@ describe('mission board persistence', () => {
   })
 })
 
+describe('loadActiveMission with Yamada state', () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  it('round-trips bunker-extract yamada state', () => {
+    const mission: GeneratedAsteroidMission = {
+      kind: 'standard',
+      id: 'test_1',
+      asteroidId: 'bennu',
+      giverId: 'yamada-farms',
+      giverName: 'Sumiko Yamada',
+      templateId: 'yamada_bunker_extract',
+      name: 'Bunker Extract',
+      briefing: '',
+      difficulty: 5,
+      region: 'kuiper-belt',
+      objectives: [],
+      totalReward: 5000,
+      waypoint: { worldX: 1, worldZ: 1 },
+      status: 'accepted',
+      yamada: {
+        archetype: 'bunker-extract',
+        destinationPlanetId: 'uranus',
+        deliveryTimerSeconds: 240,
+        organItemId: 'yamada-organ-case',
+      },
+    }
+    saveActiveMission(mission)
+    const loaded = loadActiveMission()
+    expect(loaded?.yamada).toEqual(mission.yamada)
+  })
+
+  it('round-trips bunker-protect yamada state', () => {
+    const mission: GeneratedAsteroidMission = {
+      kind: 'standard',
+      id: 'test_2',
+      asteroidId: 'bennu',
+      giverId: 'yamada-farms',
+      giverName: 'Sumiko Yamada',
+      templateId: 'yamada_bunker_protect',
+      name: 'Bunker Protect',
+      briefing: '',
+      difficulty: 5,
+      region: 'kuiper-belt',
+      objectives: [],
+      totalReward: 5000,
+      waypoint: { worldX: 1, worldZ: 1 },
+      status: 'accepted',
+      yamada: {
+        archetype: 'bunker-protect',
+        suspensionLapseSeconds: 420,
+      },
+    }
+    saveActiveMission(mission)
+    expect(loadActiveMission()?.yamada).toEqual(mission.yamada)
+  })
+
+  it('round-trips patient-rescue yamada state', () => {
+    const mission: GeneratedAsteroidMission = {
+      kind: 'standard',
+      id: 'test_3',
+      asteroidId: 'bennu',
+      giverId: 'yamada-farms',
+      giverName: 'Sumiko Yamada',
+      templateId: 'yamada_patient_rescue',
+      name: 'Patient Rescue',
+      briefing: '',
+      difficulty: 5,
+      region: 'kuiper-belt',
+      objectives: [],
+      totalReward: 5000,
+      waypoint: { worldX: 1, worldZ: 1 },
+      status: 'accepted',
+      yamada: {
+        archetype: 'patient-rescue',
+        vipOperatorIndex: 0,
+      },
+    }
+    saveActiveMission(mission)
+    expect(loadActiveMission()?.yamada).toEqual(mission.yamada)
+  })
+
+  it('preserves missions without yamada field', () => {
+    const mission: GeneratedAsteroidMission = {
+      kind: 'standard',
+      id: 'test_4',
+      asteroidId: 'bennu',
+      giverId: 'jay',
+      giverName: 'Jay Mercer',
+      templateId: 'jay_mineral_survey',
+      name: 'Mineral Survey',
+      briefing: '',
+      difficulty: 3,
+      region: 'asteroid-belt',
+      objectives: [],
+      totalReward: 2000,
+      waypoint: { worldX: 1, worldZ: 1 },
+      status: 'accepted',
+    }
+    saveActiveMission(mission)
+    expect(loadActiveMission()?.yamada).toBeUndefined()
+  })
+})
+
 describe('pending map return world', () => {
   it('returns null when absent', () => {
     expect(consumePendingMapReturnWorld()).toBeNull()
