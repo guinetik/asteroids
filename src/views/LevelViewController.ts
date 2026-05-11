@@ -2623,7 +2623,7 @@ export class LevelViewController implements Tickable {
     this.multiTool?.setVisible(false)
     this.fpsCamera?.setAiming(false, 1, 1)
     if (this.fpsCamera) {
-      this.fpsCamera.helmetLightRig.visible = false
+      this.fpsCamera.setHelmetLit(false)
     }
 
     if (this.arrivalSequence) {

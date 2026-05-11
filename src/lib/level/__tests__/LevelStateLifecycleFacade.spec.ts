@@ -70,7 +70,7 @@ describe('LevelStateLifecycleFacade', () => {
         group: new Group(),
       } as unknown as LevelEvaLifecycleDeps['playerController'],
       fpsCamera: {
-        helmetLightRig: { visible: true },
+        setHelmetLit: vi.fn(),
       } as unknown as LevelEvaLifecycleDeps['fpsCamera'],
       multiToolState: {} as unknown as LevelEvaLifecycleDeps['multiToolState'],
       multiTool: {
@@ -85,7 +85,7 @@ describe('LevelStateLifecycleFacade', () => {
 
     facade.exitEva(scene, eva)
     expect(eva.playerController.group.visible).toBe(false)
-    expect(eva.fpsCamera.helmetLightRig.visible).toBe(false)
+    expect(eva.fpsCamera.setHelmetLit).toHaveBeenCalledWith(false)
     expect(eva.onClearRockTarget).toHaveBeenCalledTimes(1)
 
     tickHandler.unregister.mockClear()

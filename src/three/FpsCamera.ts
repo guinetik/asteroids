@@ -252,7 +252,26 @@ export class FpsCamera implements Tickable {
     this.helmetLightRig.add(this.helmetLightTarget)
     this.helmetLightRig.add(this.helmetLightCone)
     this.helmetLightRig.add(this.helmetFillLight)
-    this.helmetLightRig.visible = false
+    // Keep rig + lights permanently `.visible = true` so they stay in the
+    // scene's light count from first frame. Toggling visibility on lit
+    // lights changes `NUM_*_LIGHTS` in shader source and invalidates every
+    // cached lit material program — observed as multi-hundred-ms stalls on
+    // gameplay entry. Modulate `.intensity` instead.
+    this.helmetLight.intensity = 0
+    this.helmetFillLight.intensity = 0
+    this.helmetLightCone.visible = false
+  }
+
+  /**
+   * Enable or disable the helmet lantern without changing scene light
+   * counts. Intensity-only toggle preserves the shader program cache.
+   *
+   * @param lit - `true` for EVA, `false` while inside the lander/habitat
+   */
+  setHelmetLit(lit: boolean): void {
+    this.helmetLight.intensity = lit ? HELMET_LIGHT_INTENSITY : 0
+    this.helmetFillLight.intensity = lit ? HELMET_FILL_INTENSITY : 0
+    this.helmetLightCone.visible = lit && HELMET_LIGHT_CONE_VISIBLE
   }
 
   /** Set the player entity to follow. */

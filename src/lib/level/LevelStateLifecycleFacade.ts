@@ -137,7 +137,7 @@ export class LevelStateLifecycleFacade {
     this.registerOptional(scene.tickHandler, eva.surfaceRocks, scene.priorities.physics + 3)
     scene.tickHandler.register(eva.fpsCamera, scene.priorities.render - 2)
     scene.tickHandler.register(eva.multiTool, scene.priorities.render - 2)
-    eva.fpsCamera.helmetLightRig.visible = true
+    eva.fpsCamera.setHelmetLit(true)
 
     eva.fpsCamera.setTarget(eva.playerController.group)
     scene.sceneManager.setActiveCamera(eva.fpsCamera.camera)
@@ -166,7 +166,7 @@ export class LevelStateLifecycleFacade {
     eva.onClearRockTarget()
     scene.tickHandler.unregister(eva.fpsCamera)
     scene.tickHandler.unregister(eva.multiTool)
-    eva.fpsCamera.helmetLightRig.visible = false
+    eva.fpsCamera.setHelmetLit(false)
   }
 
   /**
@@ -184,7 +184,7 @@ export class LevelStateLifecycleFacade {
     this.unregisterOptional(scene.tickHandler, eva.surfaceRocks)
     eva.onClearRockTarget()
     scene.tickHandler.unregister(eva.multiTool)
-    eva.fpsCamera.helmetLightRig.visible = false
+    eva.fpsCamera.setHelmetLit(false)
     eva.multiTool.setVisible(false)
   }
 

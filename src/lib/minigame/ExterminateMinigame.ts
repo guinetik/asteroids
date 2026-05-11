@@ -466,7 +466,11 @@ export class ExterminateMinigame implements MiniGame, MiniGameEvents {
   private buildExplosionFlash(): void {
     this.explosionFlash.visible = false
     this.explosionCore.visible = false
-    this.explosionLight.visible = false
+    // Pin the point light visible — gating it by `.visible` would flip
+    // `NUM_POINT_LIGHTS` on every blast, forcing every lit material in the
+    // scene to recompile. Modulate intensity instead (see firePulse / tick).
+    this.explosionLight.visible = true
+    this.explosionLight.intensity = 0
     this.shockwave.visible = false
     this.shockwave.rotation.x = -Math.PI / 2
     this.scene.add(this.explosionFlash)
@@ -838,7 +842,6 @@ export class ExterminateMinigame implements MiniGame, MiniGameEvents {
     this.shockwave.scale.setScalar(1)
     ;(this.shockwave.material as THREE.MeshBasicMaterial).opacity = 0.9
 
-    this.explosionLight.visible = true
     this.explosionLight.position.set(
       this.nestPosition.x,
       this.nestPosition.y + 4,
@@ -921,7 +924,7 @@ export class ExterminateMinigame implements MiniGame, MiniGameEvents {
 
       if (this.explosionFlashTimer <= 0) {
         this.explosionFlash.visible = false
-        this.explosionLight.visible = false
+        // Light stays in the scene with `.visible = true`; intensity 0 is the off state.
         this.explosionLight.intensity = 0
       }
     }

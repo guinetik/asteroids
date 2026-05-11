@@ -678,7 +678,11 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
 
   private buildExplosionFlash(): void {
     this.explosionFlash.visible = false
-    this.explosionLight.visible = false
+    // Pin the point light visible — flipping `.visible` per blast would
+    // bump `NUM_POINT_LIGHTS` and force every lit material in the scene to
+    // recompile. Modulate intensity instead.
+    this.explosionLight.visible = true
+    this.explosionLight.intensity = 0
     this.scene.add(this.explosionFlash)
     this.scene.add(this.explosionLight)
   }
@@ -1471,7 +1475,6 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
       this.virusPosition.z,
     )
     this.explosionFlash.scale.setScalar(1)
-    this.explosionLight.visible = true
     this.explosionLight.position.set(
       this.virusPosition.x,
       this.virusBaseY - 4,
@@ -1520,7 +1523,7 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
 
     if (this.explosionFlashTimer <= 0) {
       this.explosionFlash.visible = false
-      this.explosionLight.visible = false
+      // Light stays in the scene with `.visible = true`; intensity 0 is the off state.
       this.explosionLight.intensity = 0
     }
   }
