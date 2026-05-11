@@ -269,6 +269,7 @@ describe('LevelMinigameFacade initialization', () => {
       rockYieldSystem: {} as unknown as RockYieldSystem,
       composition: [],
       missionSeed: 123,
+      enemyControllerPool: {} as unknown as import('@/three/EnemyControllerPool').EnemyControllerPool,
       bindings: {
         onPrompt,
         onComplete,
@@ -364,6 +365,7 @@ describe('LevelMinigameFacade initialization', () => {
       rockYieldSystem: null,
       composition: [],
       missionSeed: 1,
+      enemyControllerPool: {} as unknown as import('@/three/EnemyControllerPool').EnemyControllerPool,
       bindings: {
         onPrompt: null,
         onComplete: null,

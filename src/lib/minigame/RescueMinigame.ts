@@ -33,9 +33,13 @@ import { spawnChimeraProjectileBurst } from '@/lib/fps/chimeraProjectileBurst'
 import { VirusModel } from '@/three/VirusModel'
 import { FpsHostageController } from '@/three/FpsHostageController'
 import { HostageModel } from '@/three/HostageModel'
-import { BacteriophageController, PHAGE_HIT_CENTER_Y } from '@/three/BacteriophageController'
-import { SpireController, SPIRE_HIT_CENTER_Y } from '@/three/SpireController'
-import { ChimeraWalkerController, CHIMERA_HIT_CENTER_Y } from '@/three/ChimeraWalkerController'
+import { type BacteriophageController, PHAGE_HIT_CENTER_Y } from '@/three/BacteriophageController'
+import { type SpireController, SPIRE_HIT_CENTER_Y } from '@/three/SpireController'
+import {
+  type ChimeraWalkerController,
+  CHIMERA_HIT_CENTER_Y,
+} from '@/three/ChimeraWalkerController'
+import type { EnemyControllerPool } from '@/three/EnemyControllerPool'
 import { EnemyProjectileMeshPool } from '@/three/EnemyProjectileMeshPool'
 import { enemyVisualTierForDifficulty, type EnemyVisualTier } from '@/three/enemyVisualPalette'
 import type { Enemy } from '@/lib/fps/enemy'
@@ -193,6 +197,7 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
   private readonly projectileSystem: ProjectileSystem
   private readonly missionDifficulty: number
   private readonly enemyVisualTier: EnemyVisualTier
+  private readonly enemyControllerPool: EnemyControllerPool
   private readonly virus: VirusModel
   private readonly virusPosition = new THREE.Vector3()
   private readonly enemyDirector = new EnemyDirector()
@@ -378,6 +383,7 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
     projectileSystem: ProjectileSystem,
     missionDifficulty: number,
     virus: VirusModel,
+    enemyControllerPool: EnemyControllerPool,
   ) {
     this.objectiveIndex = objectiveIndex
     this.objective = objective
@@ -385,6 +391,7 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
     this.heightmap = heightmap
     this.projectileSystem = projectileSystem
     this.missionDifficulty = missionDifficulty
+    this.enemyControllerPool = enemyControllerPool
     this.enemyVisualTier = enemyVisualTierForDifficulty(missionDifficulty)
     const playerDamageMultiplier = playerDamageMultiplierForTier(this.enemyVisualTier)
     this.enemyDirector.setPlayerDamageMultiplier(playerDamageMultiplier)
@@ -416,6 +423,7 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
     heightmap: Heightmap,
     projectileSystem: ProjectileSystem,
     missionDifficulty: number,
+    enemyControllerPool: EnemyControllerPool,
   ): Promise<RescueMinigame> {
     await HostageModel.preload()
     const virus = await VirusModel.create({ scale: VIRUS_SCALE })
@@ -427,6 +435,7 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
       projectileSystem,
       missionDifficulty,
       virus,
+      enemyControllerPool,
     )
     await minigame.createContainedHostageVisuals()
     return minigame
@@ -1081,33 +1090,42 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
       const z = spawnZ
       const groundY = this.heightmap.heightAt(x, z)
       const handle = this.enemyDirector.spawn(type, x, groundY, z)
+
+      let attached = false
+      if (type === 'bacteriophage') {
+        const ctrl = this.enemyControllerPool.acquirePhage(handle.enemy)
+        if (ctrl) {
+          ctrl.group.position.set(x, groundY, z)
+          this.groundControllers.set(handle.id, ctrl)
+          attached = true
+        }
+      } else if (type === 'chimera') {
+        const ctrl = this.enemyControllerPool.acquireChimera(handle.enemy)
+        if (ctrl) {
+          ctrl.group.position.set(x, groundY, z)
+          this.chimeraControllers.set(handle.id, ctrl)
+          attached = true
+        }
+      } else {
+        const ctrl = this.enemyControllerPool.acquireSpire(handle.enemy)
+        if (ctrl) {
+          ctrl.group.position.set(x, groundY + handle.config.floatHeight, z)
+          ctrl.targetPosition.set(x, groundY + handle.config.floatHeight, z)
+          this.spireControllers.set(handle.id, ctrl)
+          attached = true
+        }
+      }
+
+      if (!attached) {
+        // Pool exhaustion — bump capacity in EnemyControllerPool sizing rather
+        // than falling back to a fresh allocation that would defeat warm-up.
+        this.enemyDirector.despawn(handle)
+        continue
+      }
+
       this.enemyByHandleId.set(handle.id, handle.enemy)
       this.encounterEnemies.push(handle.enemy)
       this.projectileSystem.addEnemy(handle.enemy)
-
-      if (type === 'bacteriophage') {
-        const ctrl = new BacteriophageController(handle.enemy, {
-          visualTier: this.enemyVisualTier,
-        })
-        ctrl.group.position.set(x, groundY, z)
-        this.scene.add(ctrl.group)
-        this.groundControllers.set(handle.id, ctrl)
-      } else if (type === 'chimera') {
-        const ctrl = new ChimeraWalkerController(handle.enemy, {
-          visualTier: this.enemyVisualTier,
-        })
-        ctrl.group.position.set(x, groundY, z)
-        this.scene.add(ctrl.group)
-        this.chimeraControllers.set(handle.id, ctrl)
-      } else {
-        const ctrl = new SpireController(handle.enemy, {
-          visualTier: this.enemyVisualTier,
-        })
-        ctrl.group.position.set(x, groundY + handle.config.floatHeight, z)
-        ctrl.targetPosition.set(x, groundY + handle.config.floatHeight, z)
-        this.scene.add(ctrl.group)
-        this.spireControllers.set(handle.id, ctrl)
-      }
     }
   }
 
@@ -1174,8 +1192,11 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
     if (!ctrl) return
 
     if (ctrl.deathComplete) {
-      ctrl.group.removeFromParent()
-      ctrl.dispose()
+      if (handle.type === 'chimera') {
+        this.enemyControllerPool.releaseChimera(ctrl as ChimeraWalkerController)
+      } else {
+        this.enemyControllerPool.releasePhage(ctrl as BacteriophageController)
+      }
       this.projectileSystem.removeEnemy(handle.enemy)
       this.enemyDirector.despawn(handle)
       this.groundControllers.delete(handle.id)
@@ -1248,8 +1269,7 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
     if (!ctrl) return
 
     if (ctrl.deathComplete) {
-      ctrl.group.removeFromParent()
-      ctrl.dispose()
+      this.enemyControllerPool.releaseSpire(ctrl)
       this.projectileSystem.removeEnemy(handle.enemy)
       this.enemyDirector.despawn(handle)
       this.spireControllers.delete(handle.id)
@@ -1511,21 +1531,20 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
     }
     this.encounterEnemies.length = 0
 
+    // Return live controllers to the shared pool — never dispose them here.
+    // The pool owns the GPU resources for the level lifetime.
     for (const ctrl of this.groundControllers.values()) {
-      ctrl.group.removeFromParent()
-      ctrl.dispose()
+      this.enemyControllerPool.releasePhage(ctrl)
     }
     this.groundControllers.clear()
 
     for (const ctrl of this.chimeraControllers.values()) {
-      ctrl.group.removeFromParent()
-      ctrl.dispose()
+      this.enemyControllerPool.releaseChimera(ctrl)
     }
     this.chimeraControllers.clear()
 
     for (const ctrl of this.spireControllers.values()) {
-      ctrl.group.removeFromParent()
-      ctrl.dispose()
+      this.enemyControllerPool.releaseSpire(ctrl)
     }
     this.spireControllers.clear()
 

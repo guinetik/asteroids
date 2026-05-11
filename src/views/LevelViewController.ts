@@ -89,7 +89,9 @@ import { buildFpsPlayerConfig } from '@/lib/fps/buildFpsPlayerConfig'
 import { buildMultiToolConfig } from '@/lib/fps/buildMultiToolConfig'
 import { SurfaceRockController } from '@/three/controllers/SurfaceRockController'
 import { createEnemyVisualWarmup, type EnemyVisualWarmup } from '@/three/EnemyVisualWarmup'
+import { EnemyControllerPool } from '@/three/EnemyControllerPool'
 import { EnemyLightPool } from '@/three/EnemyLightPool'
+import { enemyVisualTierForDifficulty } from '@/three/enemyVisualPalette'
 import { RockYieldSystem } from '@/lib/mining/rockYieldSystem'
 import { loadProfile } from '@/lib/player/profile'
 import { getItemDefinition } from '@/lib/inventory/catalog'
@@ -199,6 +201,20 @@ const BUNKER_LOOT_CHEST_QUANTITY_BY_TIER = {
  */
 const ENEMY_LIGHT_POOL_SIZE = 24
 
+/**
+ * Per-archetype capacities for the shared `EnemyControllerPool`. Sized to cover
+ * the union of every active spawner: rescue minigame pulses (worst case ~12
+ * phages + a handful of supports at high difficulty) and the disturbance
+ * director cap (`MAX_LIVE_AMBIENT_ENEMIES = 5`). One pool services both so the
+ * per-(material, geometry) VAO build for every controller is amortized inside
+ * the boot precompile pass instead of on first spawn.
+ */
+const ENEMY_POOL_PHAGE_CAPACITY = 16
+/** See {@link ENEMY_POOL_PHAGE_CAPACITY}. */
+const ENEMY_POOL_CHIMERA_CAPACITY = 6
+/** See {@link ENEMY_POOL_PHAGE_CAPACITY}. */
+const ENEMY_POOL_SPIRE_CAPACITY = 6
+
 /** Dev-console `landNearObjective`: offset from waypoint toward ship (along ground XZ). */
 const DEV_LAND_NEAR_OBJECTIVE_OFFSET_M = 16
 /** Terrain clearance above the height sample so physics settles rather than spawning inside dirt. */
@@ -307,6 +323,13 @@ export class LevelViewController implements Tickable {
    * caused by lit-material program recompiles when an enemy spawns.
    */
   private enemyLightPool: EnemyLightPool | null = null
+  /**
+   * Single source of truth for procedural enemy controllers (phage / chimera /
+   * spire) shared by the disturbance director and rescue minigame. Pre-built at
+   * level boot so every per-instance VAO is amortized under the loading overlay
+   * — eliminates the spawn-time hitch that previously killed hostages on F-press.
+   */
+  private enemyControllerPool: EnemyControllerPool | null = null
   private readonly collision = new LevelCollisionFacade()
   private rockYieldSystem: RockYieldSystem | null = null
   private stateMachine: StateMachine<LevelState> | null = null
@@ -1344,6 +1367,21 @@ export class LevelViewController implements Tickable {
     this.sceneManager.addToScene(this.lootPickupController.group)
     this.tickHandler.register(this.lootPickupController, TICK_PRIORITY_RENDER)
 
+    // ── Shared enemy controller pool ─────────────────────────────
+    // Single pool of pre-built procedural enemy controllers (phage / chimera /
+    // spire) shared by the disturbance director and rescue minigame. Built up
+    // front so every per-instance `MutableTubeGeometry` VAO is warmed by the
+    // `precompileShaders` pass instead of stalling the frame the first
+    // disturbance lifts the lander or the first rescue pulse fires.
+    this.enemyControllerPool = new EnemyControllerPool({
+      scene: this.sceneManager.scene,
+      visualTier: enemyVisualTierForDifficulty(mission.difficulty),
+      lightPool: this.enemyLightPool,
+      phageCapacity: ENEMY_POOL_PHAGE_CAPACITY,
+      chimeraCapacity: ENEMY_POOL_CHIMERA_CAPACITY,
+      spireCapacity: ENEMY_POOL_SPIRE_CAPACITY,
+    })
+
     // ── Objective minigames ──────────────────────────────────────
     const missionSeed = hashLevelSeed(mission.id)
     if (
@@ -1357,7 +1395,7 @@ export class LevelViewController implements Tickable {
         projectileSystem: this.projectileSystem,
         missionDifficulty: mission.difficulty,
         seed: missionSeed,
-        lightPool: this.enemyLightPool,
+        enemyControllerPool: this.enemyControllerPool,
       })
       this.disturbanceDirector.onDamagePlayer = (damage, sourceX, sourceZ, source) => {
         this.applyPlayerDamageFeedback(damage, sourceX, sourceZ, source)
@@ -1380,6 +1418,7 @@ export class LevelViewController implements Tickable {
       missionSeed,
       danCraterPlacement: this.danPlacement,
       enemyLightPool: this.enemyLightPool,
+      enemyControllerPool: this.enemyControllerPool,
       bindings: {
         onPrompt: this.onTerminalPrompt,
         onComplete: this.onObjectiveComplete,
@@ -1733,7 +1772,7 @@ export class LevelViewController implements Tickable {
     // lazily on first draw, freezing the frame the first time disturbance
     // enemies appear. Stage them in front of the camera here so the
     // prewarm render pays that cost under the loading overlay.
-    this.disturbanceDirector?.stageForPrewarm(camera)
+    this.enemyControllerPool?.stageForPrewarm(camera)
 
     // ── Thruster wash prewarm ────────────────────────────────────
     // `compileAsync` only links shader programs — it does not actually
@@ -1851,7 +1890,7 @@ export class LevelViewController implements Tickable {
         this.enemyVisualWarmup.restoreFrustumCulling()
         this.enemyVisualWarmup.group.visible = false
       }
-      this.disturbanceDirector?.unstageFromPrewarm()
+      this.enemyControllerPool?.unstageFromPrewarm()
       this.multiTool?.setVisible(multiToolWasVisible)
       if (washStaged) {
         washStaged.scorchMesh.material.uniforms['intensity']!.value = 0
@@ -3895,6 +3934,11 @@ export class LevelViewController implements Tickable {
     this.landerController?.dispose()
     this.enemyVisualWarmup?.dispose()
     this.enemyVisualWarmup = null
+    // Tear down the shared controller pool before the light pool so the
+    // controllers' light slots are released through normal `dispose()` paths
+    // while the underlying pool is still alive.
+    this.enemyControllerPool?.dispose()
+    this.enemyControllerPool = null
     // Dispose pool *after* warmup + minigames so any in-flight controllers
     // have already released their slots back to it.
     this.enemyLightPool?.dispose()

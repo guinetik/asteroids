@@ -180,6 +180,13 @@ export interface LevelMinigameInitParams {
    * migrated fall back to per-enemy lights.
    */
   enemyLightPool?: import('@/three/EnemyLightPool').EnemyLightPool | null
+  /**
+   * Shared enemy controller pool owned by {@link LevelViewController}. Combat
+   * minigames borrow Bacteriophage/Spire/Chimera controllers from this pool
+   * instead of allocating fresh ones — the pool is prewarmed during the level
+   * precompile pass so the first enemy of the run never hitches.
+   */
+  enemyControllerPool: import('@/three/EnemyControllerPool').EnemyControllerPool
   /** Controller-owned callback bindings. */
   bindings: LevelMinigameBindings
 }
@@ -217,6 +224,7 @@ export class LevelMinigameFacade {
       missionSeed,
       danCraterPlacement,
       enemyLightPool,
+      enemyControllerPool,
       bindings,
     } = params
     const objectiveColliders: WorldCollider[] = []
@@ -303,6 +311,7 @@ export class LevelMinigameFacade {
           heightmap,
           projectileSystem,
           mission.difficulty,
+          enemyControllerPool,
         )
         this.applySharedBindings(minigame, bindings)
         minigame.onDamagePlayer = bindings.onDamagePlayer
