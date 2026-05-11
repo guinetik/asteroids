@@ -554,6 +554,44 @@ export class ArrivalSequence {
    * Call after sequence completes to leave the shuttle visible from below.
    *
    */
+  /**
+   * Toggle shuttle presentation without flipping `shuttleGroup.visible`.
+   *
+   * The shuttle group hosts 7+ PointLights (nav lights + cinematic fills)
+   * and 1 SpotLight (exfil floodlight). Flipping `.visible = false` on
+   * the parent removes them from `gatherLightsState` and invalidates every
+   * cached lit-material program. This helper hides meshes/sprites only
+   * and zeroes light intensities to preserve the shader cache.
+   *
+   * @param visible - `true` to present, `false` to hide.
+   */
+  setShuttleVisible(visible: boolean): void {
+    this.shuttleGroup.visible = true
+    this.shuttleGroup.traverse((obj) => {
+      const light = obj as THREE.Light
+      if (light.isLight) {
+        if (visible) {
+          const saved = this.savedShuttleLightIntensities.get(light)
+          if (saved !== undefined) {
+            light.intensity = saved
+            this.savedShuttleLightIntensities.delete(light)
+          }
+        } else if (!this.savedShuttleLightIntensities.has(light)) {
+          this.savedShuttleLightIntensities.set(light, light.intensity)
+          light.intensity = 0
+        }
+        return
+      }
+      const mesh = obj as THREE.Mesh
+      const sprite = obj as THREE.Sprite
+      if (mesh.isMesh || sprite.isSprite) {
+        obj.visible = visible
+      }
+    })
+  }
+
+  private readonly savedShuttleLightIntensities = new Map<THREE.Light, number>()
+
   parkShuttle(): void {
     this.phase = 'done'
     this.fallingLander?.removeFromParent()

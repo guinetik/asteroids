@@ -787,6 +787,48 @@ export class LanderController implements Tickable {
     this.updateWarningBeacon()
   }
 
+  /**
+   * Toggle lander presentation without flipping `group.visible`.
+   *
+   * Toggling the group's visibility hides every {@link THREE.Light} under
+   * it (bodyFillLight + WarningBeacon's two PointLights), which changes
+   * `NUM_POINT_LIGHTS` in the shader source and invalidates every cached
+   * lit-material program. The result is a multi-hundred-ms `getProgramInfoLog`
+   * cascade on every state transition that hides or restores the lander.
+   *
+   * This helper keeps the group structurally visible at all times and
+   * instead hides meshes/sprites + zeroes any descendant light intensities.
+   * Lights remain in `gatherLightsState`, so the shader cache survives.
+   *
+   * @param visible - `true` to present, `false` to hide.
+   */
+  setVisible(visible: boolean): void {
+    this.group.visible = true
+    this.group.traverse((obj) => {
+      const light = obj as THREE.Light
+      if (light.isLight) {
+        if (visible) {
+          const saved = this.savedLightIntensities.get(light)
+          if (saved !== undefined) {
+            light.intensity = saved
+            this.savedLightIntensities.delete(light)
+          }
+        } else if (!this.savedLightIntensities.has(light)) {
+          this.savedLightIntensities.set(light, light.intensity)
+          light.intensity = 0
+        }
+        return
+      }
+      const mesh = obj as THREE.Mesh
+      const sprite = obj as THREE.Sprite
+      if (mesh.isMesh || sprite.isSprite) {
+        obj.visible = visible
+      }
+    })
+  }
+
+  private readonly savedLightIntensities = new Map<THREE.Light, number>()
+
   /** Set terrain heightmap for ground collision. */
   setHeightmap(hm: Heightmap): void {
     this.heightmap = hm

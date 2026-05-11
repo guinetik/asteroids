@@ -1158,7 +1158,7 @@ export class LevelViewController implements Tickable {
       this.arrivalSequence?.parkShuttle()
       // Show the gameplay lander at the spawn height (it will fall with physics)
       if (this.landerController) {
-        this.landerController.group.visible = true
+        this.landerController.setVisible(true)
       }
       this.landerAudio.notifyArrivalCinematicEnd()
       // Clear the fade
@@ -1969,7 +1969,7 @@ export class LevelViewController implements Tickable {
   private enterArrival(): void {
     // Hide the gameplay lander — the shuttle's cargo lander is visible during the cinematic
     if (this.landerController) {
-      this.landerController.group.visible = false
+      this.landerController.setVisible(false)
     }
 
     // Use the arrival sequence camera
@@ -1997,7 +1997,7 @@ export class LevelViewController implements Tickable {
   private exitArrival(): void {
     // Show the lander for gameplay
     if (this.landerController) {
-      this.landerController.group.visible = true
+      this.landerController.setVisible(true)
     }
 
     // Restore gameplay lighting
@@ -2271,8 +2271,8 @@ export class LevelViewController implements Tickable {
         if (this.surfaceRocks) this.surfaceRocks.group.visible = false
         // Hide surface props the player shouldn't see while inside the bunker:
         // the lander, the orbital shuttle, and the objective waypoint beam.
-        if (this.landerController) this.landerController.group.visible = false
-        if (this.arrivalSequence) this.arrivalSequence.shuttleGroup.visible = false
+        if (this.landerController) this.landerController.setVisible(false)
+        if (this.arrivalSequence) this.arrivalSequence.setShuttleVisible(false)
         if (this.surfaceBunkerHatch) this.surfaceBunkerHatch.group.visible = false
         this.projectileSystem?.setTerrainCollisionEnabled(false)
         setWaypointMarkersVisible(false)
@@ -2322,8 +2322,8 @@ export class LevelViewController implements Tickable {
       if (this.asteroidSurface) this.asteroidSurface.group.visible = true
       if (this.surfaceRocks) this.surfaceRocks.group.visible = true
       // Restore surface props hidden on descent.
-      if (this.landerController) this.landerController.group.visible = true
-      if (this.arrivalSequence) this.arrivalSequence.shuttleGroup.visible = true
+      if (this.landerController) this.landerController.setVisible(true)
+      if (this.arrivalSequence) this.arrivalSequence.setShuttleVisible(true)
       if (this.surfaceBunkerHatch) this.surfaceBunkerHatch.group.visible = true
       this.projectileSystem?.setTerrainCollisionEnabled(true)
       setWaypointMarkersVisible(true)
@@ -2600,7 +2600,7 @@ export class LevelViewController implements Tickable {
     }
 
     if (this.landerController) {
-      this.landerController.group.visible = true
+      this.landerController.setVisible(true)
       this.landerController.resetForRespawn(this.initialLanderSpawn)
       this.landerController.flameEmitter.reset()
       for (const emitter of this.landerController.rcsEmitters.values()) {
@@ -2664,7 +2664,7 @@ export class LevelViewController implements Tickable {
     }
 
     if (options.hideLander) {
-      this.landerController.group.visible = false
+      this.landerController.setVisible(false)
     }
 
     // Stop lander physics/input — the run is over.
@@ -2719,7 +2719,7 @@ export class LevelViewController implements Tickable {
     if (this.inputManager?.wasActionPressed('skipCinematic') && this.stateMachine?.is('arrival')) {
       this.arrivalSequence?.parkShuttle()
       if (this.landerController) {
-        this.landerController.group.visible = true
+        this.landerController.setVisible(true)
       }
       this.landerAudio.notifyArrivalCinematicEnd()
       this.onArrivalFade?.(0)
