@@ -69,6 +69,19 @@ export function createEnemyVisualWarmup(
   spire.targetPosition.copy(spireEnemy.position)
   group.add(spire.group)
 
+  // Hit-flash material warmup. Each enemy controller swaps the head/eye/
+  // membrane mesh to a `MeshBasicMaterial({color: 0xff00ff})` for ~80ms on
+  // hit, then back to its normal material. That swap forces a fresh program
+  // compile (~hundreds of ms driver stall) the very first time it happens —
+  // and it happens during the despawn anim when the kill connects, exactly
+  // when the player wants smooth feedback. Stage a dummy mesh here that uses
+  // the same material flavor so the program is in cache before any combat.
+  const flashWarmupGeometry = new THREE.SphereGeometry(0.05, 4, 3)
+  const flashWarmupMaterial = new THREE.MeshBasicMaterial({ color: 0xff00ff })
+  const flashWarmupMesh = new THREE.Mesh(flashWarmupGeometry, flashWarmupMaterial)
+  flashWarmupMesh.name = 'enemy-hit-flash-warmup'
+  group.add(flashWarmupMesh)
+
   const controllers = [phage, chimera, spire]
   const frustumCullState: Array<{ obj: THREE.Object3D; frustumCulled: boolean }> = []
 
@@ -97,6 +110,8 @@ export function createEnemyVisualWarmup(
       for (const controller of controllers) {
         controller.dispose()
       }
+      flashWarmupGeometry.dispose()
+      flashWarmupMaterial.dispose()
     },
   }
 

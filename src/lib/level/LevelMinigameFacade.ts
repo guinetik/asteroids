@@ -273,6 +273,7 @@ export class LevelMinigameFacade {
           projectileSystem,
           seed: missionSeed,
           lightPool: enemyLightPool ?? null,
+          enemyControllerPool,
         })
         this.applySharedBindings(minigame, bindings)
         minigame.onRefuel = bindings.onSurveyRefuel

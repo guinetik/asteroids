@@ -36,6 +36,19 @@ function makeObjective(overrides: Partial<ConcreteObjective> = {}): ConcreteObje
   }
 }
 
+/**
+ * Minimal `EnemyControllerPool` stand-in. Tests never let the minigame reach
+ * the viroid-spawn path (none of the existing specs runs a scan long enough
+ * for that), so a stub that returns `null` from acquire is sufficient and
+ * keeps the unit test free of Three.js controller wiring.
+ */
+function makeEnemyControllerPoolStub(): import('@/three/EnemyControllerPool').EnemyControllerPool {
+  return {
+    acquirePhage: () => null,
+    releasePhage: () => undefined,
+  } as unknown as import('@/three/EnemyControllerPool').EnemyControllerPool
+}
+
 function makePlacement(): DanCraterPlacement {
   return {
     rotation: { x: 0, y: 0, z: 0 },
@@ -78,6 +91,7 @@ function setup(overrides: Partial<ConcreteObjective> = {}): SetupResult {
     craterPlacement: makePlacement(),
     projectileSystem,
     seed: 42,
+    enemyControllerPool: makeEnemyControllerPoolStub(),
   })
   return { minigame, objective, scene, projectileSystem }
 }

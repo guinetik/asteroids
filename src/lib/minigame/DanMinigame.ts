@@ -30,6 +30,7 @@ import { TerminalModel, TERMINAL_INTERACT_RANGE } from '@/three/TerminalModel'
 import { DanScanController } from '@/three/DanScanController'
 import { EnemyDirector, type EnemyHandle } from '@/lib/fps/enemyDirector'
 import { BacteriophageController, PHAGE_HIT_CENTER_Y } from '@/three/BacteriophageController'
+import type { EnemyControllerPool } from '@/three/EnemyControllerPool'
 import type { EnemyLightPool } from '@/three/EnemyLightPool'
 
 /** Default DAN scan duration when the objective omits it. Seconds. */
@@ -270,6 +271,13 @@ export interface DanMinigameInitParams {
    * recompile stall that otherwise hits on every viroid spawn.
    */
   lightPool?: EnemyLightPool | null
+  /**
+   * Shared enemy controller pool. DAN borrows pre-warmed `BacteriophageController`
+   * instances from this pool — allocating fresh controllers at spawn time would
+   * hit driver-side VAO/program first-use stalls (~hundreds of ms) every time
+   * a viroid appears during the scan.
+   */
+  enemyControllerPool: EnemyControllerPool
 }
 
 /**
@@ -315,6 +323,7 @@ export class DanMinigame implements MiniGame, MiniGameEvents {
    * have not threaded the level pool through.
    */
   private readonly lightPool: EnemyLightPool | null
+  private readonly enemyControllerPool: EnemyControllerPool
   /** Static collision volumes owned by this DAN objective. */
   readonly worldColliders: readonly WorldCollider[]
 
@@ -375,6 +384,7 @@ export class DanMinigame implements MiniGame, MiniGameEvents {
     this.projectileSystem = params.projectileSystem
     this.seed = params.seed
     this.lightPool = params.lightPool ?? null
+    this.enemyControllerPool = params.enemyControllerPool
     const particleTier: DanPressureTier = params.objective.particleTier ?? 'medium'
     this.tuning = DAN_TIER_TUNING[particleTier]
     this.scanDuration = params.objective.scanDurationSeconds ?? DEFAULT_DAN_SCAN_DURATION_SECONDS
@@ -716,10 +726,16 @@ export class DanMinigame implements MiniGame, MiniGameEvents {
     const z = this.placement.crater.z + Math.sin(angle) * r
     const groundY = this.heightmap.heightAt(x, z)
     const handle = this.enemyDirector.spawn('bacteriophage', x, groundY, z)
+    const ctrl = this.enemyControllerPool.acquirePhage(handle.enemy)
+    if (!ctrl) {
+      // Pool exhaustion — drop the spawn rather than allocating fresh (which
+      // would pay the VAO + program first-use stall we're trying to avoid).
+      // Capacity tuning lives on `LevelViewController.ENEMY_POOL_PHAGE_CAPACITY`.
+      this.enemyDirector.despawn(handle)
+      return
+    }
     this.projectileSystem.addEnemy(handle.enemy)
-    const ctrl = new BacteriophageController(handle.enemy, { lightPool: this.lightPool })
     ctrl.group.position.set(x, groundY, z)
-    this.scene.add(ctrl.group)
     this.viroidControllers.set(handle.id, ctrl)
   }
 
@@ -728,8 +744,7 @@ export class DanMinigame implements MiniGame, MiniGameEvents {
     const ctrl = this.viroidControllers.get(handle.id)
     if (!ctrl) return
     if (ctrl.deathComplete) {
-      ctrl.group.removeFromParent()
-      ctrl.dispose()
+      this.enemyControllerPool.releasePhage(ctrl)
       this.projectileSystem.removeEnemy(handle.enemy)
       this.enemyDirector.despawn(handle)
       this.viroidControllers.delete(handle.id)
@@ -845,8 +860,7 @@ export class DanMinigame implements MiniGame, MiniGameEvents {
   /** Despawn all viroids and dispose their controllers. */
   private cleanupViroids(): void {
     for (const ctrl of this.viroidControllers.values()) {
-      ctrl.group.removeFromParent()
-      ctrl.dispose()
+      this.enemyControllerPool.releasePhage(ctrl)
     }
     // Pull each enemy out of the projectile registry before the director
     // resets its handle list — `despawnAll` clears positions in place, so

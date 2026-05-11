@@ -90,6 +90,7 @@ import { buildMultiToolConfig } from '@/lib/fps/buildMultiToolConfig'
 import { SurfaceRockController } from '@/three/controllers/SurfaceRockController'
 import { createEnemyVisualWarmup, type EnemyVisualWarmup } from '@/three/EnemyVisualWarmup'
 import { EnemyControllerPool } from '@/three/EnemyControllerPool'
+import { DanScanController } from '@/three/DanScanController'
 import { EnemyLightPool } from '@/three/EnemyLightPool'
 import { enemyVisualTierForDifficulty } from '@/three/enemyVisualPalette'
 import { RockYieldSystem } from '@/lib/mining/rockYieldSystem'
@@ -233,6 +234,7 @@ const DISTURBANCE_ALERT_DURATION_SECONDS = 3
 const DISTURBANCE_DISABLED_OBJECTIVE_TYPES = new Set<ConcreteObjective['type']>([
   'bunker',
   'rescue',
+  'dan',
 ])
 
 /**
@@ -1774,6 +1776,18 @@ export class LevelViewController implements Tickable {
     // prewarm render pays that cost under the loading overlay.
     this.enemyControllerPool?.stageForPrewarm(camera)
 
+    // DAN scan minigame materials (neutron particle PBR + 3 additive beam
+    // variants + completion pulse). Without this, the first time the player
+    // starts a DAN scan the renderer hits `onFirstUse` on all five materials
+    // mid-frame and stalls for ~3s. Staging them in front of the camera here
+    // makes the boot precompile cover them under the loading overlay.
+    const danPrewarm = DanScanController.stageForPrewarm()
+    const danAnchor = new THREE.Vector3()
+    camera.getWorldDirection(danAnchor).multiplyScalar(8).add(camera.position)
+    danPrewarm.group.position.copy(danAnchor)
+    scene.add(danPrewarm.group)
+    stageVisible(danPrewarm.group)
+
     // ── Thruster wash prewarm ────────────────────────────────────
     // `compileAsync` only links shader programs — it does not actually
     // render anything, so per-(material, geometry) WebGL VAOs and any
@@ -1891,6 +1905,8 @@ export class LevelViewController implements Tickable {
         this.enemyVisualWarmup.group.visible = false
       }
       this.enemyControllerPool?.unstageFromPrewarm()
+      scene.remove(danPrewarm.group)
+      danPrewarm.dispose()
       this.multiTool?.setVisible(multiToolWasVisible)
       if (washStaged) {
         washStaged.scorchMesh.material.uniforms['intensity']!.value = 0

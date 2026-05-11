@@ -189,6 +189,8 @@ export interface DanScanControllerOptions {
 export class DanScanController implements Tickable {
   private readonly options: DanScanControllerOptions
   private readonly particles: DanParticleEntry[] = []
+  private particleMaterial: THREE.MeshStandardMaterial | null = null
+  private particleGeometry: THREE.SphereGeometry | null = null
   private particleSpawnAccumulator = 0
   private spawning = false
   private elapsed = 0
@@ -337,10 +339,16 @@ export class DanScanController implements Tickable {
         this.options.projectileSystem.removeDanParticle(entry.spawnIndex)
       }
       this.options.scene.remove(entry.mesh)
-      entry.mesh.geometry.dispose()
-      entry.mesh.material.dispose()
     }
     this.particles.length = 0
+    if (this.particleGeometry) {
+      this.particleGeometry.dispose()
+      this.particleGeometry = null
+    }
+    if (this.particleMaterial) {
+      this.particleMaterial.dispose()
+      this.particleMaterial = null
+    }
 
     if (this.beamCore) {
       this.options.scene.remove(this.beamCore)
@@ -368,22 +376,76 @@ export class DanScanController implements Tickable {
     }
   }
 
-  /** Allocate the full particle pool up-front so spawn cost stays uniform. */
-  private preallocateParticles(): void {
-    const geometry = new THREE.SphereGeometry(DAN_PARTICLE_RADIUS, 16, 12)
-    for (let i = 0; i < MAX_DAN_PARTICLES; i++) {
-      // Same material idiom as LootPickupController — emissive PBR sphere so
-      // neutrons read as glowing physical particles in the level lighting,
-      // not flat additive billboards. Per-instance material so we can pulse
-      // emissive intensity independently.
-      const material = new THREE.MeshStandardMaterial({
+  /**
+   * Stage dummy meshes carrying every distinct material flavor DanScanController
+   * will allocate at minigame start (one PBR particle material + three additive
+   * MeshBasicMaterial beam/muzzle variants + one completion-pulse material).
+   * Caller adds the returned group to the scene before the precompile pass and
+   * disposes it after — the program cache will then hit on every DanScanController
+   * material created later, avoiding ~3s of driver `onFirstUse` stalls when the
+   * DAN scan starts.
+   *
+   * @returns Group + dispose() function. Position the group inside the camera
+   *   frustum before rendering.
+   */
+  static stageForPrewarm(): { group: THREE.Group; dispose: () => void } {
+    const group = new THREE.Group()
+    group.name = 'dan-scan-prewarm'
+    const owned: { geometry: THREE.BufferGeometry; material: THREE.Material }[] = []
+    const addMesh = (geometry: THREE.BufferGeometry, material: THREE.Material) => {
+      group.add(new THREE.Mesh(geometry, material))
+      owned.push({ geometry, material })
+    }
+    addMesh(
+      new THREE.SphereGeometry(DAN_PARTICLE_RADIUS, 16, 12),
+      new THREE.MeshStandardMaterial({
         color: DAN_PARTICLE_COLOR,
         emissive: DAN_PARTICLE_EMISSIVE,
         emissiveIntensity: 1.4,
         metalness: 0.1,
         roughness: 0.4,
-      })
-      const mesh = new THREE.Mesh(geometry, material)
+      }),
+    )
+    const beamMatOpts = {
+      color: DAN_BEAM_COLOR,
+      transparent: true,
+      opacity: 0.5,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    } as const
+    addMesh(new THREE.CylinderGeometry(DAN_BEAM_CORE_RADIUS, DAN_BEAM_CORE_RADIUS, 1, 12), new THREE.MeshBasicMaterial(beamMatOpts))
+    addMesh(new THREE.CylinderGeometry(DAN_BEAM_GLOW_RADIUS, DAN_BEAM_GLOW_RADIUS, 1, 16), new THREE.MeshBasicMaterial(beamMatOpts))
+    addMesh(new THREE.SphereGeometry(DAN_MUZZLE_RADIUS, 16, 12), new THREE.MeshBasicMaterial(beamMatOpts))
+    addMesh(new THREE.TorusGeometry(1, COMPLETION_PULSE_TUBE, 12, 48), new THREE.MeshBasicMaterial(beamMatOpts))
+    return {
+      group,
+      dispose: () => {
+        for (const o of owned) {
+          o.geometry.dispose()
+          o.material.dispose()
+        }
+      },
+    }
+  }
+
+  /** Allocate the full particle pool up-front so spawn cost stays uniform. */
+  private preallocateParticles(): void {
+    this.particleGeometry = new THREE.SphereGeometry(DAN_PARTICLE_RADIUS, 16, 12)
+    const geometry = this.particleGeometry
+    // Shared material across the whole pool: per-instance materials each get a
+    // unique program cache key, so a fresh `MeshStandardMaterial` per particle
+    // forced N driver shader-link stalls at minigame start. One material → one
+    // program. Per-particle visual variation now comes from a scale pulse keyed
+    // to `pulsePhase` (see tickParticles).
+    this.particleMaterial = new THREE.MeshStandardMaterial({
+      color: DAN_PARTICLE_COLOR,
+      emissive: DAN_PARTICLE_EMISSIVE,
+      emissiveIntensity: 1.4,
+      metalness: 0.1,
+      roughness: 0.4,
+    })
+    for (let i = 0; i < MAX_DAN_PARTICLES; i++) {
+      const mesh = new THREE.Mesh(geometry, this.particleMaterial)
       mesh.name = `dan-particle-${i}`
       mesh.visible = false
       this.options.scene.add(mesh)
@@ -434,10 +496,12 @@ export class DanScanController implements Tickable {
       entry.registryEntry.cx = entry.mesh.position.x
       entry.registryEntry.cy = entry.mesh.position.y
       entry.registryEntry.cz = entry.mesh.position.z
-      // Emissive pulse — gives each neutron a "live" breathing glow keyed
-      // to its own phase so the bowl sparkles instead of strobing in unison.
+      // Per-particle scale pulse — material is shared across the pool (one
+      // program, one emissive intensity), so visual variation rides on mesh
+      // scale instead of per-instance emissiveIntensity.
       const pulse = Math.sin(this.elapsed * DAN_PARTICLE_PULSE_SPEED + entry.pulsePhase)
-      entry.mesh.material.emissiveIntensity = 1.4 + pulse * DAN_PARTICLE_PULSE_AMPLITUDE
+      const scale = 1 + pulse * DAN_PARTICLE_PULSE_AMPLITUDE * 0.35
+      entry.mesh.scale.setScalar(scale)
     }
   }
 

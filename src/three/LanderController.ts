@@ -93,8 +93,11 @@ const LANDER_THRUSTER_CONFIG: ThrusterSystemConfig<LanderThrusterName> = {
 /** Node name for the main descent engine bell in the GLB */
 const MAIN_ENGINE_NODE = 'Thruster_Lunar_Lander_0'
 
-/** RCS ascend thrust — smaller boost than main engine */
-const RCS_ASCEND_THRUST = 3.14
+/**
+ * RCS vertical thrust (Shift ascend + C descend reaction) — smaller than main engine.
+ * Both directions scale with the `landerThrusterSpeed` upgrade like the main engine.
+ */
+const RCS_VERTICAL_THRUST = 3.14
 
 /** Main engine flame emitter config */
 const FLAME_POOL_SIZE = 500
@@ -123,12 +126,6 @@ const RCS_LIFETIME = 0.5
 const RCS_SPREAD = 1.5
 const RCS_PUSH_FORCE = 10
 const RCS_SPAWN_RATE = 250
-
-/** Small fill light so the lander hull stays legible in darkness. */
-const BODY_FILL_LIGHT_COLOR = 0xdde4f0
-const BODY_FILL_LIGHT_INTENSITY = 5
-const BODY_FILL_LIGHT_DISTANCE = 200
-const BODY_FILL_LIGHT_Y_OFFSET = 15
 
 /** Roof-mounted warning beacon centered above the lander chassis. */
 const TOP_BEACON_Y_OFFSET = 22
@@ -340,11 +337,6 @@ export class LanderController implements Tickable {
   readonly thrusterSystem: ThrusterSystem<LanderThrusterName>
   readonly flameEmitter: ParticleEmitter
   readonly nozzleGlow: THREE.Sprite
-  readonly bodyFillLight = new THREE.PointLight(
-    BODY_FILL_LIGHT_COLOR,
-    BODY_FILL_LIGHT_INTENSITY,
-    BODY_FILL_LIGHT_DISTANCE,
-  )
   readonly topWarningBeacon = new WarningBeacon({
     lightIntensity: TOP_BEACON_LIGHT_INTENSITY,
     lightDistance: TOP_BEACON_LIGHT_DISTANCE,
@@ -542,9 +534,7 @@ export class LanderController implements Tickable {
     this.thrusterSystem.onFuelEmpty = () => {
       this.onFuelEmpty?.()
     }
-    this.bodyFillLight.position.set(0, BODY_FILL_LIGHT_Y_OFFSET, 0)
     this.topWarningBeacon.group.position.set(0, TOP_BEACON_Y_OFFSET, 0)
-    this.group.add(this.bodyFillLight)
     this.group.add(this.topWarningBeacon.group)
     this.updateWarningBeacon()
 
@@ -916,12 +906,14 @@ export class LanderController implements Tickable {
     // Update tilt + yaw first so quaternion is current for thrust direction and flame
     this.tickTilt(dt)
 
+    const landerThrusterSpeed = getCurrentUpgradeValue('landerThrusterSpeed')
+
     // Main engine — thrust along lander's local up axis
     if (this.isMainEngineActive) {
       const localUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.group.quaternion)
       const slopePenalty = this.getLiftoffSlopePenalty()
       const boost = this.liftoffBoostTimer > 0 ? LIFTOFF_BOOST * slopePenalty : 1
-      const thrust = MAIN_ENGINE_THRUST * getCurrentUpgradeValue('landerThrusterSpeed') * dt * boost
+      const thrust = MAIN_ENGINE_THRUST * landerThrusterSpeed * dt * boost
       this.body.impulse(localUp.y * thrust)
       this.lateralVelocity.x += localUp.x * thrust
       this.lateralVelocity.z += localUp.z * thrust
@@ -941,15 +933,27 @@ export class LanderController implements Tickable {
       const localUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.group.quaternion)
       const slopePenalty = this.getLiftoffSlopePenalty()
       const boost = this.liftoffBoostTimer > 0 ? RCS_LIFTOFF_BOOST * slopePenalty : 1
-      const thrust = RCS_ASCEND_THRUST * dt * boost
+      const thrust = RCS_VERTICAL_THRUST * landerThrusterSpeed * dt * boost
       this.body.impulse(localUp.y * thrust)
       this.lateralVelocity.x += localUp.x * thrust
       this.lateralVelocity.z += localUp.z * thrust
     }
 
+    // RCS descend — upward nozzle thrust reacts downward (in air only; grounded handled in tickLateralMovement)
+    if (
+      !this.body.grounded &&
+      this.isRcsActionActive('rcsDescend')
+    ) {
+      const localUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.group.quaternion)
+      const thrust = RCS_VERTICAL_THRUST * landerThrusterSpeed * dt
+      this.body.impulse(-localUp.y * thrust)
+      this.lateralVelocity.x += -localUp.x * thrust
+      this.lateralVelocity.z += -localUp.z * thrust
+    }
+
     // RCS emitters + lateral movement
     this.tickRcs(dt)
-    this.tickLateralMovement(dt)
+    this.tickLateralMovement(dt, landerThrusterSpeed)
 
     // Platformer gravity + ground collision against terrain
     const floorY = this.sampleTerrainSupport().height
@@ -1238,21 +1242,27 @@ export class LanderController implements Tickable {
     this._prevAttitudeWarning = attitude
   }
 
-  private tickLateralMovement(dt: number): void {
+  /**
+   * @param dt - Delta time in seconds.
+   * @param landerThrusterSpeed - `landerThrusterSpeed` upgrade multiplier (matches main engine).
+   */
+  private tickLateralMovement(dt: number, landerThrusterSpeed: number): void {
     if (this.body.grounded) {
       this.lateralVelocity.set(0, 0, 0)
       return
     }
     if (!this.thrusterSystem.canFire('rcs', this.landerBurnRateModifiers())) return
 
+    const lateral = RCS_LATERAL_FORCE * landerThrusterSpeed
+
     // RCS lateral force — rotated by yaw (camera couples to lander orientation)
     let localX = 0
     let localZ = 0
 
-    if (this.inputManager.isActionActive('rcsLeft')) localZ += RCS_LATERAL_FORCE
-    if (this.inputManager.isActionActive('rcsRight')) localZ -= RCS_LATERAL_FORCE
-    if (this.inputManager.isActionActive('rcsFore')) localX -= RCS_LATERAL_FORCE
-    if (this.inputManager.isActionActive('rcsAft')) localX += RCS_LATERAL_FORCE
+    if (this.inputManager.isActionActive('rcsLeft')) localZ += lateral
+    if (this.inputManager.isActionActive('rcsRight')) localZ -= lateral
+    if (this.inputManager.isActionActive('rcsFore')) localX -= lateral
+    if (this.inputManager.isActionActive('rcsAft')) localX += lateral
 
     // Rotate by yaw so thrust matches screen directions
     const cosY = Math.cos(this.yaw)
@@ -1262,7 +1272,7 @@ export class LanderController implements Tickable {
 
     // C (rcsDescend) doubles as retro-brake — damps lateral velocity
     if (this.inputManager.isActionActive('rcsDescend')) {
-      const damping = 1 - RETRO_BRAKE_DAMPING * dt
+      const damping = 1 - RETRO_BRAKE_DAMPING * landerThrusterSpeed * dt
       this.lateralVelocity.x *= damping
       this.lateralVelocity.z *= damping
     }

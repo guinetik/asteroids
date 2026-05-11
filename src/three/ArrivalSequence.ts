@@ -23,41 +23,6 @@ import {
 const SHUTTLE_MODEL_PATH = '/models/shuttle.glb'
 const LANDER_MODEL_PATH = '/models/lander.glb'
 
-/** Belly underlight — illuminates the shuttle hull from below when parked. */
-const NAV_UNDER_LIGHT_COLOR = 0x6699cc
-/** Belly underlight intensity (gameplay value). Pre-created at intensity 0. */
-const NAV_UNDER_LIGHT_INTENSITY = 20
-/** Belly underlight reach. */
-const NAV_UNDER_LIGHT_DISTANCE = 1200
-/** Belly underlight local-space offset on the shuttle group. */
-const NAV_UNDER_LIGHT_OFFSET_Y = -25
-/** Top nav light — skyline silhouette glow. */
-const NAV_TOP_LIGHT_COLOR = 0xffeedd
-/** Top nav light intensity (gameplay value). */
-const NAV_TOP_LIGHT_INTENSITY = 10
-/** Top nav light reach. */
-const NAV_TOP_LIGHT_DISTANCE = 800
-/** Top nav light local-space offset. */
-const NAV_TOP_LIGHT_OFFSET_Y = 15
-/** Cargo bay interior glow. */
-const NAV_CARGO_GLOW_COLOR = 0xffaa44
-/** Cargo bay glow intensity (gameplay value). */
-const NAV_CARGO_GLOW_INTENSITY = 8
-/** Cargo bay glow reach. */
-const NAV_CARGO_GLOW_DISTANCE = 600
-/** Cargo bay glow local-space offset. */
-const NAV_CARGO_GLOW_OFFSET_X = -3
-/** Cargo bay glow local-space offset. */
-const NAV_CARGO_GLOW_OFFSET_Y = -2
-/** Engine nozzle glow. */
-const NAV_ENGINE_GLOW_COLOR = 0xff6633
-/** Engine nozzle glow intensity (gameplay value). */
-const NAV_ENGINE_GLOW_INTENSITY = 6
-/** Engine nozzle glow reach. */
-const NAV_ENGINE_GLOW_DISTANCE = 500
-/** Engine nozzle glow local-space offset. */
-const NAV_ENGINE_GLOW_OFFSET_X = -6
-
 /** NASA model is in centimeters. Scale to meters. */
 const MODEL_SCALE = 0.01
 
@@ -271,21 +236,6 @@ export class ArrivalSequence {
   private exfilFloodlight: THREE.SpotLight | null = null
   private exfilFloodlightTarget: THREE.Object3D | null = null
   private exfilFloodlightCone: THREE.Mesh | null = null
-  /**
-   * Persistent nav lights pre-created during {@link load} with `intensity = 0`,
-   * lit by {@link parkShuttle}. Created up front so they participate in the
-   * boot precompile pass — toggling visibility (or adding lights post-boot)
-   * mutates `NUM_POINT_LIGHTS`, which forces every lit material in the scene
-   * to recompile on its next draw. See `ThrusterWashController` (same pattern).
-   */
-  private navUnderLight: THREE.PointLight | null = null
-  /** See {@link navUnderLight}. */
-  private navTopLight: THREE.PointLight | null = null
-  /** See {@link navUnderLight}. */
-  private navCargoGlow: THREE.PointLight | null = null
-  /** See {@link navUnderLight}. */
-  private navEngineGlow: THREE.PointLight | null = null
-
   // Shuttle flight state
   private shuttleStartPos = new THREE.Vector3()
   private shuttleEndPos = new THREE.Vector3()
@@ -350,46 +300,19 @@ export class ArrivalSequence {
     const shuttleScene = this.shuttleScene
     this.shuttleGroup.scale.setScalar(SHUTTLE_CINEMATIC_SCALE)
 
-    // Fill lights attached to shuttle — keeps hull readable after flip
-    // Model is ~14 units across (1400cm * MODEL_SCALE 0.01), so lights must be close
-    const cinematicFill = new THREE.PointLight(0xddeeff, 30, 60)
-    cinematicFill.position.set(0, 12, 0)
-    this.shuttleGroup.add(cinematicFill)
-    const cinematicBelow = new THREE.PointLight(0xffeedd, 20, 50)
-    cinematicBelow.position.set(0, -10, 0)
-    this.shuttleGroup.add(cinematicBelow)
-    const cinematicRim = new THREE.PointLight(0xffeedd, 15, 50)
-    cinematicRim.position.set(-15, 0, 0)
-    this.shuttleGroup.add(cinematicRim)
+    // Cinematic fill lights used to live here as three additional PointLights
+    // attached to the shuttle. They were only meaningful during the 5-second
+    // arrival cinematic but persisted at full intensity for the entire run,
+    // adding ~3 PointLight fragment loops to every lit material. The
+    // cinematic gets its readability from the boosted sun + hemisphere fill
+    // applied by `LevelViewController.enterArrival()` instead.
 
-    // Nav lights — pre-created so the boot precompile sees them in
-    // `NUM_POINT_LIGHTS`. `parkShuttle()` lights them up by intensity, never
-    // by adding fresh lights (which would otherwise trigger a scene-wide
-    // shader recompile cascade the moment the cinematic ends).
-    this.navUnderLight = new THREE.PointLight(
-      NAV_UNDER_LIGHT_COLOR,
-      0,
-      NAV_UNDER_LIGHT_DISTANCE,
-    )
-    this.navUnderLight.position.set(0, NAV_UNDER_LIGHT_OFFSET_Y, 0)
-    this.shuttleGroup.add(this.navUnderLight)
-    this.navTopLight = new THREE.PointLight(NAV_TOP_LIGHT_COLOR, 0, NAV_TOP_LIGHT_DISTANCE)
-    this.navTopLight.position.set(0, NAV_TOP_LIGHT_OFFSET_Y, 0)
-    this.shuttleGroup.add(this.navTopLight)
-    this.navCargoGlow = new THREE.PointLight(
-      NAV_CARGO_GLOW_COLOR,
-      0,
-      NAV_CARGO_GLOW_DISTANCE,
-    )
-    this.navCargoGlow.position.set(NAV_CARGO_GLOW_OFFSET_X, NAV_CARGO_GLOW_OFFSET_Y, 0)
-    this.shuttleGroup.add(this.navCargoGlow)
-    this.navEngineGlow = new THREE.PointLight(
-      NAV_ENGINE_GLOW_COLOR,
-      0,
-      NAV_ENGINE_GLOW_DISTANCE,
-    )
-    this.navEngineGlow.position.set(NAV_ENGINE_GLOW_OFFSET_X, 0, 0)
-    this.shuttleGroup.add(this.navEngineGlow)
+    // Nav lights culled: previously 4 PointLights blinking on the shuttle
+    // during the arrival cinematic, then sitting at intensity 0 for the rest
+    // of the run. Each one added a fragment-lighting loop to every lit
+    // material in /level, costing ~30% of steady-state GPU time for visuals
+    // the player only saw during a 5-second flythrough. Sun + hemisphere fill
+    // carry the cinematic readability.
 
     // Find door nodes
     this.doorPortNode = this.findNode(shuttleScene, 'door-prt')
@@ -623,12 +546,7 @@ export class ArrivalSequence {
       sprite.visible = false
     }
 
-    // Navigation lights — pre-created during `load()` at intensity 0 so the
-    // scene's `NUM_POINT_LIGHTS` is pinned at boot. Just raise intensity here.
-    if (this.navUnderLight) this.navUnderLight.intensity = NAV_UNDER_LIGHT_INTENSITY
-    if (this.navTopLight) this.navTopLight.intensity = NAV_TOP_LIGHT_INTENSITY
-    if (this.navCargoGlow) this.navCargoGlow.intensity = NAV_CARGO_GLOW_INTENSITY
-    if (this.navEngineGlow) this.navEngineGlow.intensity = NAV_ENGINE_GLOW_INTENSITY
+    // Nav lights culled — see comment in `load()`. No-op kept as a marker.
   }
 
   /** Remove shuttle and falling lander from scene entirely. */
