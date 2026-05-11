@@ -644,7 +644,8 @@ const catNeedsAttentionPrompt = computed<string | null>(() => {
   if (!profile.completedJourneyIds?.includes('welcome')) return null
   if (profile.sushiBladder >= CAT_BLADDER_FULL_THRESHOLD) return 'litterbox is full'
   if (profile.litterPollution >= CAT_LITTER_FULL_THRESHOLD) return 'litterbox needs cleaning'
-  if (profile.sushiHunger <= CAT_HUNGER_NEEDY_THRESHOLD) return 'food bowl is empty'
+  if (profile.sushiHunger <= CAT_HUNGER_NEEDY_THRESHOLD && profile.bowlServings <= 0)
+    return 'food bowl is empty'
   if (profile.sushiLove <= CAT_LOVE_NEEDY_THRESHOLD) return 'wants attention'
   return null
 })
