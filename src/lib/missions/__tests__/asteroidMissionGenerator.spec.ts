@@ -241,17 +241,22 @@ describe('pickAsteroidForDifficulty', () => {
   })
 
   it('allows Eros for Mars-hosted early/mid missions', () => {
-    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(SELECT_SECOND_ASTEROID_RANDOM)
+    // Mars/diff 3 host pool: [ryugu-global, ryugu-multi, bennu-global, eros, vesta].
+    // SELECT_LAST_ASTEROID_RANDOM lands on the last → vesta; index 3 (eros) needs ~0.65.
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.65)
 
     expect(pickAsteroidForDifficulty(3, 'mars')).toBe('eros')
     randomSpy.mockRestore()
   })
 
   it('does not select Eros for unrelated hosts when global alternatives exist', () => {
-    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(SELECT_SECOND_ASTEROID_RANDOM)
-
-    expect(pickAsteroidForDifficulty(3, 'venus')).toBe('bennu')
-    randomSpy.mockRestore()
+    // Venus/diff 3 host pool: [ryugu-global, ryugu-multi, bennu-global]. Eros (earth/mars only)
+    // must not appear regardless of which slot the random hits.
+    for (const r of [0.0, 0.34, 0.67, 0.99]) {
+      const spy = vi.spyOn(Math, 'random').mockReturnValue(r)
+      expect(pickAsteroidForDifficulty(3, 'venus')).not.toBe('eros')
+      spy.mockRestore()
+    }
   })
 
   it('preserves global fallback when no host is supplied', () => {

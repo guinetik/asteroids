@@ -1,9 +1,12 @@
 [
   { "asteroidId": "itokawa", "minDifficulty": 1, "maxDifficulty": 2 },
-  { "asteroidId": "itokawa", "minDifficulty": 1, "maxDifficulty": 2, "planetIds": ["earth"] },
-  { "asteroidId": "ryugu", "minDifficulty": 1, "maxDifficulty": 3, "planetIds": ["earth"] },
-  { "asteroidId": "ryugu", "minDifficulty": 1, "maxDifficulty": 3, "planetIds": ["mars"] },
-  { "asteroidId": "ryugu", "minDifficulty": 1, "maxDifficulty": 3, "planetIds": ["mercury"] },
+  { "asteroidId": "ryugu", "minDifficulty": 1, "maxDifficulty": 4 },
+  {
+    "asteroidId": "ryugu",
+    "minDifficulty": 1,
+    "maxDifficulty": 4,
+    "planetIds": ["earth", "mars", "mercury", "venus"]
+  },
   { "asteroidId": "bennu", "minDifficulty": 2, "maxDifficulty": 4 },
   { "asteroidId": "bennu", "minDifficulty": 1, "maxDifficulty": 3, "planetIds": ["earth"] },
   { "asteroidId": "xg7", "minDifficulty": 1, "maxDifficulty": 3, "planetIds": ["earth"] },
@@ -16,6 +19,7 @@
   },
   { "asteroidId": "psyche", "minDifficulty": 4, "maxDifficulty": 7 },
   { "asteroidId": "xg7", "minDifficulty": 6, "maxDifficulty": 8 },
+  { "asteroidId": "asset-2306-s", "minDifficulty": 5, "maxDifficulty": 8, "planetIds": ["saturn"] },
   { "asteroidId": "kr3", "minDifficulty": 8, "maxDifficulty": 10 },
   {
     "asteroidId": "hektor",
