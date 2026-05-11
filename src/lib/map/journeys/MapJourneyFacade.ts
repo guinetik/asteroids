@@ -66,6 +66,12 @@ export interface MapJourneyFacadeDeps {
   persistProfile: () => void
   /** Forwarded to `MapMessageFacade.setTutorialMessagesUnlocked` when the welcome journey completes. */
   setTutorialMessagesUnlocked: (unlocked: boolean) => void
+  /**
+   * Notify the contract system that a journey just completed so contracts gated
+   * on `triggerOnJourneyCompleted` (e.g. USC Venus on `welcome`) can be offered
+   * after the onboarding banner sequence rather than during it.
+   */
+  notifyContractJourneyCompleted: (journeyId: JourneyId) => void
   /** HUD callbacks; invoked with `?.` inside the facade so unset entries are no-ops. */
   callbacks: MapJourneyCallbacks
 }
@@ -105,6 +111,7 @@ export class MapJourneyFacade {
     deps.setTutorialMessagesUnlocked(hasCompletedJourney(result.profile, WELCOME_JOURNEY_ID))
 
     for (const journeyId of result.completedJourneyIds) {
+      deps.notifyContractJourneyCompleted(journeyId)
       const display = getJourneyDisplay(journeyId)
       if (!display) continue
       deps.callbacks.onJourneyCompletedAnnouncement?.(

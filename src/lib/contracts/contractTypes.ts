@@ -441,6 +441,12 @@ export interface Contract {
   /** Offer this contract when the player first enters orbit at this planet id. */
   triggerOnPlanetVisited?: string
   /**
+   * Offer this contract once the named journey transitions into `completedJourneyIds`.
+   * Use to gate post-onboarding contracts so their offer message can't race the
+   * player's intro flow (e.g. USC Venus Certification only after `welcome` ends).
+   */
+  triggerOnJourneyCompleted?: string
+  /**
    * Combined offer gate. The runtime AND-s every present sub-field. Authoring
    * just one of these fields makes the gate degenerate to a single check.
    */

@@ -468,6 +468,26 @@ export class ContractSystem {
   }
 
   /**
+   * Notify the system that a player journey just transitioned into the
+   * `completedJourneyIds` set. Offers any contract whose `triggerOnJourneyCompleted`
+   * matches and that has no existing instance yet. Idempotent — re-firing for the
+   * same journey after the contract is offered/active/completed is a no-op.
+   *
+   * @param journeyId - Journey id (e.g. `'welcome'`) that just completed.
+   */
+  notifyJourneyCompleted(journeyId: string): void {
+    let changed = false
+    for (const contract of this.contracts.values()) {
+      if (contract.triggerOnJourneyCompleted !== journeyId) continue
+      if (this.snapshot.instances[contract.id]) continue
+      this.offerContract(contract)
+      changed = true
+    }
+    this.persist()
+    if (changed) this.afterChange()
+  }
+
+  /**
    * Notify the system that an upgrade was installed (or its level changed).
    *
    * @param upgradeId - Upgrade id whose level changed.

@@ -885,6 +885,8 @@ export class MapViewController implements Tickable {
       persistProfile: () => this.persistPlayerProfile(),
       setTutorialMessagesUnlocked: (unlocked) =>
         this.messageFacade.setTutorialMessagesUnlocked(unlocked),
+      notifyContractJourneyCompleted: (journeyId) =>
+        contractSystem.notifyJourneyCompleted(journeyId),
       callbacks: {
         onJourneyTracker: (state) => this.onJourneyTracker?.(state),
         onJourneyTrackerVisible: (visible) => this.onJourneyTrackerVisible?.(visible),

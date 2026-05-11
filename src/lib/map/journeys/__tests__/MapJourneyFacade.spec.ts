@@ -26,6 +26,7 @@ function buildFacade(initial: PlayerProfile = quietProfile()) {
   let profile = initial
   const persistProfile = vi.fn()
   const setTutorialMessagesUnlocked = vi.fn()
+  const notifyContractJourneyCompleted = vi.fn()
   const callbacks: MapJourneyCallbacks = {
     onJourneyTracker: vi.fn(),
     onJourneyTrackerVisible: vi.fn(),
@@ -39,6 +40,7 @@ function buildFacade(initial: PlayerProfile = quietProfile()) {
     },
     persistProfile,
     setTutorialMessagesUnlocked,
+    notifyContractJourneyCompleted,
     callbacks,
   }
   const facade = new MapJourneyFacade()

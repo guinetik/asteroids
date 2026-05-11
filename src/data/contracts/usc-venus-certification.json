@@ -4,7 +4,7 @@
   "inboxName": "United Space Consortium",
   "from": "USC — Operator Relations, Sol Sector",
   "sentAt": "2306-04-06 15:30 UTC",
-  "triggerOnMissionOfKind": { "n": 1, "missionType": "asteroid" },
+  "triggerOnJourneyCompleted": "welcome",
   "introSubject": "RE: CERTIFICATION REQUEST 4471-V-CERT — VENUS LANE",
   "introBody": [
     "HANDLER,",
