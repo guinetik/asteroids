@@ -6,7 +6,7 @@ Yamada is a multigenerational family practice on Uranus's moons. They sell time.
 
 The handler is **Sumiko Yamada**, granddaughter of the current matriarch, mid-30s by appearance, ~60 by Yamada math. Country-doctor register; quiet, formal but not stiff; warm without performing warmth. The horror lives in her cheerfulness about awful things. She runs intake on Titania.
 
-The unnamed matriarch is ~240 years old and stays off-screen for this contract. She is the act-4 figure.
+The unnamed matriarch is ~240 years old and stays off-screen for this contract.
 
 The faction fills the East Asian gap in the cast. Their texture is *practice* not *corporation* — clinic, not Cyberpunk biotech megacorp. Wool sweaters and tea, not lab coats and screens.
 
@@ -14,7 +14,7 @@ The faction fills the East Asian gap in the cast. Their texture is *practice* no
 
 Each contract teaches one system. Yamada's system is **biological cargo with thermal/time constraints** — a new cargo class that has to be moved within a temperature window and a clock. Not new physics; a new lens on the existing grid. Mercury hardened the ship; Uranus hardens the cargo.
 
-The contract also gates Uranus fast travel and serves as the act-4 antechamber: the player's first contact with the longevity infrastructure that will retroactively explain Saturn.
+The contract also gates Uranus fast travel and introduces the longevity infrastructure that has been running quietly in the background of the system.
 
 ## Trigger
 
@@ -25,9 +25,9 @@ The contract also gates Uranus fast travel and serves as the act-4 antechamber: 
 
 By the end of the contract, the player must have:
 
-1. **Seen the listening ward** — neuron-computer Saturnines in jars, hooked to deep-space arrays, listening for decades on instruments Yamada maintains. This is the SETI infrastructure that explains how Uranus has been quietly running a 50-year signal hunt in the background. Also the act-4 escalation seed.
+1. **Seen the listening ward** — neuron-computer Saturnines in jars, hooked to deep-space arrays, listening for decades on instruments Yamada maintains. This is the SETI infrastructure that explains how Uranus has been quietly running a 50-year signal hunt in the background.
 2. **Met an old patient** (offscreen) — at least one Bunker Extract delivers to a "strange orbit, quieter than you expect" patient receiving asteroid. This plants that some Saturnine patients don't have bodies anymore.
-3. **Heard Finch's name** in a Yamada context — the enroll completion drops *"Mr. Finch in particular has a fondness for the frames. I do not know him personally; I know him as a file. The practice has had his file for some time."* That single line is the act-4 detonator: when the player walks into the Uranus signal team in act 4 and says *Finch sent me*, the shock is double-loaded — Finch is the interlocutor *and* the longest-running patient on file.
+3. **Heard Finch's name** in a Yamada context — the enroll completion drops *"Mr. Finch in particular has a fondness for the frames. I do not know him personally; I know him as a file. The practice has had his file for some time."*
 
 These three beats are non-negotiable. Everything else is texture.
 
@@ -69,17 +69,17 @@ The player flies to Titania. Sumiko meets them at the dock. Three rooms, one off
 
 **1. The Margaret Room.** The first sheep, kept past every reason to die, displayed in a small environmental chamber. Sumiko narrates. *"She is older than your country. Older than most of our patients. She is the answer to every question you have not yet asked."* This is the practice's foundational lie: that everything we do is just *keeping animals alive past their reasons.*
 
-**2. The Pig Ward.** Thousands of suspension cylinders neatly racked, each labeled with a patient's name. The player walks past. Sumiko narrates without shame. **One cylinder reads "H. Halloran-Vey, est. 1740."** The player will not know this is Finch. (Finch is publicly known as Mr. Finch.) This is the seed for the act-4 reveal.
+**2. The Pig Ward.** Thousands of suspension cylinders neatly racked, each labeled with a patient's name. The player walks past. Sumiko narrates without shame. **One cylinder reads "H. Halloran-Vey, est. 1740."** The player will not know this is Finch. (Finch is publicly known as Mr. Finch.)
 
 **3. The Listening Ward.** Quieter, older. The neuron-computer patients in jars, hooked to deep-space arrays. Sumiko's register shifts here — reverent, careful. *"These are our oldest patients. Some of them have been listening for a hundred years. They hear things now that they could not have heard when they were alive."* The player does not get to ask what.
 
 Then the offer. Enroll or decline.
 
-**Enroll.** Player receives the **glasses** as a permanent HUD cosmetic. Saturnine NPCs treat the player differently from now on — Marta clocks them, Halsey clocks them and says nothing, Finch in act 4 will *recognize* the frames. Reward: Uranus fast travel + 2× pay multiplier on Yamada contracts + cosmetic + story flag.
+**Enroll.** Player receives the **glasses** as a permanent HUD cosmetic. Saturnine NPCs treat the player differently from now on — Marta clocks them, Halsey clocks them and says nothing, Finch recognizes the frames. Reward: Uranus fast travel + 2× pay multiplier on Yamada contracts + cosmetic + story flag.
 
 **Decline.** Sumiko walks the player to the dock herself. Standing contracts remain available. The door does not close. Reward: Uranus fast travel + story flag. No multiplier.
 
-**Crucial:** decline is not a punished path. Yamada has time. The act-4 door opens from either side — the enrolled player gets recognition; the declined player gets to be *the one Saturnine-adjacent figure who walked away*, which carries its own weight in act 4. Both are valid. This is the contract's design innovation against Hoyt's transmit/tamper and Halsey's release/quiet — those are forks about *what you do to the world*; this is a threshold about *what you let the world do to you.*
+**Crucial:** decline is not a punished path. Yamada has time. The enrolled player gets recognition from Saturnine NPCs going forward; the declined player gets to be *the one Saturnine-adjacent figure who walked away*, which carries its own weight. Both are valid. This is the contract's design innovation against Hoyt's transmit/tamper and Halsey's release/quiet — those are forks about *what you do to the world*; this is a threshold about *what you let the world do to you.*
 
 ## Rewards summary
 
@@ -103,8 +103,8 @@ These don't exist yet and will need to be built before the contract ships:
 
 ## Open questions
 
-1. **The matriarch's name.** Saved for act 4 by default, but if we want to plant it now I need it for Sumiko's introBody.
+1. **The matriarch's name.** Off-screen for this contract, but if we want to plant it now I need it for Sumiko's introBody.
 2. **What the glasses actually do mechanically.** Right now they're a cosmetic + identity marker. We could give them a functional layer (HUD overlay, NPC dialogue gating) but I'd argue against — Cinderline's encaustum is also pure marker, and the symmetry is good.
 3. **Whether the hat is offered separately.** Mentioned in the enroll completion as available but not pushed. If we want the hat to ever do anything, we need to decide what — currently it's flavor.
-4. **Whether enrolled players see Yamada NPCs differently across the system.** Worth doing. Marta has one extra line if she sees the glasses. Finch in act 4 reacts to them. Halsey does not, and that silence is its own beat.
-5. **Beatrice.** Named in the enroll completion as the player's pig. Do we want the player to ever *see* Beatrice? My instinct: only in act 4, only if enrolled.
+4. **Whether enrolled players see Yamada NPCs differently across the system.** Worth doing. Marta has one extra line if she sees the glasses. Finch reacts to them. Halsey does not, and that silence is its own beat.
+5. **Beatrice.** Named in the enroll completion as the player's pig. Do we want the player to ever *see* Beatrice?
