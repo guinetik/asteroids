@@ -5,6 +5,7 @@ import type {
   YamadaPatientRescueState,
   YamadaMissionState,
 } from '../yamadaArchetype'
+import { stampYamadaState, pickSuspensionLapseSeconds } from '../yamadaArchetype'
 
 describe('YamadaMissionState union', () => {
   it('discriminates by archetype', () => {
@@ -28,5 +29,57 @@ describe('YamadaMissionState union', () => {
       'bunker-extract',
       'patient-rescue',
     ])
+  })
+})
+
+describe('stampYamadaState', () => {
+  it('returns undefined for non-Yamada archetype strings', () => {
+    expect(stampYamadaState({ archetype: undefined, difficulty: 5 })).toBeUndefined()
+    expect(stampYamadaState({ archetype: 'not-a-real-archetype', difficulty: 5 })).toBeUndefined()
+  })
+
+  it('stamps bunker-protect with a difficulty-derived timer', () => {
+    const state = stampYamadaState({ archetype: 'bunker-protect', difficulty: 5 })
+    expect(state).toEqual({
+      archetype: 'bunker-protect',
+      suspensionLapseSeconds: pickSuspensionLapseSeconds(5),
+    })
+  })
+
+  it('stamps bunker-extract with destination + timer + organ id', () => {
+    const state = stampYamadaState({
+      archetype: 'bunker-extract',
+      difficulty: 6,
+      destinationPlanetId: 'uranus',
+      deliveryTimerSeconds: 300,
+    })
+    expect(state).toEqual({
+      archetype: 'bunker-extract',
+      destinationPlanetId: 'uranus',
+      deliveryTimerSeconds: 300,
+      organItemId: 'yamada-organ-case',
+    })
+  })
+
+  it('stamps patient-rescue with a random VIP index within range', () => {
+    const state = stampYamadaState({
+      archetype: 'patient-rescue',
+      difficulty: 7,
+      operatorCount: 4,
+      rand: () => 0.75,
+    })
+    expect(state).toEqual({ archetype: 'patient-rescue', vipOperatorIndex: 3 })
+  })
+})
+
+describe('pickSuspensionLapseSeconds', () => {
+  it('returns 420 (7 min) at difficulty 4-6', () => {
+    expect(pickSuspensionLapseSeconds(4)).toBe(420)
+    expect(pickSuspensionLapseSeconds(6)).toBe(420)
+  })
+
+  it('returns 300 (5 min) at difficulty 7-9', () => {
+    expect(pickSuspensionLapseSeconds(7)).toBe(300)
+    expect(pickSuspensionLapseSeconds(9)).toBe(300)
   })
 })

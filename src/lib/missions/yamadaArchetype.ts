@@ -53,3 +53,73 @@ export type YamadaMissionState =
   | YamadaBunkerProtectState
   | YamadaBunkerExtractState
   | YamadaPatientRescueState
+
+/**
+ * Suspension-lapse timer by difficulty for Bunker Protect.
+ * 4–6 → 7 min; 7–9 → 5 min. Tuneable per design open-questions list.
+ *
+ * @param difficulty - Mission difficulty (1–10).
+ */
+export function pickSuspensionLapseSeconds(difficulty: number): number {
+  if (difficulty <= 6) return 420
+  return 300
+}
+
+/** Inventory item id granted by the Bunker Extract dispense. */
+export const YAMADA_ORGAN_ITEM_ID = 'yamada-organ-case'
+
+/** Acceptance-time context required to stamp the Yamada runtime state. */
+export interface YamadaStampInput {
+  /** Archetype string from the giver template (may be undefined). */
+  archetype: string | undefined
+  /** Rolled mission difficulty. */
+  difficulty: number
+  /** Bunker Extract: pinned destination planet id. */
+  destinationPlanetId?: string
+  /** Bunker Extract: precomputed timer length (seconds). */
+  deliveryTimerSeconds?: number
+  /** Patient Rescue: total operators in the rescue objective. */
+  operatorCount?: number
+  /** Optional RNG injectable for tests. Defaults to `Math.random`. */
+  rand?: () => number
+}
+
+/**
+ * Translate a giver template's `archetype` tag into the Yamada runtime state
+ * attached to `GeneratedAsteroidMission.yamada`. Returns `undefined` for any
+ * archetype outside the three asteroid Yamada variants — that signals the
+ * caller (asteroid mission generator) not to set the field.
+ *
+ * @param input - Acceptance-time context.
+ * @returns Discriminated state, or undefined for non-Yamada archetypes.
+ */
+export function stampYamadaState(input: YamadaStampInput): YamadaMissionState | undefined {
+  const rand = input.rand ?? Math.random
+  switch (input.archetype) {
+    case 'bunker-protect':
+      return {
+        archetype: 'bunker-protect',
+        suspensionLapseSeconds: pickSuspensionLapseSeconds(input.difficulty),
+      }
+    case 'bunker-extract': {
+      if (!input.destinationPlanetId || input.deliveryTimerSeconds === undefined) {
+        return undefined
+      }
+      return {
+        archetype: 'bunker-extract',
+        destinationPlanetId: input.destinationPlanetId,
+        deliveryTimerSeconds: input.deliveryTimerSeconds,
+        organItemId: YAMADA_ORGAN_ITEM_ID,
+      }
+    }
+    case 'patient-rescue': {
+      const count = Math.max(1, input.operatorCount ?? 1)
+      return {
+        archetype: 'patient-rescue',
+        vipOperatorIndex: Math.floor(rand() * count),
+      }
+    }
+    default:
+      return undefined
+  }
+}
