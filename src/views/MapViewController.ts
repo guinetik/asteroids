@@ -121,7 +121,7 @@ import {
   setBodyAccess,
   setLastDockedPlanet,
 } from '@/lib/player/profile'
-import { tickSushiNeeds } from '@/lib/sushi/needs'
+import { tickSushiNeeds, tryAutoEat, tryAutoLitter } from '@/lib/sushi/needs'
 import type { BodyAccessState, PlayerProfile } from '@/lib/player/types'
 import {
   hasCompletedJourney,
@@ -2805,7 +2805,15 @@ export class MapViewController implements Tickable {
    */
   private tickSushiNeedsDecay(dt: number): void {
     if (!Number.isFinite(dt) || dt <= 0) return
-    const next = tickSushiNeeds(this.playerProfile, dt)
+    let next = tickSushiNeeds(this.playerProfile, dt)
+    // While the player is outside the habitat the live CatController isn't running, so
+    // Sushi can't eat or use the litterbox on his own. Simulate those actions here as the
+    // first response to a needy state — the HUD prompt in MapView falls through naturally
+    // when autonomy can't succeed (empty bowl / full litterbox).
+    if (!this.habitatState.isActive) {
+      next = tryAutoEat(next)
+      next = tryAutoLitter(next)
+    }
     if (next === this.playerProfile) return
     this.playerProfile = next
     this.onSushiCareUpdate?.()

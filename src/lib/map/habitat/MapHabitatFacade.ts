@@ -50,6 +50,7 @@ import { MapModeCoordinator } from '@/lib/map/mode/MapModeCoordinator'
 import { uiAudio } from '@/audio/UiAudioDirector'
 import { FpsPointerLockSession } from '@/lib/fps/FpsPointerLockSession'
 import type { JourneyTriggerId } from '@/lib/journeys'
+import { SUSHI_HUNGER_RESTORE_PER_SERVING } from '@/lib/sushi/needs'
 
 /**
  * Starting pitch for the wake-up cinematic — looking straight up at the ceiling, as if you
@@ -60,8 +61,6 @@ const WAKE_UP_START_PITCH = Math.PI / 2
 /** Camera Y position while lying in bed — lerped up to the standing height during wake-up. */
 const WAKE_UP_LYING_HEIGHT = 0.5
 
-/** Hunger restored each time Sushi consumes one serving from the bowl (0..100 scale). */
-const SUSHI_HUNGER_RESTORE_PER_SERVING = 25
 /** Love granted each time the player pets Sushi (0..100 scale). */
 const SUSHI_LOVE_PER_PET = 10
 /** Love granted each time Sushi pounces on the laser dot (0..100 scale). Smaller than a
