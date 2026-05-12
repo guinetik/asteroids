@@ -37,6 +37,18 @@ const MISSION_TRACKER_ARIA_LABEL = 'Active missions'
 function emitFocus(row: MissionTrackerRow): void {
   emit('focusMission', row)
 }
+
+/**
+ * Format a countdown in seconds as `m:ss`. Negative or zero values return `0:00`.
+ *
+ * @param totalSeconds - Seconds remaining.
+ */
+function formatMmSs(totalSeconds: number): string {
+  const t = Math.max(0, Math.floor(totalSeconds))
+  const m = Math.floor(t / 60)
+  const s = t % 60
+  return `${m}:${s.toString().padStart(2, '0')}`
+}
 </script>
 
 <template>
@@ -82,6 +94,31 @@ function emitFocus(row: MissionTrackerRow): void {
               class="mission-tracker-panel__row-progress"
             >
               {{ row.progress }}
+            </span>
+            <span
+              v-if="row.timerSeconds !== undefined"
+              class="mission-tracker-panel__row-timer"
+            >
+              {{ formatMmSs(row.timerSeconds) }}
+            </span>
+            <span
+              v-if="row.bar"
+              class="mission-tracker-panel__row-bar"
+            >
+              <span class="mission-tracker-panel__row-bar-label">{{ row.bar.label }}</span>
+              <span class="mission-tracker-panel__row-bar-track">
+                <span
+                  class="mission-tracker-panel__row-bar-fill"
+                  :style="{ width: `${Math.max(0, Math.min(100, (row.bar.value / row.bar.max) * 100))}%` }"
+                />
+              </span>
+            </span>
+            <span
+              v-if="row.status"
+              class="mission-tracker-panel__row-status"
+              :class="`mission-tracker-panel__row-status--${row.status.tone}`"
+            >
+              {{ row.status.label }}
             </span>
           </button>
         </li>
@@ -233,5 +270,71 @@ function emitFocus(row: MissionTrackerRow): void {
 
 .mission-tracker-panel__row-btn--selected .mission-tracker-panel__row-progress {
   color: var(--tracker-selected-soft);
+}
+
+.mission-tracker-panel__row-timer {
+  font-family: 'Datatype', ui-monospace, monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  color: var(--tracker-accent-strong);
+  margin-top: 0.15rem;
+}
+
+.mission-tracker-panel__row-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.2rem;
+  width: 100%;
+}
+
+.mission-tracker-panel__row-bar-label {
+  font-family: 'Datatype', ui-monospace, monospace;
+  font-size: 0.55rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--tracker-eyebrow);
+  flex-shrink: 0;
+}
+
+.mission-tracker-panel__row-bar-track {
+  flex: 1;
+  height: 3px;
+  background: rgb(var(--mission-tracker-cyan-border) / 0.18);
+  border-radius: 1px;
+  overflow: hidden;
+}
+
+.mission-tracker-panel__row-bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--tracker-accent-strong);
+  transition: width 0.2s ease;
+}
+
+.mission-tracker-panel__row-status {
+  font-family: 'Datatype', ui-monospace, monospace;
+  font-size: 0.55rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  padding: 0.1rem 0.35rem;
+  margin-top: 0.2rem;
+  align-self: flex-start;
+  border-radius: 2px;
+}
+
+.mission-tracker-panel__row-status--ok {
+  background: rgba(74, 222, 128, 0.12);
+  color: rgba(74, 222, 128, 0.95);
+}
+
+.mission-tracker-panel__row-status--warn {
+  background: rgba(250, 204, 21, 0.12);
+  color: rgba(250, 204, 21, 0.95);
+}
+
+.mission-tracker-panel__row-status--danger {
+  background: rgba(248, 113, 113, 0.16);
+  color: rgba(248, 113, 113, 0.96);
 }
 </style>
