@@ -406,6 +406,16 @@ export type PinnedAsset =
       modelPath: string
       /** Stable string hashed to a deterministic Kuiper-belt position. */
       positionSeed: string
+      /**
+       * Route the dock prompt sends the player to.
+       * @defaultValue `'level'`
+       */
+      dockTarget?: 'level' | 'station'
+      /**
+       * When `dockTarget === 'station'`, the station JSON id passed as
+       * `?station=` to the `/station` route (e.g. `'yamada-titania'`).
+       */
+      stationId?: string
     }
 
 /** One completion arm per outcome id of a contained `'choice-mission'` step. */
