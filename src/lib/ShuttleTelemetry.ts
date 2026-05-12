@@ -225,4 +225,27 @@ export interface MapOverlayState {
   trajectoryPoints: MapTrajectoryPoint[]
   /** Mission waypoint projected to screen, if an active asteroid mission exists. */
   missionWaypoint: { screenX: number; screenY: number; name: string; distance: string } | null
+  /**
+   * Cargo safe-thermal band annulus, present only when the active mission is a
+   * Bunker Extract with an organ in transit. All radii are in viewport % (same
+   * convention as `thermalZones`) so the renderer can place the SVG paths
+   * directly. Separate X/Y radii account for non-square viewports. The band is
+   * centered on the Sun (world origin). Rendered as a translucent emerald ring
+   * on the tactical map so the player can plan a route within the cargo-safe
+   * corridor.
+   */
+  safeCargoBand?: {
+    /** Sun screen X (%) — annulus centre. */
+    centerX: number
+    /** Sun screen Y (%) — annulus centre. */
+    centerY: number
+    /** Inner edge radius along the viewport X axis, in %. */
+    innerRadiusX: number
+    /** Inner edge radius along the viewport Y axis, in %. */
+    innerRadiusY: number
+    /** Outer edge radius along the viewport X axis, in %. */
+    outerRadiusX: number
+    /** Outer edge radius along the viewport Y axis, in %. */
+    outerRadiusY: number
+  }
 }

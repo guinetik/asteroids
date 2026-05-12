@@ -4670,6 +4670,8 @@ export class MapViewController implements Tickable {
       activeAsteroidMission: this.missionBoard.activeAsteroidMission,
       gravityConfig: MAP_CONFIG.MAP_GRAVITY_CONFIG,
       overlayData: mapOverlayData,
+      shuttleHeatLevel: CURRENT_PLAYER_UPGRADE_LEVELS.shuttleHeatResistance ?? 1,
+      shuttleFreezeLevel: CURRENT_PLAYER_UPGRADE_LEVELS.shuttleFreezeResistance ?? 1,
     })
     if (state) this.onMapOverlay(state)
   }

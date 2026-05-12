@@ -31,6 +31,7 @@ import {
   type WorldLineHistoryPoint,
   type WorldLineRecordState,
 } from '@/lib/worldLineHistory'
+import { cargoThermalToleranceBand } from '@/lib/missions/cargoIntegrity'
 
 /** Per-frame inputs for {@link MapOverlayProjector.buildOverlayState}. */
 export interface MapOverlayBuildInput {
@@ -58,6 +59,10 @@ export interface MapOverlayBuildInput {
   gravityConfig: GravityConfig
   /** Data-file tuning (world-line sample cadence, nearest-body count, mass threshold for rings). */
   overlayData: MapOverlayTuning
+  /** Player Heat resistance level (integer 1–3). Used to widen the cargo safe band. Defaults to 1. */
+  shuttleHeatLevel?: number
+  /** Player Freeze resistance level (integer 1–3). Used to widen the cargo safe band. Defaults to 1. */
+  shuttleFreezeLevel?: number
 }
 
 /** Per-frame inputs for {@link MapOverlayProjector.recordWorldLinePoint}. */
@@ -244,6 +249,39 @@ export class MapOverlayProjector {
 
     const asteroidBelts = this.buildAsteroidBelts(input.mapCamera)
 
+    // Safe cargo band: only populated during a Bunker Extract mission with the organ in transit.
+    // Projected to screen-space % using the same X/Y split as thermalZones so the SVG renderer
+    // draws a true screen-space circle on non-square viewports.
+    let safeCargoBand: MapOverlayState['safeCargoBand']
+    const yamada = input.activeAsteroidMission?.yamada
+    if (yamada?.archetype === 'bunker-extract' && yamada.organDispensed === true) {
+      const band = cargoThermalToleranceBand({
+        heatLevel: input.shuttleHeatLevel ?? 1,
+        freezeLevel: input.shuttleFreezeLevel ?? 1,
+      })
+      const sunCenter = input.mapCamera.projectToScreen(new THREE.Vector3(0, 0, 0))
+      const innerEdgeX = input.mapCamera.projectToScreen(
+        new THREE.Vector3(band.innerSafeRadius, 0, 0),
+      )
+      const innerEdgeZ = input.mapCamera.projectToScreen(
+        new THREE.Vector3(0, 0, band.innerSafeRadius),
+      )
+      const outerEdgeX = input.mapCamera.projectToScreen(
+        new THREE.Vector3(band.outerSafeRadius, 0, 0),
+      )
+      const outerEdgeZ = input.mapCamera.projectToScreen(
+        new THREE.Vector3(0, 0, band.outerSafeRadius),
+      )
+      safeCargoBand = {
+        centerX: sunCenter.x * PERCENT,
+        centerY: sunCenter.y * PERCENT,
+        innerRadiusX: Math.abs(innerEdgeX.x - sunCenter.x) * PERCENT,
+        innerRadiusY: Math.abs(innerEdgeZ.y - sunCenter.y) * PERCENT,
+        outerRadiusX: Math.abs(outerEdgeX.x - sunCenter.x) * PERCENT,
+        outerRadiusY: Math.abs(outerEdgeZ.y - sunCenter.y) * PERCENT,
+      }
+    }
+
     return {
       visible: true,
       labels,
@@ -257,6 +295,7 @@ export class MapOverlayProjector {
       thermalZones,
       trajectoryPoints,
       missionWaypoint,
+      safeCargoBand,
     }
   }
 

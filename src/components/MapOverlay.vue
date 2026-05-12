@@ -137,6 +137,20 @@ const trajectorySegments = computed(() => {
       />
     </svg>
 
+    <!-- Safe cargo band — emerald annulus, always visible when organ is in transit. -->
+    <svg
+      v-if="overlay.safeCargoBand"
+      class="map-thermal-svg"
+      viewBox="0 0 100 100"
+      preserveAspectRatio="none"
+    >
+      <path
+        :d="buildThermalZonePath(overlay.safeCargoBand)"
+        fill-rule="evenodd"
+        class="map-cargo-band-ring"
+      />
+    </svg>
+
     <!-- Asteroid belt annuli (Main Belt, Kuiper Belt) — CSS-authored over the tac map.
          X and Y radii are projected independently so the annulus stays a true screen-
          space circle on widescreen viewports (matches thermal-zone projection). -->

@@ -751,6 +751,13 @@ body,
   fill: #818cf8;
 }
 
+.map-cargo-band-ring {
+  fill: rgba(74, 222, 128, 0.10);
+  stroke: rgba(74, 222, 128, 0.45);
+  stroke-width: 0.25;
+  mix-blend-mode: screen;
+}
+
 .map-trajectory-line {
   stroke: rgba(52, 211, 153, 0.55);
   stroke-width: 1.5;
