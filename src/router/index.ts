@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { canAccessLevelRoute } from '@/lib/level/levelRouteAccess'
+import { canAccessStationRoute } from '@/lib/station/stationRouteAccess'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -29,13 +30,22 @@ const router = createRouter({
       name: 'level',
       component: () => import('@/views/LevelView.vue'),
     },
+    {
+      path: '/station',
+      name: 'station',
+      component: () => import('@/views/StationView.vue'),
+    },
   ],
 })
 
 router.beforeEach((to) => {
-  if (to.name !== 'level') return true
-  if (canAccessLevelRoute(to.query)) return true
-  return { name: 'map' }
+  if (to.name === 'level') {
+    return canAccessLevelRoute(to.query) ? true : { name: 'map' }
+  }
+  if (to.name === 'station') {
+    return canAccessStationRoute(to.query) ? true : { name: 'map' }
+  }
+  return true
 })
 
 export default router
