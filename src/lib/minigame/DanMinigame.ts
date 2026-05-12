@@ -758,6 +758,13 @@ export class DanMinigame implements MiniGame, MiniGameEvents {
       const groundY = this.heightmap.heightAt(handle.enemy.position.x, handle.enemy.position.z)
       ctrl.group.position.y = groundY
       handle.enemy.position.y = groundY + PHAGE_HIT_CENTER_Y
+      // Face the gait direction. Without this, the body translates but the
+      // legs keep their fixed world-space angles — reads as "sliding" instead
+      // of walking. Mirrors LevelDisturbanceDirector's phage sync.
+      if (handle.lastOutput.isMoving) {
+        const dir = handle.lastOutput.moveDir
+        ctrl.group.rotation.y = Math.atan2(dir.x, dir.z)
+      }
     }
     ctrl.tick(dt)
   }

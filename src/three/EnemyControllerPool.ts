@@ -240,6 +240,11 @@ export class EnemyControllerPool {
         position: ctrl.group.position.clone(),
       })
       ctrl.group.position.set(baseAnchor.x + xOff, baseAnchor.y, baseAnchor.z)
+      // Swap the hit-flash material onto the head/eye/membrane meshes for the
+      // prewarm draw. The flash swap on first kill otherwise pays a per-(geo,
+      // flashMat) VAO build inside the despawn anim — the lag the user sees
+      // the first time each enemy type dies.
+      ctrl.prewarmFlash()
       ctrl.group.traverse((obj) => {
         const mesh = obj as THREE.Mesh
         if (!mesh.isMesh) return
@@ -253,6 +258,7 @@ export class EnemyControllerPool {
   unstageFromPrewarm(): void {
     for (const entry of this.prewarmRestoreEntries) {
       entry.ctrl.group.position.copy(entry.position)
+      entry.ctrl.endPrewarmFlash()
     }
     this.prewarmRestoreEntries.length = 0
     for (const entry of this.prewarmFrustumCullState) {

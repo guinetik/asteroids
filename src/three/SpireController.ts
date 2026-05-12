@@ -467,6 +467,19 @@ export class SpireController implements Tickable {
   // Hit / fire / death
   // ═══════════════════════════════════════════════════════════════
 
+  /**
+   * Swap hit-flash material onto the membrane so the prewarm render pays the
+   * VAO build now instead of on the first kill.
+   */
+  prewarmFlash(): void {
+    this.membrane.material = flashMat
+  }
+
+  /** Restore normal membrane material after the prewarm render. */
+  endPrewarmFlash(): void {
+    this.membrane.material = this.membraneTronMat
+  }
+
   /** Flash membrane magenta + body recoil on hit — called by VC when projectile connects. */
   flash(): void {
     this.flashTimer = HIT_FLASH_DURATION

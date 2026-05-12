@@ -504,6 +504,10 @@ export class BacteriophageController implements Tickable {
     this.core.scale.setScalar(1)
     this.group.scale.setScalar(PHAGE_SCALE)
     this.group.rotation.set(0, 0, 0)
+    // Last tickDeath left the leg tubes curled under the body. Without this
+    // rebake the next acquirer sees a death pose for the first 0.25s before
+    // the regular leg refresh interval kicks in.
+    this.refreshLegGeometry(0, false)
     // Toggling `group.visible` would mutate `NUM_POINT_LIGHTS` (the pooled
     // body light becomes uncounted), forcing a scene-wide lit-material
     // recompile on the next spawn. Park the group far below ground instead
@@ -532,6 +536,20 @@ export class BacteriophageController implements Tickable {
    */
   setLightsEnabled(enabled: boolean): void {
     this.lightsEnabled = enabled
+  }
+
+  /**
+   * Swap the head mesh to the shared hit-flash material so the prewarm render
+   * pays the per-instance VAO build now instead of on the first kill. Pool
+   * callers pair this with {@link endPrewarmFlash} around the prewarm draw.
+   */
+  prewarmFlash(): void {
+    this.head.material = flashMat
+  }
+
+  /** Restore the head's TRON material after the prewarm render. */
+  endPrewarmFlash(): void {
+    this.head.material = this.headTronMat
   }
 
   /** Clean up all geometry and materials. */

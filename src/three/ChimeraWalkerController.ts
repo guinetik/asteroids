@@ -455,6 +455,23 @@ export class ChimeraWalkerController implements Tickable {
     this.enemy.onDeath = () => this.die()
   }
 
+  /**
+   * Swap hit-flash material onto the head membrane + eyes so the prewarm
+   * render pays the VAO build up-front instead of on the first kill.
+   */
+  prewarmFlash(): void {
+    this.headMembrane.material = flashMat
+    this.leftEye.material = flashMat
+    this.rightEye.material = flashMat
+  }
+
+  /** Restore normal head/eye materials after the prewarm render. */
+  endPrewarmFlash(): void {
+    this.headMembrane.material = this.headMembraneMat
+    this.leftEye.material = this.leftEyeMat
+    this.rightEye.material = this.rightEyeMat
+  }
+
   /** Flash the head membrane magenta and apply recoil. */
   flash(): void {
     this.flashTimer = HIT_FLASH_DURATION
