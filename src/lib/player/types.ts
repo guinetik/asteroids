@@ -126,6 +126,8 @@ export interface PlayerProfile {
   completedMissionCount: number
   /** Asteroid ID → mission visit count. Incremented once per mission, not per landing. */
   visitedAsteroids: Record<string, number>
+  /** Most recently completed asteroid mission body id, or null before the first completion. */
+  lastVisitedAsteroidId?: string | null
   /** Lifetime achievement counters persisted with the profile and migrated for legacy saves. */
   achievementStats: PlayerAchievementStats
   /**

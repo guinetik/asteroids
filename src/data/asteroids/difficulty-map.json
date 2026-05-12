@@ -1,11 +1,10 @@
 [
   { "asteroidId": "itokawa", "minDifficulty": 1, "maxDifficulty": 2 },
-  { "asteroidId": "ryugu", "minDifficulty": 1, "maxDifficulty": 4 },
   {
     "asteroidId": "ryugu",
     "minDifficulty": 1,
     "maxDifficulty": 4,
-    "planetIds": ["earth", "mars", "mercury", "venus"]
+    "planetIds": ["earth", "mars"]
   },
   { "asteroidId": "bennu", "minDifficulty": 2, "maxDifficulty": 4 },
   { "asteroidId": "bennu", "minDifficulty": 1, "maxDifficulty": 3, "planetIds": ["earth"] },

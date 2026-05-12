@@ -320,6 +320,7 @@ describe('recordAsteroidVisit', () => {
     const updated = recordAsteroidVisit(profile, 'bennu')
 
     expect(updated.visitedAsteroids['bennu']).toBe(1)
+    expect(updated.lastVisitedAsteroidId).toBe('bennu')
   })
 
   it('increments count on subsequent visits', () => {
@@ -337,6 +338,7 @@ describe('recordAsteroidVisit', () => {
 
     expect(v2.visitedAsteroids['bennu']).toBe(1)
     expect(v2.visitedAsteroids['psyche']).toBe(1)
+    expect(v2.lastVisitedAsteroidId).toBe('psyche')
   })
 
   it('does not mutate the original profile', () => {
@@ -344,6 +346,7 @@ describe('recordAsteroidVisit', () => {
     recordAsteroidVisit(profile, 'bennu')
 
     expect(profile.visitedAsteroids).toEqual({})
+    expect(profile.lastVisitedAsteroidId).toBeNull()
   })
 })
 

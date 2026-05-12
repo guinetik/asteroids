@@ -6,6 +6,7 @@ const EXPECTED_ASTEROID_IDS = [
   ['bennu'],
   ['eros'],
   ['itokawa'],
+  ['ryugu'],
   ['vesta'],
   ['psyche'],
   ['xg7'],

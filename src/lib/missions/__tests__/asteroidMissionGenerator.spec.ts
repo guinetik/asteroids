@@ -233,6 +233,36 @@ describe('rollObjective', () => {
 })
 
 describe('pickAsteroidForDifficulty', () => {
+  it('allows Ryugu for Earth-hosted early missions', () => {
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0)
+
+    expect(pickAsteroidForDifficulty(3, 'earth')).toBe('ryugu')
+    randomSpy.mockRestore()
+  })
+
+  it('allows Ryugu for Mars-hosted early missions', () => {
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0)
+
+    expect(pickAsteroidForDifficulty(3, 'mars')).toBe('ryugu')
+    randomSpy.mockRestore()
+  })
+
+  it('avoids the last visited asteroid when another candidate exists', () => {
+    const profile = { lastVisitedAsteroidId: 'ryugu' } as unknown as PlayerProfile
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0)
+
+    expect(pickAsteroidForDifficulty(3, 'earth', profile)).not.toBe('ryugu')
+    randomSpy.mockRestore()
+  })
+
+  it('keeps the last visited asteroid when it is the only candidate', () => {
+    const profile = { lastVisitedAsteroidId: 'bennu' } as unknown as PlayerProfile
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0)
+
+    expect(pickAsteroidForDifficulty(3, 'venus', profile)).toBe('bennu')
+    randomSpy.mockRestore()
+  })
+
   it('allows Eros for Earth-hosted early/mid missions', () => {
     // Earth at difficulty 3 has multiple host-tagged entries (bennu, xg7, eros);
     // SELECT_LAST_ASTEROID_RANDOM lands on the last one declared (eros).

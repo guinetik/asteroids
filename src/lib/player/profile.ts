@@ -336,6 +336,11 @@ function normalizeLoadedProfile(data: unknown): PlayerProfile | null {
     visitedAsteroids = p.visitedAsteroids as Record<string, number>
   }
 
+  const lastVisitedAsteroidId =
+    typeof p.lastVisitedAsteroidId === 'string' && p.lastVisitedAsteroidId.trim().length > 0
+      ? p.lastVisitedAsteroidId
+      : null
+
   let orbitedSolarBodies: Record<string, number> = {}
   if (
     p.orbitedSolarBodies !== undefined &&
@@ -541,6 +546,7 @@ function normalizeLoadedProfile(data: unknown): PlayerProfile | null {
     credits: p.credits,
     completedMissionCount,
     visitedAsteroids,
+    lastVisitedAsteroidId,
     achievementStats: normalizeAchievementStats(p.achievementStats),
     orbitedSolarBodies,
     lastDockedPlanetId,
@@ -652,6 +658,7 @@ export function createProfile(name: string): PlayerProfile {
     credits: STARTING_CREDITS,
     completedMissionCount: 0,
     visitedAsteroids: {},
+    lastVisitedAsteroidId: null,
     achievementStats: createDefaultAchievementStats(),
     orbitedSolarBodies: {},
     lastDockedPlanetId: 'earth',
@@ -1163,6 +1170,7 @@ export function recordAsteroidVisit(profile: PlayerProfile, asteroidId: string):
       ...profile.visitedAsteroids,
       [asteroidId]: currentCount + 1,
     },
+    lastVisitedAsteroidId: asteroidId,
   }
 }
 

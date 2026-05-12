@@ -151,6 +151,25 @@ function isAsteroidEntryAvailableForHost(
 }
 
 /**
+ * Drop the most recently completed asteroid from the candidate pool when doing
+ * so still leaves at least one unique body. This keeps procedural boards
+ * varied without dead-ending one-body pools.
+ *
+ * @param entries - Candidate difficulty-map entries after host and unlock filtering.
+ * @param lastVisitedAsteroidId - Most recent completed asteroid id, when known.
+ * @returns Candidate entries with the recent asteroid removed when possible.
+ */
+function avoidLastVisitedAsteroid(
+  entries: readonly DifficultyMapEntry[],
+  lastVisitedAsteroidId: string | null | undefined,
+): readonly DifficultyMapEntry[] {
+  if (!lastVisitedAsteroidId) return entries
+  const alternatives = entries.filter((entry) => entry.asteroidId !== lastVisitedAsteroidId)
+  const uniqueAlternativeIds = new Set(alternatives.map((entry) => entry.asteroidId))
+  return uniqueAlternativeIds.size > 0 ? alternatives : entries
+}
+
+/**
  * Pick a random asteroid template that fits the given difficulty and host planet.
  *
  * Host-specific entries only appear for listed planets. Global entries remain available
@@ -195,7 +214,8 @@ export function pickAsteroidForDifficulty(
     return (difficultyMap as DifficultyMapEntry[])[0]!.asteroidId
   }
 
-  return entries[Math.floor(Math.random() * entries.length)]!.asteroidId
+  const variedEntries = avoidLastVisitedAsteroid(entries, profile?.lastVisitedAsteroidId)
+  return variedEntries[Math.floor(Math.random() * variedEntries.length)]!.asteroidId
 }
 
 /**
