@@ -586,8 +586,8 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
           const dz = pz - tz
           if (dx * dx + dz * dz <= ORGAN_DISPENSE_NEAR_RANGE_SQ) {
             this._isPlayerNear = true
-            if (ctx.terminalInteractPressed) {
-              // Player is pressing E this frame — accumulate hold time.
+            if (ctx.terminalInteractHeld) {
+              // Player is holding E this frame — accumulate hold time.
               this._dispenseElapsed = Math.min(
                 ORGAN_DISPENSE_DURATION_SECONDS,
                 this._dispenseElapsed + dt,
@@ -606,9 +606,12 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
                 )
                 this.onPrompt?.(`[E] DRAWING ORGAN ${pct}%`)
               }
-            } else {
-              // Player released E — reset accumulator but stay near.
+            } else if (this._dispenseElapsed > 0) {
+              // E released mid-hold — reset progress so partial holds don't carry over.
               this._dispenseElapsed = 0
+              this.onPrompt?.('[E] DRAW ORGAN')
+            } else {
+              // Player near but not holding E.
               this.onPrompt?.('[E] DRAW ORGAN')
             }
             return

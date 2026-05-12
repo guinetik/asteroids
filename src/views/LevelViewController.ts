@@ -3276,6 +3276,7 @@ export class LevelViewController implements Tickable {
       playerForwardSnap = { x: v.x, y: v.y, z: v.z }
     }
     const terminalInteractPressed = this.inputManager?.wasActionPressed('terminalInteract') ?? false
+    const terminalInteractHeld = this.inputManager?.isActionActive('terminalInteract') ?? false
     this.minigames.tick(
       dt,
       {
@@ -3295,6 +3296,7 @@ export class LevelViewController implements Tickable {
         playerForward: playerForwardSnap,
         interactPressed: this.inputManager?.wasActionPressed('interact') ?? false,
         terminalInteractPressed,
+        terminalInteractHeld,
       },
       this.onTerminalPrompt,
     )

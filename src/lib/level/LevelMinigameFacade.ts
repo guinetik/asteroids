@@ -74,6 +74,12 @@ export interface LevelMinigameTickState {
   interactPressed: boolean
   /** Whether the terminal interact action fired this frame. */
   terminalInteractPressed: boolean
+  /**
+   * Whether the terminal-interact action is currently held this frame
+   * (level-triggered). Use for held-E mechanics like the Yamada dispense beat.
+   * Defaults to `false` when omitted.
+   */
+  terminalInteractHeld?: boolean
 }
 
 /**
@@ -510,6 +516,7 @@ export class LevelMinigameFacade {
       playerForward: state.playerForward,
       interactPressed: state.interactPressed,
       terminalInteractPressed: state.terminalInteractPressed,
+      terminalInteractHeld: state.terminalInteractHeld,
     }
   }
 

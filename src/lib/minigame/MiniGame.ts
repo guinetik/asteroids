@@ -42,6 +42,13 @@ export interface MiniGameContext {
   interactPressed: boolean
   /** Whether the terminal interact key (E) was just pressed this frame. */
   terminalInteractPressed: boolean
+  /**
+   * Whether the terminal-interact action is currently held this frame
+   * (level-triggered, distinct from {@link terminalInteractPressed} which is
+   * edge-triggered). Use this for held-E mechanics like the Yamada cylinder
+   * dispense beat. Defaults to `false` when omitted.
+   */
+  terminalInteractHeld?: boolean
 }
 
 /** Events a minigame can emit. */
