@@ -19,6 +19,11 @@ import type {
   MiningOreCategory,
 } from '@/lib/missions/types'
 import type { Inventory } from '@/lib/inventory/types'
+import type {
+  CargoState,
+  CargoThermalZone,
+  DeliveryTimerState,
+} from '@/lib/missions/cargoIntegrity'
 import { getItemDefinition } from '@/lib/inventory/catalog'
 import { computeMiningProgressKg } from '@/lib/missions/turretMiningSession'
 
@@ -233,4 +238,75 @@ function oreLabelFor(category: MiningOreCategory): string {
   if (category === 'any') return 'Any main-belt ore'
   const def = getItemDefinition(category)
   return def ? def.label : category
+}
+
+/** Short label for each thermal zone shown in the HUD status badge. */
+const ZONE_LABELS: Record<CargoThermalZone, string> = {
+  safe: 'SAFE',
+  hot: 'HOT',
+  cold: 'COLD',
+}
+
+/** Color tone for each thermal zone — non-safe zones are always danger. */
+const ZONE_TONES: Record<CargoThermalZone, MissionTrackerStatusTone> = {
+  safe: 'ok',
+  hot: 'danger',
+  cold: 'danger',
+}
+
+/** Max integrity constant matching the cargo model's start value. */
+const CARGO_INTEGRITY_MAX = 100
+
+/**
+ * Build the three Bunker Extract cargo HUD rows — integrity bar, delivery
+ * countdown, and thermal-zone status — for the right-hand mission tracker.
+ *
+ * Returns an empty array unless the active mission is a Yamada Bunker Extract
+ * whose organ has been dispensed, AND all three live state inputs are present.
+ *
+ * @param mission - Active asteroid mission, or null.
+ * @param timer - Live delivery countdown state, or null.
+ * @param cargo - Live cargo integrity state, or null.
+ * @param zone - Current thermal zone classification, or null.
+ * @returns Three tracker rows, in order: integrity → timer → zone. Empty array if any precondition fails.
+ * @author guinetik
+ * @date 2026-05-11
+ * @spec docs/superpowers/specs/2026-05-11-yamada-mission-pool-design.md
+ */
+export function buildBunkerExtractCargoRows(
+  mission: GeneratedAsteroidMission | null,
+  timer: DeliveryTimerState | null,
+  cargo: CargoState | null,
+  zone: CargoThermalZone | null,
+): MissionTrackerRow[] {
+  if (!mission || mission.yamada?.archetype !== 'bunker-extract') return []
+  if (!mission.yamada.organDispensed || !timer || !cargo || !zone) return []
+  const focus: MissionTrackerFocus = {
+    kind: 'planet',
+    planetId: mission.yamada.destinationPlanetId,
+  }
+  return [
+    {
+      id: `cargo-integrity:${mission.id}`,
+      title: 'Cargo Integrity',
+      bar: {
+        value: Math.round(cargo.integrity),
+        max: CARGO_INTEGRITY_MAX,
+        label: 'Integrity',
+      },
+      focus,
+    },
+    {
+      id: `cargo-timer:${mission.id}`,
+      title: 'Delivery Window',
+      timerSeconds: timer.remaining,
+      focus,
+    },
+    {
+      id: `cargo-zone:${mission.id}`,
+      title: 'Thermal Zone',
+      status: { label: ZONE_LABELS[zone], tone: ZONE_TONES[zone] },
+      focus,
+    },
+  ]
 }

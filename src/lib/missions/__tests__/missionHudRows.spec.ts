@@ -286,6 +286,158 @@ describe('buildMissionTrackerGroups', () => {
   })
 })
 
+import { buildBunkerExtractCargoRows } from '../missionHudRows'
+
+function makeBunkerExtractMission(organDispensed: boolean): GeneratedAsteroidMission {
+  return {
+    kind: 'standard',
+    id: 'm-be-1',
+    asteroidId: 'bennu',
+    giverId: 'yamada-farms',
+    giverName: 'Sumiko Yamada',
+    templateId: 'yamada_bunker_extract',
+    name: 'Bunker Extract',
+    briefing: '',
+    difficulty: 5,
+    region: 'kuiper-belt',
+    objectives: [],
+    totalReward: 5000,
+    waypoint: { worldX: 1, worldZ: 1 },
+    status: 'accepted',
+    yamada: {
+      archetype: 'bunker-extract',
+      destinationPlanetId: 'uranus',
+      deliveryTimerSeconds: 240,
+      organItemId: 'yamada-organ-case',
+      organDispensed,
+    },
+  }
+}
+
+describe('buildBunkerExtractCargoRows', () => {
+  it('returns empty when no mission is active', () => {
+    expect(buildBunkerExtractCargoRows(null, null, null, null)).toEqual([])
+  })
+
+  it('returns empty when active mission is not bunker-extract', () => {
+    const mission: GeneratedAsteroidMission = {
+      ...makeBunkerExtractMission(true),
+      yamada: undefined,
+    }
+    expect(
+      buildBunkerExtractCargoRows(
+        mission,
+        { total: 240, remaining: 200, expired: false },
+        { integrity: 80 },
+        'safe',
+      ),
+    ).toEqual([])
+  })
+
+  it('returns empty when organ has not been dispensed', () => {
+    const mission = makeBunkerExtractMission(false)
+    expect(
+      buildBunkerExtractCargoRows(
+        mission,
+        { total: 240, remaining: 200, expired: false },
+        { integrity: 80 },
+        'safe',
+      ),
+    ).toEqual([])
+  })
+
+  it('returns empty when any live state is missing', () => {
+    const mission = makeBunkerExtractMission(true)
+    expect(buildBunkerExtractCargoRows(mission, null, { integrity: 80 }, 'safe')).toEqual([])
+    expect(
+      buildBunkerExtractCargoRows(
+        mission,
+        { total: 240, remaining: 200, expired: false },
+        null,
+        'safe',
+      ),
+    ).toEqual([])
+    expect(
+      buildBunkerExtractCargoRows(
+        mission,
+        { total: 240, remaining: 200, expired: false },
+        { integrity: 80 },
+        null,
+      ),
+    ).toEqual([])
+  })
+
+  it('returns 3 rows when everything is populated', () => {
+    const mission = makeBunkerExtractMission(true)
+    const rows = buildBunkerExtractCargoRows(
+      mission,
+      { total: 240, remaining: 200, expired: false },
+      { integrity: 80 },
+      'safe',
+    )
+    expect(rows.length).toBe(3)
+    const integrityRow = rows.find((r) => r.bar)
+    expect(integrityRow?.bar?.value).toBe(80)
+    expect(integrityRow?.bar?.max).toBe(100)
+    expect(integrityRow?.bar?.label).toBe('Integrity')
+    const timerRow = rows.find((r) => r.timerSeconds !== undefined)
+    expect(timerRow?.timerSeconds).toBe(200)
+    const zoneRow = rows.find((r) => r.status)
+    expect(zoneRow?.status?.label).toBe('SAFE')
+    expect(zoneRow?.status?.tone).toBe('ok')
+  })
+
+  it('maps zone hot to danger tone with HOT label', () => {
+    const mission = makeBunkerExtractMission(true)
+    const rows = buildBunkerExtractCargoRows(
+      mission,
+      { total: 240, remaining: 200, expired: false },
+      { integrity: 80 },
+      'hot',
+    )
+    const zoneRow = rows.find((r) => r.status)
+    expect(zoneRow?.status?.label).toBe('HOT')
+    expect(zoneRow?.status?.tone).toBe('danger')
+  })
+
+  it('maps zone cold to danger tone with COLD label', () => {
+    const mission = makeBunkerExtractMission(true)
+    const rows = buildBunkerExtractCargoRows(
+      mission,
+      { total: 240, remaining: 200, expired: false },
+      { integrity: 80 },
+      'cold',
+    )
+    const zoneRow = rows.find((r) => r.status)
+    expect(zoneRow?.status?.label).toBe('COLD')
+    expect(zoneRow?.status?.tone).toBe('danger')
+  })
+
+  it('rounds the integrity bar value', () => {
+    const mission = makeBunkerExtractMission(true)
+    const rows = buildBunkerExtractCargoRows(
+      mission,
+      { total: 240, remaining: 200, expired: false },
+      { integrity: 73.6 },
+      'safe',
+    )
+    expect(rows.find((r) => r.bar)?.bar?.value).toBe(74)
+  })
+
+  it('focuses the destination planet on all three rows', () => {
+    const mission = makeBunkerExtractMission(true)
+    const rows = buildBunkerExtractCargoRows(
+      mission,
+      { total: 240, remaining: 200, expired: false },
+      { integrity: 80 },
+      'safe',
+    )
+    for (const row of rows) {
+      expect(row.focus).toEqual({ kind: 'planet', planetId: 'uranus' })
+    }
+  })
+})
+
 describe('MissionTrackerRow optional bar/timer/status fields', () => {
   it('supports a timerSeconds field for countdown rows', () => {
     const row: MissionTrackerRow = {
