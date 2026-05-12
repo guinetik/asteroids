@@ -68,17 +68,19 @@ const INDICATOR_FORWARD_OFFSET = 0.05
 /**
  * Controller for the suspension cylinder. Owns a single root `THREE.Group`
  * that callers parent into the bunker scene at the desired world position.
+ * The public field is named `group` to match `BunkerTableModel` so the two
+ * can be used interchangeably as the bunker's central interactable.
  */
 export class SuspensionCylinderModel {
   /** Root Object3D — parent into the bunker scene. */
-  public readonly root: THREE.Group
+  public readonly group: THREE.Group
 
   /** Indicator strip — toggle visibility during dispense animation. */
   private readonly indicator: THREE.Mesh
 
   /** Build the full placeholder hierarchy. */
   public constructor() {
-    this.root = new THREE.Group()
+    this.group = new THREE.Group()
 
     const baseGeom = new THREE.CylinderGeometry(
       CYLINDER_RADIUS * BASE_TOP_RADIUS_FACTOR,
@@ -92,7 +94,7 @@ export class SuspensionCylinderModel {
     })
     const base = new THREE.Mesh(baseGeom, baseMat)
     base.position.y = BASE_HEIGHT * 0.5
-    this.root.add(base)
+    this.group.add(base)
 
     const glassGeom = new THREE.CylinderGeometry(
       CYLINDER_RADIUS,
@@ -114,7 +116,7 @@ export class SuspensionCylinderModel {
     })
     const glass = new THREE.Mesh(glassGeom, glassMat)
     glass.position.y = BASE_HEIGHT + CYLINDER_HEIGHT * 0.5
-    this.root.add(glass)
+    this.group.add(glass)
 
     const pigGeom = new THREE.CapsuleGeometry(
       CYLINDER_RADIUS * PIG_RADIUS_FACTOR,
@@ -129,7 +131,7 @@ export class SuspensionCylinderModel {
     const pig = new THREE.Mesh(pigGeom, pigMat)
     pig.rotation.z = Math.PI / 2
     pig.position.y = BASE_HEIGHT + CYLINDER_HEIGHT * 0.5
-    this.root.add(pig)
+    this.group.add(pig)
 
     const indicatorGeom = new THREE.BoxGeometry(
       CYLINDER_RADIUS * INDICATOR_WIDTH_FACTOR,
@@ -143,7 +145,7 @@ export class SuspensionCylinderModel {
       BASE_HEIGHT + CYLINDER_HEIGHT * INDICATOR_VERTICAL_FRACTION,
       CYLINDER_RADIUS + INDICATOR_FORWARD_OFFSET,
     )
-    this.root.add(this.indicator)
+    this.group.add(this.indicator)
   }
 
   /**
@@ -158,7 +160,7 @@ export class SuspensionCylinderModel {
 
   /** Dispose all geometry and materials owned by the controller. */
   public dispose(): void {
-    this.root.traverse((obj) => {
+    this.group.traverse((obj) => {
       if (obj instanceof THREE.Mesh) {
         obj.geometry.dispose()
         if (Array.isArray(obj.material)) {
