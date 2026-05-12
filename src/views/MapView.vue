@@ -1156,6 +1156,19 @@ onMounted(async () => {
       void router.push('/level')
     }
     viewController.onRequestDock = (assetRef: string) => {
+      // Stations whose metadata marks `dockTarget: 'station'` route straight to the
+      // station-interior scene instead of opening the contract-step dock panel.
+      const meta = viewController
+        .getAllPinnedAssetMetadata()
+        .find((a) => a.assetRef === assetRef)
+      if (
+        meta?.kind === 'station' &&
+        meta.dockTarget === 'station' &&
+        meta.stationId
+      ) {
+        void router.push(`/station?station=${meta.stationId}`)
+        return
+      }
       dockedAsset.value = { assetRef, label: dockPromptState.value?.label ?? 'STATION' }
     }
     viewController.onPortalWelcome = () => {
@@ -1186,7 +1199,7 @@ onMounted(async () => {
       // — refresh so the cyan pill + notifyContractUpdate fire on arrival.
       refreshActiveMessage()
     })
-    await viewController.init(container.value)
+    await viewController.init(container.value, router)
     unsubscribeContractShuttleUpgrade = onContractShuttleUpgradeGranted((payload) => {
       viewController.syncShuttleUpgradeGrantFromContract(
         payload.upgradeId,

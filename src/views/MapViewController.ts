@@ -237,6 +237,8 @@ import {
   onContractStepActivated,
 } from '@/lib/contracts/runtime'
 import type { ContractStoreSnapshot } from '@/lib/contracts/contractTypes'
+import type { PinnedAssetLifecyclePayload } from '@/lib/contracts/ContractSystem'
+import type { Router } from 'vue-router'
 import type { ContractStepActivatedPayload } from '@/lib/contracts/ContractSystem'
 import { PinnedStationController } from '@/three/PinnedStationController'
 import {
@@ -379,6 +381,17 @@ export class MapViewController implements Tickable {
   private shuttleEffects: MapShuttleEffects | null = null
   /** Active Three.js controllers for contract-pinned station assets, keyed by assetRef. */
   private pinnedStationControllers = new Map<string, PinnedStationController>()
+  /**
+   * Stations spawned via the dev-console (not driven by an active contract). Merged into
+   * the dock-proximity / dock-prompt asset lists alongside {@link contractSystem.getActivePinnedAssets}
+   * and exempted from {@link syncPinnedStations} cleanup so they survive ticks.
+   */
+  private _devSpawnedStations: Map<string, PinnedAssetLifecyclePayload> = new Map()
+  /**
+   * Vue router handle, captured at {@link init} time. Used by dev-console navigation
+   * helpers (e.g. `openYamadaStation`) so they can route without the Vue layer.
+   */
+  private router: Router | null = null
   private evaSession: EvaSession | null = null
   private currentEvaPrompt: string | null = null
   /** Owns the UnrealBloomPass tweaks for EVA override, inspect swaps, and orbit clamp. */
@@ -901,7 +914,8 @@ export class MapViewController implements Tickable {
     this.orbitFacade.slingshotCharge = value
   }
 
-  async init(container: HTMLElement): Promise<void> {
+  async init(container: HTMLElement, router?: Router): Promise<void> {
+    this.router = router ?? null
     this.emitBootState('preparing', 'Loading')
 
     // Create canvas
@@ -2732,6 +2746,20 @@ export class MapViewController implements Tickable {
       cullHalfExtentX: halfViewX,
       cullHalfExtentZ: halfViewZ,
     })
+  }
+
+  /**
+   * Snapshot of every pinned-asset metadata record visible to the dock subsystem
+   * — both contract-driven and dev-spawned. Consumers (e.g. the Vue dock prompt
+   * routing branch) must use this rather than {@link contractSystem.getActivePinnedAssets}
+   * directly, otherwise dev-spawned entries (added via {@link spawnYamadaStation})
+   * won't be discoverable.
+   */
+  getAllPinnedAssetMetadata(): PinnedAssetLifecyclePayload[] {
+    return [
+      ...contractSystem.getActivePinnedAssets(),
+      ...this._devSpawnedStations.values(),
+    ]
   }
 
   /**

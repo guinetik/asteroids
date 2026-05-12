@@ -216,6 +216,18 @@ export interface PinnedAssetLifecyclePayload {
   modelPath?: string
   /** Stable seed hashed to a deterministic position (only when `kind === 'station'`). */
   positionSeed?: string
+  /**
+   * Route the dock prompt sends the player to (only meaningful when `kind === 'station'`).
+   * `'level'` opens the contract-step dock panel; `'station'` routes to the
+   * `/station` route with `?station=<stationId>`.
+   * @defaultValue `'level'`
+   */
+  dockTarget?: 'level' | 'station'
+  /**
+   * Station JSON id passed as `?station=` when `dockTarget === 'station'` (e.g.
+   * `'yamada-titania'`). Only meaningful when `kind === 'station'`.
+   */
+  stationId?: string
 }
 
 /** Payload for {@link ContractSystemHooks.onStepActivated}. */
@@ -1214,6 +1226,8 @@ function buildPinnedAssetLifecyclePayload(a: PinnedAsset): PinnedAssetLifecycleP
       label: a.label,
       modelPath: a.modelPath,
       positionSeed: a.positionSeed,
+      dockTarget: a.dockTarget,
+      stationId: a.stationId,
     }
   }
   return {
