@@ -53,6 +53,10 @@ export interface MapDevCommandContext {
   unlockHektor: () => void
   /** Restores Hektor orbital capture to the default restricted state. */
   restrictHektor: () => void
+  /** Dev-spawn the Yamada Titania station as a pinned asset (idempotent). */
+  spawnYamadaStation: () => void
+  /** Dev-only: route directly to the Yamada Titania station interior. */
+  openYamadaStation: () => void
 }
 
 /** Register the map-view dev-console commands. Idempotent across session restarts. */
@@ -119,6 +123,12 @@ export function registerMapDevCommands(ctx: MapDevCommandContext): void {
     },
     restrictHektor: () => {
       ctx.restrictHektor()
+    },
+    spawnYamadaStation: () => {
+      ctx.spawnYamadaStation()
+    },
+    openYamadaStation: () => {
+      ctx.openYamadaStation()
     },
   })
 }

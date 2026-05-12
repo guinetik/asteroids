@@ -1558,6 +1558,8 @@ export class MapViewController implements Tickable {
       devOpenOrbitalMinigame: (item, quantity) => this.devOpenOrbitalMinigame(item, quantity),
       unlockHektor: () => this.devSetBodyAccess('hektor', 'unrestricted'),
       restrictHektor: () => this.devSetBodyAccess('hektor', 'restricted'),
+      spawnYamadaStation: () => this.spawnYamadaStation(),
+      openYamadaStation: () => this.openYamadaStation(),
     })
 
     this.missionFacade.hydrateFromStorage(this.onMissionBoardUpdate)
@@ -2391,7 +2393,10 @@ export class MapViewController implements Tickable {
         let nearestRef: string | null = null
         let nearestLabel = ''
         let nearestDist = DOCK_PROXIMITY_M
-        const activeMeta = contractSystem.getActivePinnedAssets()
+        const activeMeta: PinnedAssetLifecyclePayload[] = [
+          ...contractSystem.getActivePinnedAssets(),
+          ...this._devSpawnedStations.values(),
+        ]
         for (const [ref, controller] of this.pinnedStationControllers) {
           const d = shuttlePos.distanceTo(controller.getWorldPosition())
           if (d < nearestDist) {
@@ -2763,6 +2768,53 @@ export class MapViewController implements Tickable {
   }
 
   /**
+   * Dev-only: spawn the Yamada Titania station as a pinned asset and register
+   * matching metadata so the dock-proximity loop, prompt label, and routing
+   * branch all see it. Idempotent — repeated calls log a warning and bail.
+   */
+  spawnYamadaStation(): void {
+    const scene = this.sceneObjects?.scene
+    if (!scene) {
+      console.warn('[MapView.spawnYamadaStation] scene not ready')
+      return
+    }
+    const ref = 'yamada-titania-station'
+    if (this._devSpawnedStations.has(ref) || this.pinnedStationControllers.has(ref)) {
+      console.info('[MapView.spawnYamadaStation] already spawned')
+      return
+    }
+    const ctrl = new PinnedStationController({
+      scene,
+      modelPath: 'models/station.glb',
+      positionSeed: ref,
+    })
+    this.pinnedStationControllers.set(ref, ctrl)
+    this._devSpawnedStations.set(ref, {
+      assetRef: ref,
+      kind: 'station',
+      region: 'uranian-system',
+      label: 'YAMADA TITANIA',
+      modelPath: 'models/station.glb',
+      positionSeed: ref,
+      dockTarget: 'station',
+      stationId: 'yamada-titania',
+    })
+    console.info('[MapView.spawnYamadaStation] at', ctrl.getWorldPosition().toArray())
+  }
+
+  /**
+   * Dev-only: route directly to the Yamada Titania station interior, bypassing
+   * the dock prompt. Requires a router handle captured at {@link init} time.
+   */
+  openYamadaStation(): void {
+    if (!this.router) {
+      console.warn('[MapView.openYamadaStation] router not available')
+      return
+    }
+    void this.router.push('/station?station=yamada-titania&dev=true')
+  }
+
+  /**
    * Diff the set of contract-pinned stations against the live Three.js registry.
    * Spawns a {@link PinnedStationController} for each newly-active station asset and
    * disposes controllers whose contracts are no longer active. Called once per tick.
@@ -2773,6 +2825,9 @@ export class MapViewController implements Tickable {
     const desired = contractSystem.getActivePinnedAssets()
     const desiredRefs = new Set(desired.map((a) => a.assetRef))
     for (const [ref, controller] of this.pinnedStationControllers) {
+      // Dev-spawned stations are not part of the contract's desired set; the sync
+      // path must NOT dispose them on the next tick.
+      if (this._devSpawnedStations.has(ref)) continue
       if (!desiredRefs.has(ref)) {
         controller.dispose()
         this.pinnedStationControllers.delete(ref)
@@ -5951,6 +6006,7 @@ export class MapViewController implements Tickable {
       controller.dispose()
     }
     this.pinnedStationControllers.clear()
+    this._devSpawnedStations.clear()
     this.beltControllers = []
     this.planetControllers = []
     this.gravitationalEventManager?.setNearbyHudCallbacks(null)
