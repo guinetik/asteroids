@@ -1,30 +1,30 @@
 {
   "planetId": "jupiter",
-  "giverName": "Jovian Cloud City",
-  "giverId": "jovian-cloud-city",
+  "giverName": "The Jovian Society",
+  "giverId": "jovian-society",
   "missions": [
     {
-      "id": "jupiter_cloud_city_any_ore",
-      "name": "Construction Supplies",
-      "description": "Cloud City is always expanding. They'll take whatever ore you can bring.",
+      "id": "jovian_society_bulk_ore",
+      "name": "Asset-Backed Stockpile",
+      "description": "The Society wants bulk asteroid feedstock parked in inventory before the next hull-plate auction settles.",
       "difficulty": "easy",
       "oreCategory": "any",
       "targetKg": 380,
       "reward": 820
     },
     {
-      "id": "jupiter_cloud_city_magnetite",
-      "name": "Shielded Platform Reinforcement",
-      "description": "New residential sectors need magnetite for radiation-shielded support frames. Purity matters — Cloud City inspectors reject mixed loads.",
+      "id": "jovian_society_magnetite_contract",
+      "name": "Shielding Futures",
+      "description": "Vance is packaging magnetite-rich ore into radiation-shielded cargo pod futures. Deliver clean ore and keep the margin intact.",
       "difficulty": "medium",
       "oreCategory": "magnetite",
       "targetKg": 500,
       "reward": 1500
     },
     {
-      "id": "jupiter_cloud_city_iron_nickel",
-      "name": "Executive Suites",
-      "description": "Premium iron-nickel fittings for the new orbital penthouse tier. Discreet delivery, excellent pay.",
+      "id": "jovian_society_iron_nickel_core",
+      "name": "Pressure Hull Reserve",
+      "description": "Society yards are paying premium rates for dense iron-nickel alloy suitable for storm-rated pressure hull ribs.",
       "difficulty": "hard",
       "oreCategory": "iron-nickel-alloy",
       "targetKg": 225,

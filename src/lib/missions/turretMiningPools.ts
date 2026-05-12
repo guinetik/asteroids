@@ -13,6 +13,7 @@ import type { TurretMiningMissionPool } from './types'
 import { PLANET_IDS } from '@/lib/planets/catalog'
 
 import marsData from '@/data/shuttle-missions/mining/mars.json'
+import ceresData from '@/data/shuttle-missions/mining/ceres.json'
 import jupiterData from '@/data/shuttle-missions/mining/jupiter.json'
 import uranusData from '@/data/shuttle-missions/mining/uranus.json'
 import neptuneData from '@/data/shuttle-missions/mining/neptune.json'
@@ -21,6 +22,7 @@ import plutoData from '@/data/shuttle-missions/mining/pluto.json'
 /** All turret mining pools, one per giver planet. */
 export const TURRET_MINING_POOLS: TurretMiningMissionPool[] = [
   marsData,
+  ceresData,
   jupiterData,
   uranusData,
   neptuneData,

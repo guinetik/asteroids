@@ -15,6 +15,7 @@ import earthData from '@/data/shuttle-missions/earth.json'
 import marsData from '@/data/shuttle-missions/mars.json'
 import venusData from '@/data/shuttle-missions/venus.json'
 import mercuryData from '@/data/shuttle-missions/mercury.json'
+import ceresData from '@/data/shuttle-missions/ceres.json'
 import jupiterData from '@/data/shuttle-missions/jupiter.json'
 import saturnData from '@/data/shuttle-missions/saturn.json'
 import uranusData from '@/data/shuttle-missions/uranus.json'
@@ -26,6 +27,7 @@ export const SHUTTLE_MISSION_POOLS: ShuttleMissionPool[] = [
   marsData,
   venusData,
   mercuryData,
+  ceresData,
   jupiterData,
   saturnData,
   uranusData,

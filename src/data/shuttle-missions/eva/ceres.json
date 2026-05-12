@@ -1,0 +1,38 @@
+{
+  "planetId": "ceres",
+  "giverName": "Dean Bernard Porter",
+  "missions": [
+    {
+      "id": "porter_ceres_archive_relay",
+      "name": "Archive Relay Repair",
+      "description": "Restore an Institute relay carrying encrypted continuity records between Ceres vaults.",
+      "poiType": "relay_antenna",
+      "minigameType": "relay_repair",
+      "reward": 360
+    },
+    {
+      "id": "porter_ceres_quarantine_satellite",
+      "name": "Quarantine Satellite Service",
+      "description": "Service a quarantine satellite that watches outbound biological cargo for trace containment failures.",
+      "poiType": "satellite",
+      "minigameType": "satellite_servicing",
+      "reward": 420
+    },
+    {
+      "id": "porter_ceres_specimen_telescope",
+      "name": "Specimen Telescope Alignment",
+      "description": "Align the Institute telescope used to screen faint thermal signatures from long-duration specimen canisters.",
+      "poiType": "telescope",
+      "minigameType": "telescope_alignment",
+      "reward": 450
+    },
+    {
+      "id": "porter_ceres_vault_relay",
+      "name": "Vault Relay Swap",
+      "description": "Replace relay hardware that keeps Porter's offsite vault telemetry synchronized with the Ceres clinic.",
+      "poiType": "relay_antenna",
+      "minigameType": "relay_repair",
+      "reward": 390
+    }
+  ]
+}

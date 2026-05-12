@@ -193,9 +193,9 @@ describe('Jay Mercer expansion missions', () => {
     }
   })
 
-  it('Jays expansion templates surface when jovianContractTampered is set', () => {
-    // Run 80 generations at the Jupiter host with the flag set — at least one expansion
-    // template must appear, confirming the flag gate opens.
+  it('Jays expansion templates surface at Jupiter when jovianContractTampered is set', () => {
+    // Once the Jovian contract is tampered, Jupiter falls back from the handler-only
+    // board and Jay's flagged expansion templates can surface again.
     const expansionIds = new Set([
       'jay_jupiter_belt_cycle',
       'jay_jupiter_asteroid_listing',
@@ -207,7 +207,7 @@ describe('Jay Mercer expansion missions', () => {
     const profile = stubProfile({ activeStoryFlags: { jovianContractTampered: true } })
     let sawExpansion = false
     for (let i = 0; i < 80; i++) {
-      const mission = generateAsteroidMission(6, host, Math.random, null, null, profile)
+      const mission = generateAsteroidMission(6, host, Math.random, null, 'jay', profile)
       if (expansionIds.has(mission.templateId)) {
         sawExpansion = true
         break

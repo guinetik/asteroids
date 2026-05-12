@@ -1,0 +1,34 @@
+{
+  "planetId": "ceres",
+  "giverName": "Ceres Institute for Eternal Biology",
+  "giverId": "ceres-institute",
+  "missions": [
+    {
+      "id": "ceres_institute_bulk_substrate",
+      "name": "Bulk Substrate Order",
+      "description": "Porter's lab needs neutral asteroid substrate for disposable growth racks. Any stable ore will do.",
+      "difficulty": "easy",
+      "oreCategory": "any",
+      "targetKg": 300,
+      "reward": 800
+    },
+    {
+      "id": "ceres_institute_magnetite_screening",
+      "name": "Magnetite Screening Run",
+      "description": "Magnetite-rich ore for shielded specimen drawers in the Institute's lower vaults.",
+      "difficulty": "medium",
+      "oreCategory": "magnetite",
+      "targetKg": 420,
+      "reward": 1500
+    },
+    {
+      "id": "ceres_institute_water_ice_vault",
+      "name": "Cold Vault Reserve",
+      "description": "High-purity water-ice for Porter's emergency tissue vault reserve. The Institute pays for clean chain of custody.",
+      "difficulty": "hard",
+      "oreCategory": "water-ice",
+      "targetKg": 375,
+      "reward": 2350
+    }
+  ]
+}

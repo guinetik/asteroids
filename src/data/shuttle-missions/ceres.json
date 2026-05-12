@@ -1,0 +1,30 @@
+{
+  "planetId": "ceres",
+  "giverName": "Dean Bernard Porter",
+  "missions": [
+    {
+      "id": "porter_earth_archive_reagents",
+      "name": "Archive Reagent Retrieval",
+      "description": "Dean Porter needs sealed Earth archive reagents for the Institute's oldest cellular continuity trials.",
+      "targetPlanet": "earth",
+      "gatherQuantity": 8,
+      "reward": 6500
+    },
+    {
+      "id": "porter_mars_cleanroom_parts",
+      "name": "Cleanroom Parts Run",
+      "description": "Mars fabricators have sterile valve assemblies the Ceres Institute can still certify for century-scale biology work.",
+      "targetPlanet": "mars",
+      "gatherQuantity": 5,
+      "reward": 5400
+    },
+    {
+      "id": "porter_venus_pressure_samples",
+      "name": "Pressure Sample Case",
+      "description": "Porter wants Venus pressure-cured sample cases for a tissue vault that must survive ugly failure modes.",
+      "targetPlanet": "venus",
+      "gatherQuantity": 4,
+      "reward": 6100
+    }
+  ]
+}

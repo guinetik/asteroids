@@ -1,12 +1,30 @@
 {
   "planetId": "uranus",
-  "giverName": "United Space Consortium",
-  "giverId": "usc-uranus",
+  "giverName": "Yamada Farms",
+  "giverId": "yamada-farms",
   "missions": [
     {
-      "id": "usc_uranus_ice_research",
-      "name": "Cryogenic Research Shipment",
-      "description": "USC labs need primordial water-ice for deep-cold chemistry studies. Bring it fresh from the kuiper belt.",
+      "id": "yamada_uranus_ward_feedstock",
+      "name": "Ward Feedstock",
+      "description": "The practice needs ordinary asteroid feedstock for quiet repairs around the patient ward. No pedigree required, just a clean manifest.",
+      "difficulty": "easy",
+      "oreCategory": "any",
+      "targetKg": 325,
+      "reward": 850
+    },
+    {
+      "id": "yamada_uranus_olivine_glass",
+      "name": "Greenhouse Glass Batch",
+      "description": "Olivine-rich ore for a small run of radiation-tinted greenhouse glass. Yamada wants the batch kept separate from industrial stock.",
+      "difficulty": "medium",
+      "oreCategory": "olivine",
+      "targetKg": 450,
+      "reward": 1450
+    },
+    {
+      "id": "yamada_uranus_ice_research",
+      "name": "Cryogenic Reagent Shipment",
+      "description": "Primordial water-ice for the suspension cylinders beneath Yamada Farms. Bring it fresh, sealed, and very cold.",
       "difficulty": "hard",
       "oreCategory": "water-ice",
       "targetKg": 425,

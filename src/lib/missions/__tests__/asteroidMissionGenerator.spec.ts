@@ -565,30 +565,29 @@ describe('generateAsteroidMission', () => {
     expect(hard.objectives.length).toBeLessThanOrEqual(objectiveCountForDifficulty(8))
   })
 
-  it('Saturn host only offers combat, rescue, bunker, or mineral-analysis objectives', () => {
+  it('Saturn host prioritizes Finch missions once Finch is unlocked', () => {
     const saturn = getPlanet('saturn')
     const hostR = saturn.orbit.semiMajorAxis * ORBIT_SCALE
     const host = { planetId: 'saturn' as const, worldX: hostR, worldZ: 0 }
-    for (let d = 2; d <= 10; d++) {
+    const profile = {
+      activeStoryFlags: { jovianContractTampered: true },
+    } as unknown as PlayerProfile
+    for (let d = 4; d <= 9; d++) {
       for (let i = 0; i < 24; i++) {
-        const mission = generateAsteroidMission(d, host)
+        const mission = generateAsteroidMission(d, host, Math.random, null, null, profile)
         expect(mission.originPlanetId).toBe('saturn')
-        for (const obj of mission.objectives) {
-          expect(RESTRICTED_HOST_OBJECTIVE_TYPES.has(obj.type)).toBe(true)
-        }
+        expect(mission.giverId).toBe('mr-finch')
       }
     }
   })
 
-  it('Saturn host posts a restricted-board contract from difficulty 1', () => {
+  it('Saturn host can still fall back when Finch has no eligible mission', () => {
     const saturn = getPlanet('saturn')
     const hostR = saturn.orbit.semiMajorAxis * ORBIT_SCALE
     const host = { planetId: 'saturn' as const, worldX: hostR, worldZ: 0 }
     const mission = generateAsteroidMission(1, host)
     expect(mission.originPlanetId).toBe('saturn')
-    for (const obj of mission.objectives) {
-      expect(RESTRICTED_HOST_OBJECTIVE_TYPES.has(obj.type)).toBe(true)
-    }
+    expect(mission.giverId).not.toBe('mr-finch')
   })
 
   it('Mercury host only offers combat, rescue, bunker, or mineral-analysis objectives', () => {
@@ -617,8 +616,8 @@ describe('generateAsteroidMission', () => {
     }
   })
 
-  it('can generate mineral-analysis missions for every planet at every difficulty', () => {
-    for (const planetId of ['mercury', 'venus', 'earth', 'mars', 'jupiter', 'saturn'] as const) {
+  it('can generate mineral-analysis missions for every general board at every difficulty', () => {
+    for (const planetId of ['mercury', 'venus', 'earth', 'mars'] as const) {
       const planet = getPlanet(planetId)
       const hostR = planet.orbit.semiMajorAxis * ORBIT_SCALE
       const host = { planetId, worldX: hostR, worldZ: 0 }
@@ -632,6 +631,58 @@ describe('generateAsteroidMission', () => {
 
         expect(mission.originPlanetId).toBe(planetId)
         expect(mission.objectives.some((obj) => obj.type === 'mineral-analysis')).toBe(true)
+      }
+    }
+  })
+
+  it('Jupiter host only drafts Jovian Society asteroid missions before tampering', () => {
+    const jupiter = getPlanet('jupiter')
+    const hostR = jupiter.orbit.semiMajorAxis * ORBIT_SCALE
+    const host = { planetId: 'jupiter' as const, worldX: hostR, worldZ: 0 }
+    for (let difficulty = 3; difficulty <= 10; difficulty++) {
+      for (let i = 0; i < 16; i++) {
+        const mission = generateAsteroidMission(difficulty, host)
+        expect(mission.giverId).toBe('jovian-society')
+      }
+    }
+  })
+
+  it('Jupiter host falls back to legacy givers and blocks Jovian Society after tampering', () => {
+    const jupiter = getPlanet('jupiter')
+    const hostR = jupiter.orbit.semiMajorAxis * ORBIT_SCALE
+    const host = { planetId: 'jupiter' as const, worldX: hostR, worldZ: 0 }
+    const profile = {
+      activeStoryFlags: { jovianContractTampered: true },
+    } as unknown as PlayerProfile
+    const seenGivers = new Set<string>()
+
+    for (let i = 0; i < 80; i++) {
+      const mission = generateAsteroidMission(6, host, Math.random, null, null, profile)
+      expect(mission.giverId).not.toBe('jovian-society')
+      seenGivers.add(mission.giverId)
+    }
+
+    expect(seenGivers.size).toBeGreaterThan(0)
+  })
+
+  it('Uranus host only drafts Yamada Farms asteroid missions', () => {
+    const uranus = getPlanet('uranus')
+    const hostR = uranus.orbit.semiMajorAxis * ORBIT_SCALE
+    const host = { planetId: 'uranus' as const, worldX: hostR, worldZ: 0 }
+    for (let difficulty = 4; difficulty <= 9; difficulty++) {
+      for (let i = 0; i < 16; i++) {
+        const mission = generateAsteroidMission(difficulty, host)
+        expect(mission.giverId).toBe('yamada-farms')
+      }
+    }
+  })
+
+  it('Ceres host only drafts Ceres Institute asteroid missions', () => {
+    const host = { planetId: 'ceres' as const, worldX: 0, worldZ: 0 }
+    for (let difficulty = 4; difficulty <= 9; difficulty++) {
+      for (let i = 0; i < 16; i++) {
+        const mission = generateAsteroidMission(difficulty, host)
+        expect(mission.giverId).toBe('ceres-institute')
       }
     }
   })

@@ -1,11 +1,11 @@
 {
   "planetId": "jupiter",
-  "giverName": "Jupiter Orbital Station",
+  "giverName": "Vance Holroyd, Senior Asset Officer",
   "missions": [
     {
       "id": "jupiter_magnetosphere_buoy",
       "name": "Magnetosphere Buoy Reboot",
-      "description": "A magnetosphere buoy is glitching under Jupiter's radiation belt. EVA across, flash the rad-hardened firmware, bring back the data logs.",
+      "description": "A Society magnetosphere buoy is glitching under Jupiter's radiation belt. EVA across, flash the rad-hardened firmware, bring back the billable data logs.",
       "poiType": "relay_antenna",
       "minigameType": "relay_repair",
       "reward": 300
@@ -13,7 +13,7 @@
     {
       "id": "jupiter_io_torus_probe",
       "name": "Io Torus Sulfur Probe",
-      "description": "The sulfur-monitoring probe in the Io plasma torus is offline. Replace the ion-pitted mass analyzer and realign the antenna.",
+      "description": "A sulfur-monitoring probe in the Io plasma torus is offline. Replace the analyzer before Vance loses the moon traffic forecast.",
       "poiType": "satellite",
       "minigameType": "relay_repair",
       "reward": 350
@@ -21,7 +21,7 @@
     {
       "id": "jupiter_orbital_asset_servicing",
       "name": "Orbital Asset Servicing",
-      "description": "On-orbit asset is throwing faults across multiple subsystems. Diagnostics inconclusive — EVA out, find the broken parts, patch them in place.",
+      "description": "A Society orbital asset is throwing faults across multiple subsystems. Diagnostics are inconclusive, so Vance wants eyes on the hardware.",
       "poiType": "satellite",
       "minigameType": "satellite_servicing",
       "reward": 400
@@ -29,7 +29,7 @@
     {
       "id": "jupiter_galilean_telescope_phasing",
       "name": "Galilean Telescope Phasing",
-      "description": "The moon-watching telescope is out of phase after a radiation flush of the actuators. EVA, read the wavefront sensor, walk each segment in by hand.",
+      "description": "The moon-watching telescope is out of phase after a radiation flush. Walk each segment in by hand before the forecasts lose value.",
       "poiType": "telescope",
       "minigameType": "telescope_alignment",
       "reward": 450

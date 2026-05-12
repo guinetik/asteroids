@@ -16,6 +16,7 @@ import mercuryData from '@/data/shuttle-missions/eva/mercury.json'
 import venusData from '@/data/shuttle-missions/eva/venus.json'
 import earthData from '@/data/shuttle-missions/eva/earth.json'
 import marsData from '@/data/shuttle-missions/eva/mars.json'
+import ceresData from '@/data/shuttle-missions/eva/ceres.json'
 import jupiterData from '@/data/shuttle-missions/eva/jupiter.json'
 import saturnData from '@/data/shuttle-missions/eva/saturn.json'
 import uranusData from '@/data/shuttle-missions/eva/uranus.json'
@@ -27,6 +28,7 @@ export const EVA_MISSION_POOLS: VisitRelayMissionPool[] = [
   venusData,
   earthData,
   marsData,
+  ceresData,
   jupiterData,
   saturnData,
   uranusData,

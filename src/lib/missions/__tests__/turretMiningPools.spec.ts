@@ -4,7 +4,7 @@ import { getTurretMiningPool, TURRET_MINING_POOLS } from '../turretMiningPools'
 describe('turretMiningPools', () => {
   it('exposes pools for all five giver planets', () => {
     const planetIds = TURRET_MINING_POOLS.map((p) => p.planetId).sort()
-    expect(planetIds).toEqual(['jupiter', 'mars', 'neptune', 'pluto', 'uranus'])
+    expect(planetIds).toEqual(['ceres', 'jupiter', 'mars', 'neptune', 'pluto', 'uranus'])
   })
 
   it('returns the Mars pool with three missions', () => {
@@ -22,12 +22,8 @@ describe('turretMiningPools', () => {
   })
 
   it('USC planets use the same giver name', () => {
-    const names = ['uranus', 'neptune', 'pluto'].map((id) => getTurretMiningPool(id)?.giverName)
-    expect(names).toEqual([
-      'United Space Consortium',
-      'United Space Consortium',
-      'United Space Consortium',
-    ])
+    const names = ['neptune', 'pluto'].map((id) => getTurretMiningPool(id)?.giverName)
+    expect(names).toEqual(['United Space Consortium', 'United Space Consortium'])
   })
 
   it('every mission uses an ore category from the MiningOreCategory union', () => {

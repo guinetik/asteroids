@@ -745,10 +745,9 @@ export function generateWaypointInRegion(
  * Stations whose mission boards are restricted to exterminate / rescue (combat & SAR) work.
  * Adding a planet here makes that planet's asteroid board reject mining / survey templates,
  * regardless of difficulty band — used for narrative-tagged worlds whose flavor would clash
- * with generic hauler contracts (Saturn = hazard cleanup; Mercury = Cinderline territory,
- * viroid hunting).
+ * with generic hauler contracts (Mercury = Cinderline territory, viroid hunting).
  */
-const COMBAT_ONLY_HOST_PLANET_IDS: ReadonlySet<string> = new Set(['saturn', 'mercury'])
+const COMBAT_ONLY_HOST_PLANET_IDS: ReadonlySet<string> = new Set(['mercury'])
 
 /**
  * Whether the host planet only posts exterminate / rescue contracts on its asteroid board.
@@ -758,6 +757,62 @@ const COMBAT_ONLY_HOST_PLANET_IDS: ReadonlySet<string> = new Set(['saturn', 'mer
  */
 function isCombatOnlyHostPlanet(planetId: string): boolean {
   return COMBAT_ONLY_HOST_PLANET_IDS.has(planetId)
+}
+
+/**
+ * Host boards that only accept one local handler's asteroid templates while their
+ * local contract state allows that handler.
+ */
+const EXCLUSIVE_HOST_GIVER_IDS: ReadonlyMap<string, string> = new Map([
+  ['jupiter', 'jovian-society'],
+  ['uranus', 'yamada-farms'],
+  ['ceres', 'ceres-institute'],
+])
+
+/** Host boards that prefer a local handler when at least one matching template is available. */
+const PRIORITY_HOST_GIVER_IDS: ReadonlyMap<string, string> = new Map([['saturn', 'mr-finch']])
+
+/** Story flag that severs Jupiter from Jovian Society local contracts. */
+const JOVIAN_CONTRACT_TAMPERED_FLAG = 'jovianContractTampered'
+
+/**
+ * Resolve the exclusive giver id for a host board, when it has one.
+ *
+ * @param planetId - Host planet identifier.
+ * @param profile - Player profile used to read story flags.
+ * @returns The required local giver id, or `undefined` when the host is not exclusive.
+ */
+function getExclusiveHostGiverId(planetId: string, profile: PlayerProfile): string | undefined {
+  if (planetId === 'jupiter' && hasStoryFlag(profile, JOVIAN_CONTRACT_TAMPERED_FLAG)) {
+    return undefined
+  }
+  return EXCLUSIVE_HOST_GIVER_IDS.get(planetId)
+}
+
+/**
+ * Whether a giver is barred from a host board by local story state.
+ *
+ * @param planetId - Host planet identifier.
+ * @param giverId - Candidate mission giver id.
+ * @param profile - Player profile used to read story flags.
+ * @returns `true` when that giver should not be drafted at the host.
+ */
+function isGiverBlockedForHost(planetId: string, giverId: string, profile: PlayerProfile): boolean {
+  return (
+    planetId === 'jupiter' &&
+    giverId === 'jovian-society' &&
+    hasStoryFlag(profile, JOVIAN_CONTRACT_TAMPERED_FLAG)
+  )
+}
+
+/**
+ * Resolve the preferred giver id for a host board, when it has one.
+ *
+ * @param planetId - Host planet identifier.
+ * @returns The preferred local giver id, or `undefined` when the host has no priority rule.
+ */
+function getPriorityHostGiverId(planetId: string): string | undefined {
+  return PRIORITY_HOST_GIVER_IDS.get(planetId)
 }
 
 /**
@@ -817,6 +872,7 @@ export function generateAsteroidMission(
 ): GeneratedAsteroidMission {
   const anchor = host ?? syntheticEarthHostAnchor()
   const combatOnlyHost = isCombatOnlyHostPlanet(anchor.planetId)
+  const exclusiveHostGiverId = getExclusiveHostGiverId(anchor.planetId, profile)
   /**
    * Combat-only hosts use the full giver catalog so Colonial Guard / Frontier Rescue are not
    * squeezed out by low-tier miners and surveyors that share the same difficulty band; the
@@ -837,6 +893,12 @@ export function generateAsteroidMission(
   const hostEffectiveGiverId = hostOverride?.giverId ?? null
 
   for (const giver of givers) {
+    if (isGiverBlockedForHost(anchor.planetId, giver.id, profile)) {
+      continue
+    }
+    if (exclusiveHostGiverId !== undefined && giver.id !== exclusiveHostGiverId) {
+      continue
+    }
     // requiredGiverId narrows the pool unless the host override re-stamps every
     // mission to the requested giver — in which case all templates are eligible.
     if (
@@ -878,13 +940,22 @@ export function generateAsteroidMission(
   if (candidates.length === 0) {
     const planetSuffix = combatOnlyHost
       ? ` for ${anchor.planetId} (exterminate/rescue/bunker only)`
+      : exclusiveHostGiverId !== undefined
+        ? ` for ${anchor.planetId} (${exclusiveHostGiverId} only)`
       : ''
     throw new Error(`No templates match difficulty ${difficulty}${planetSuffix}`)
   }
 
   let pool = candidates
+  const priorityHostGiverId = getPriorityHostGiverId(anchor.planetId)
+  if (priorityHostGiverId !== undefined) {
+    const priorityPool = candidates.filter((c) => c.giver.id === priorityHostGiverId)
+    if (priorityPool.length > 0) {
+      pool = priorityPool
+    }
+  }
   if (difficulty <= NEAR_EARTH_ONLY_MAX_MISSION_DIFFICULTY) {
-    const nearEarthOnly = candidates.filter((c) => c.region === 'near-earth')
+    const nearEarthOnly = pool.filter((c) => c.region === 'near-earth')
     if (nearEarthOnly.length > 0) {
       pool = nearEarthOnly
     }

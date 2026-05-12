@@ -1,27 +1,27 @@
 {
   "planetId": "jupiter",
-  "giverName": "Jupiter Orbital Command",
+  "giverName": "Vance Holroyd, Senior Asset Officer",
   "missions": [
     {
-      "id": "jupiter_saturn_ice",
-      "name": "Saturn Ring Ice Collection",
-      "description": "Jupiter station needs pristine ice from Saturn's rings for coolant production.",
+      "id": "vance_saturn_ice_hedge",
+      "name": "Saturn Ring Ice Hedge",
+      "description": "Vance wants pristine Saturn ring ice booked against the Society's coolant futures before the next maintenance vote.",
       "targetPlanet": "saturn",
       "gatherQuantity": 4,
       "reward": 5625
     },
     {
-      "id": "jupiter_mars_methane",
-      "name": "Martian Methane for Refineries",
-      "description": "Jupiter's atmospheric refineries use methane as a catalyst. Collect from Mars.",
+      "id": "vance_mars_methane_refinery",
+      "name": "Martian Methane Position",
+      "description": "The Jovian Society's refinery book needs Martian methane as catalyst stock. Vance pays cleanly if the shipment clears before repricing.",
       "targetPlanet": "mars",
       "gatherQuantity": 5,
       "reward": 5000
     },
     {
-      "id": "jupiter_earth_supplies",
-      "name": "Earth Resupply Mission",
-      "description": "Long-haul cargo pickup from Earth. The crew needs fresh supplies.",
+      "id": "vance_earth_board_supplies",
+      "name": "Boardroom Resupply",
+      "description": "Earth-side concessions owe the Society a sealed supply crate. Vance wants it routed through Jupiter before any smaller creditors notice.",
       "targetPlanet": "earth",
       "gatherQuantity": 10,
       "reward": 6875
