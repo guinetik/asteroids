@@ -35,14 +35,21 @@ import SushiMetersOverlay from '@/components/hud/SushiMetersOverlay.vue'
 import { parseKeyPrompt } from '@/lib/ui/parseKeyPrompt'
 import {
   buildMissionTrackerGroups,
+  buildBunkerExtractCargoRows,
   type MissionTrackerRow,
 } from '@/lib/missions/missionHudRows'
+import type {
+  CargoState,
+  CargoThermalZone,
+  DeliveryTimerState,
+} from '@/lib/missions/cargoIntegrity'
 import PickupToast from '@/components/PickupToast.vue'
 import type { PickupEntry } from '@/components/PickupToast.vue'
 import type {
   ShuttleMissionBoard,
   ActiveShuttleMission,
   ActiveVisitRelayMission,
+  GeneratedAsteroidMission,
 } from '@/lib/missions/types'
 import type { OrbitalMiniGame } from '@/lib/minigame/OrbitalMiniGame'
 import { isCanvasOrbitalMinigame } from '@/lib/minigame/canvasOrbitalMinigames'
@@ -484,6 +491,11 @@ const shopLanderHullFull = computed(() => {
 const evaMinigameMission = ref<ActiveVisitRelayMission | null>(null)
 const evaMinigameInstance = ref<OrbitalMiniGame | null>(null)
 const missionBoard = ref<ShuttleMissionBoard | null>(null)
+/** Cargo delivery state refs — updated every frame during an active Bunker Extract mission. */
+const cargoMission = ref<GeneratedAsteroidMission | null>(null)
+const cargoTimer = ref<DeliveryTimerState | null>(null)
+const cargoState = ref<CargoState | null>(null)
+const cargoZone = ref<CargoThermalZone | null>(null)
 const missionNotification = ref<string | null>(null)
 let missionNotificationTimer: TimerHandle | null = null
 const pickups = ref<PickupEntry[]>([])
@@ -517,7 +529,23 @@ const activeContractHudRows = computed(() =>
 const missionTrackerGroups = computed(() => {
   const board = missionBoard.value
   if (!board) return []
-  return buildMissionTrackerGroups(board, shopInventory.value)
+  const baseGroups = buildMissionTrackerGroups(board, shopInventory.value)
+  const cargoRows = buildBunkerExtractCargoRows(
+    cargoMission.value,
+    cargoTimer.value,
+    cargoState.value,
+    cargoZone.value,
+  )
+  if (cargoRows.length === 0) return baseGroups
+  // Append cargo rows to the asteroid group — cargo IS the active asteroid mission.
+  const result = baseGroups.map((g) =>
+    g.key === 'asteroid' ? { ...g, rows: [...g.rows, ...cargoRows] } : g,
+  )
+  // Fallback: asteroid group absent but cargo rows exist — surface them anyway.
+  if (!result.some((g) => g.key === 'asteroid')) {
+    result.push({ key: 'asteroid', title: 'Asteroid', rows: cargoRows })
+  }
+  return result
 })
 
 /** Mirrors the controller's reactive flag so the ESC prompt can react to it. */
@@ -1089,6 +1117,12 @@ onMounted(async () => {
     }
     viewController.onMissionBoardUpdate = (board) => {
       missionBoard.value = board
+    }
+    viewController.onCargoState = (state) => {
+      cargoMission.value = state.mission
+      cargoTimer.value = state.timer
+      cargoState.value = state.cargo
+      cargoZone.value = state.zone
     }
     viewController.onMissionComplete = (mission) => {
       if (mission) {

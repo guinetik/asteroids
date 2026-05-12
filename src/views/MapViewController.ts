@@ -266,6 +266,18 @@ import {
 } from '@/lib/map/eva/MapEvaMultitoolFacade'
 import type { MapEvaShuttleHullHealTarget } from '@/lib/fps/projectileSystem'
 import { applyShuttleBuffs } from '@/lib/shuttle/buffs'
+import {
+  createCargoState,
+  createDeliveryTimer,
+  tickCargo,
+  tickDeliveryTimer,
+  cargoThermalToleranceBand,
+  classifyThermalZone,
+  computeOvershoot,
+  type CargoState,
+  type CargoThermalZone,
+  type DeliveryTimerState,
+} from '@/lib/missions/cargoIntegrity'
 
 /**
  * Orbit / grid / debris toggle snapshot for syncing the map HUD after intro suppression.
@@ -485,6 +497,13 @@ export class MapViewController implements Tickable {
   private adriftTimer = 0
   /** Facade owning the {@link ShipHealth} instance, HP persist timer, and pagehide hook. */
   private readonly healthFacade = new MapShipHealthFacade()
+
+  /** Delivery countdown for an active Bunker Extract mission; null when no organ is in transit. */
+  private cargoDeliveryTimer: DeliveryTimerState | null = null
+  /** Thermal integrity state for an active Bunker Extract mission; null when no organ is in transit. */
+  private cargoState: CargoState | null = null
+  /** Current thermal zone the shuttle occupies relative to the cargo tolerance band. */
+  private cargoCurrentZone: CargoThermalZone | null = null
 
   private get shipHealth() {
     return this.healthFacade.shipHealth
@@ -718,6 +737,20 @@ export class MapViewController implements Tickable {
    * `null` until wired by the Vue owner.
    */
   onJovianEpilogueDue: (() => void) | null = null
+
+  /**
+   * Notifies the Vue layer of the current cargo state for the active Bunker
+   * Extract mission, or `null` when no cargo is being carried. Fires every
+   * frame the cargo state updates so the HUD can re-render.
+   */
+  public onCargoState:
+    | ((state: {
+        mission: GeneratedAsteroidMission | null
+        timer: DeliveryTimerState | null
+        cargo: CargoState | null
+        zone: CargoThermalZone | null
+      }) => void)
+    | undefined
 
   private get missionBoard(): ShuttleMissionBoard {
     return this.missionFacade.board
@@ -1513,6 +1546,19 @@ export class MapViewController implements Tickable {
     })
 
     this.missionFacade.hydrateFromStorage(this.onMissionBoardUpdate)
+
+    // Hydrate cargo delivery state when a bunker-extract organ is already in transit.
+    const hydratedMission = this.missionFacade.board.activeAsteroidMission
+    if (
+      hydratedMission?.yamada?.archetype === 'bunker-extract' &&
+      hydratedMission.yamada.organDispensed === true
+    ) {
+      this.cargoDeliveryTimer = createDeliveryTimer(hydratedMission.yamada.deliveryTimerSeconds)
+      this.cargoState = createCargoState()
+      this.cargoCurrentZone = 'safe'
+      this.emitCargoState()
+    }
+
     /**
      * Act 1 climax staging must run *after* {@link MapMissionFacade.hydrateFromStorage}.
      * If `replayAct1JourneyTriggers` runs earlier, `maybeStageAct1Climax` writes the
@@ -2046,6 +2092,8 @@ export class MapViewController implements Tickable {
       this.onRadiationWarning?.(IDLE_RADIATION_STATE)
       this.shuttleAudio.tickRadiationTelemetry(false)
     }
+
+    this.tickCargoIfActive(dt)
 
     // Planet collision — instant death if shuttle flies into a planet mesh
     if (this.shuttleController && !this.shuttleController.dead && !this.isSimulationFrozen()) {
@@ -2842,6 +2890,79 @@ export class MapViewController implements Tickable {
 
   private emitJourneyTracker(): void {
     this.journeyFacade.emitTracker()
+  }
+
+  /**
+   * Pushes the current cargo delivery state snapshot to the Vue layer.
+   * Fires on init, on every cargo tick, and when cargo is cleared (null fields).
+   */
+  private emitCargoState(): void {
+    if (!this.onCargoState) return
+    const mission = this.missionFacade.board.activeAsteroidMission
+    this.onCargoState({
+      mission,
+      timer: this.cargoDeliveryTimer,
+      cargo: this.cargoState,
+      zone: this.cargoCurrentZone,
+    })
+  }
+
+  /**
+   * Ticks the active Bunker Extract cargo delivery — advances thermal integrity and
+   * the delivery countdown. Mirrors the health-tick pattern at {@link tick}.
+   * Triggers {@link failBunkerExtract} if the organ is ruined or time expires.
+   *
+   * @param dt - Delta time in seconds.
+   */
+  private tickCargoIfActive(dt: number): void {
+    if (!this.cargoDeliveryTimer || !this.cargoState || !this.shuttleController) return
+    if (this.cargoDeliveryTimer.expired || this.cargoState.integrity <= 0) return
+
+    const heatLevel = CURRENT_PLAYER_UPGRADE_LEVELS.shuttleHeatResistance ?? 1
+    const freezeLevel = CURRENT_PLAYER_UPGRADE_LEVELS.shuttleFreezeResistance ?? 1
+    const band = cargoThermalToleranceBand({ heatLevel, freezeLevel })
+
+    const x = this.shuttleController.position.x
+    const z = this.shuttleController.position.z
+    const sunDistance = Math.hypot(x, z)
+
+    this.cargoCurrentZone = classifyThermalZone(sunDistance, band)
+    const overshoot = computeOvershoot(sunDistance, band)
+    this.cargoState = tickCargo(this.cargoState, {
+      dt,
+      zone: this.cargoCurrentZone,
+      overshoot,
+    })
+    this.cargoDeliveryTimer = tickDeliveryTimer(this.cargoDeliveryTimer, dt)
+    this.emitCargoState()
+
+    if (this.cargoState.integrity <= 0) {
+      this.failBunkerExtract('integrity')
+      return
+    }
+    if (this.cargoDeliveryTimer.expired) {
+      this.failBunkerExtract('timer')
+    }
+  }
+
+  /**
+   * Called when a Bunker Extract cargo delivery fails — either the organ's
+   * thermal integrity hit zero or the delivery timer expired. Clears cargo
+   * state, voids the active mission, then reloads to land at the last planet.
+   * Matches the Phase 3.5 `failBunkerProtect` pattern.
+   *
+   * @param reason - Whether failure was due to thermal damage or timeout.
+   */
+  private failBunkerExtract(reason: 'integrity' | 'timer'): void {
+    // Silence the TS unused-parameter warning in strict mode — reason is kept
+    // for future telemetry / analytics instrumentation.
+    void reason
+    this.cargoState = null
+    this.cargoDeliveryTimer = null
+    this.cargoCurrentZone = null
+    this.emitCargoState()
+    clearActiveMission()
+    window.location.reload()
   }
 
   private canLeaveHabitatJourney(): boolean {
@@ -5681,6 +5802,10 @@ export class MapViewController implements Tickable {
     // Flush before dispose so the final HP write lands in the profile; dispose then removes
     // the pagehide listener and clears any pending throttled-persist timer.
     this.flushShuttleHullToProfile()
+    this.cargoDeliveryTimer = null
+    this.cargoState = null
+    this.cargoCurrentZone = null
+    this.onCargoState = undefined
     this.healthFacade.dispose()
     this.unsubscribeJourneyMessageArchive?.()
     this.unsubscribeJourneyMessageArchive = null
