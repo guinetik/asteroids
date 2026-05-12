@@ -28,8 +28,8 @@
     },
     {
       "id": "yamada_bunker_extract",
-      "name": "Bunker Extract — Cylinder Recovery",
-      "briefing": "Pilot — the cylinder has done its work and the pig is ready to come home. Collect it, mount it on the lander, bring it to the patient's receiving asteroid. There will be a clock. Do not race it; the cargo is fragile in ways racing does not respect. One of these deliveries goes to an old patient of ours — the orbit is strange, and you may find the place quieter than you expect. They will not be in a state to talk back. — Sumiko",
+      "name": "Bunker Extract — Organ Recovery",
+      "briefing": "Pilot — the patient-pig has done its work and the organ is ready for harvest. Clear the bunker, recover the organ case, and deliver it to the human recipient before the thermal window closes. There will be a clock, but this is not a race; speed only matters if the case stays cold and steady. One of these deliveries goes to an old patient of ours — the orbit is strange, and you may find the place quieter than you expect. They will not be in a state to talk back. — Sumiko",
       "archetype": "bunker-extract",
       "objectiveSlots": [
         {
