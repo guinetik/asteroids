@@ -33,6 +33,7 @@ import {
 } from '@/lib/bunker/bunkerWaveSchedule'
 import type { BunkerWalkableBounds } from '@/three/bunker/BunkerWallBuilder'
 import type { ProjectileSystem } from '@/lib/fps/projectileSystem'
+import { SuspensionCylinderModel } from '@/three/SuspensionCylinderModel'
 
 /**
  * XZ-distance from the surface hatch within which the descent prompt fires.
@@ -46,6 +47,14 @@ const SURFACE_HATCH_INTERACT_RANGE = 18
 const ARENA_DOOR_INTERACT_RANGE = 2.5
 /** XZ distance threshold (world units) for the antechamber exit hatch. */
 const EXIT_HATCH_INTERACT_RANGE = 2.5
+
+/** Seconds the player must hold E near the cylinder to complete the organ dispense. */
+const ORGAN_DISPENSE_DURATION_SECONDS = 3.5
+/**
+ * Squared XZ radius within which the cylinder dispense prompt fires (world units).
+ * Uses the same value as the existing chest/terminal check (5 units → 25 squared).
+ */
+const ORGAN_DISPENSE_NEAR_RANGE_SQ = 25
 
 /** Test seam — internal options for {@link BunkerMinigame.createForTest}. */
 export interface BunkerMinigameTestOptions {
@@ -88,6 +97,8 @@ export interface BunkerMinigameCreateOptions {
    * Yamada mission archetype, if this bunker belongs to a Yamada mission.
    * When `'bunker-protect'`, the central terminal is replaced with a
    * suspension cylinder and the interact label reads `'[E] REBOOT SUSPENSION'`.
+   * When `'bunker-extract'`, waves are skipped and the cylinder interaction
+   * becomes a held-E organ dispense beat.
    * Omit for standard (non-Yamada) bunker missions.
    */
   missionArchetype?: string
@@ -111,6 +122,11 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
   private surfaceHatchPos: { x: number; z: number } | null = null
 
   private readonly missionArchetype: string | undefined
+
+  /** Accumulated hold time (seconds) for the bunker-extract organ dispense beat. */
+  private _dispenseElapsed = 0
+  /** Whether the organ dispense beat has completed this run. */
+  private _dispenseComplete = false
 
   private readonly _steps: MiniGameStep[] = [
     { label: 'Land in the bunker zone', complete: false, active: true },
@@ -162,6 +178,12 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
    * `exitBunker`).
    */
   onExit: (() => void) | null = null
+  /**
+   * Fired exactly once when the Yamada organ dispense beat completes (bunker-extract only).
+   * Task 5.2 wires the real handler here to grant the organ to inventory and
+   * mark `organDispensed = true` on the mission record.
+   */
+  onOrganDispensed: (() => void) | undefined
 
   /**
    * Build a minigame with a real scene controller. Used by `LevelMinigameFacade`.
@@ -360,7 +382,7 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
     this.scene?.enemyProjectileSystem.tick(dt)
     this.scene?.tick(dt)
 
-    this.updateInteractionPrompts(ctx)
+    this.updateInteractionPrompts(ctx, dt)
 
     if (
       this.state.current === 'arena-entry' &&
@@ -372,10 +394,32 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
       this.state.notifyArenaEntered()
     }
 
+    // Bunker-extract: no enemies spawn — immediately clear the wave once the
+    // arena is entered so the FSM advances to final-clear → exit-prompt and
+    // the loot door opens without combat.
+    if (
+      this.missionArchetype === 'bunker-extract' &&
+      this.state.current === 'wave-active' &&
+      this.spawnedWaveIndex !== this.state.currentWaveIndex
+    ) {
+      // Mark the wave as "processed" without spawning any enemies.
+      this.spawnedWaveIndex = this.state.currentWaveIndex
+      this.wavesCleared += 1
+      this.state.notifyWaveCleared()
+      // Re-read the FSM state after `notifyWaveCleared()` mutates it.
+      const after = this.state.current as BunkerSubState
+      if ((after === 'exit-prompt' || after === 'final-clear') && this.scene) {
+        this.scene.hatch.setOpen(false)
+        this.scene.lootDoor.setOpen(true)
+        this.advanceStep(2) // Clear the waves
+      }
+    }
+
     // Spawn the wave roster once on entry to a fresh wave-active state. The
     // spawnedWaveIndex tracker prevents respawning every tick while enemies
-    // are still alive.
+    // are still alive. Skipped for bunker-extract (handled above).
     if (
+      this.missionArchetype !== 'bunker-extract' &&
       this.state.current === 'wave-active' &&
       this.scene &&
       this.spawnedWaveIndex !== this.state.currentWaveIndex
@@ -388,8 +432,9 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
 
     // Wave is cleared when at least one enemy was spawned for it AND every
     // enemy is dead. The `spawnedWaveIndex` guard ensures we don't fire
-    // wave-cleared on the same frame as the spawn.
+    // wave-cleared on the same frame as the spawn. Skipped for bunker-extract.
     if (
+      this.missionArchetype !== 'bunker-extract' &&
       this.state.current === 'wave-active' &&
       this.scene &&
       this.spawnedWaveIndex === this.state.currentWaveIndex &&
@@ -457,8 +502,9 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
    * matching action callbacks on press. Run at the end of every tick.
    *
    * @param ctx - Per-frame minigame context (player position, key edges)
+   * @param dt - Frame delta time in seconds (used by the bunker-extract dispense accumulator)
    */
-  private updateInteractionPrompts(ctx: MiniGameContext): void {
+  private updateInteractionPrompts(ctx: MiniGameContext, dt: number): void {
     this._isPlayerNear = false
 
     // Surface hatch — only relevant before the player has descended.
@@ -530,8 +576,49 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
         }
       }
 
-      // Check terminal
-      if (!this._terminalInteracted) {
+      // Check terminal / cylinder
+      if (this.missionArchetype === 'bunker-extract') {
+        // Bunker-extract: held-E organ dispense beat instead of instant interact.
+        if (!this._dispenseComplete) {
+          const tx = this.scene.rootWorldPosition.x + this.scene.table.group.position.x
+          const tz = this.scene.rootWorldPosition.z + this.scene.table.group.position.z
+          const dx = px - tx
+          const dz = pz - tz
+          if (dx * dx + dz * dz <= ORGAN_DISPENSE_NEAR_RANGE_SQ) {
+            this._isPlayerNear = true
+            if (ctx.terminalInteractPressed) {
+              // Player is pressing E this frame — accumulate hold time.
+              this._dispenseElapsed = Math.min(
+                ORGAN_DISPENSE_DURATION_SECONDS,
+                this._dispenseElapsed + dt,
+              )
+              if (this._dispenseElapsed >= ORGAN_DISPENSE_DURATION_SECONDS) {
+                this._dispenseComplete = true
+                this._terminalInteracted = true
+                this.advanceStep(3) // Advance 'Extract data from terminal'
+                if (this.scene.table instanceof SuspensionCylinderModel) {
+                  this.scene.table.setIndicatorActive(true)
+                }
+                this.onOrganDispensed?.()
+              } else {
+                const pct = Math.round(
+                  (this._dispenseElapsed / ORGAN_DISPENSE_DURATION_SECONDS) * 100,
+                )
+                this.onPrompt?.(`[E] DRAWING ORGAN ${pct}%`)
+              }
+            } else {
+              // Player released E — reset accumulator but stay near.
+              this._dispenseElapsed = 0
+              this.onPrompt?.('[E] DRAW ORGAN')
+            }
+            return
+          } else {
+            // Player walked away — reset accumulator.
+            this._dispenseElapsed = 0
+          }
+        }
+      } else if (!this._terminalInteracted) {
+        // Standard terminal interaction (bunker-protect or normal bunker).
         const tx = this.scene.rootWorldPosition.x + this.scene.table.group.position.x
         const tz = this.scene.rootWorldPosition.z + this.scene.table.group.position.z
         const dx = px - tx

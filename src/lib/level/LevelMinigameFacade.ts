@@ -140,6 +140,12 @@ export interface LevelMinigameBindings {
   onLootChest: ((tier: string) => boolean) | null
   /** Register static objective prop colliders after minigames create their scene props. */
   onRegisterObjectiveColliders: ((colliders: readonly WorldCollider[]) => void) | null
+  /**
+   * Fired once when the Yamada organ dispense beat completes in a bunker-extract mission.
+   * Task 5.2 wires the real handler (inventory grant + mission flag). `null` or omitted
+   * for non-Yamada bunker runs.
+   */
+  onOrganDispensed?: (() => void) | null
 }
 
 /**
@@ -344,6 +350,8 @@ export class LevelMinigameFacade {
         minigame.onDestroyLander = () => bindings.onDestroyLander?.('bunker')
         minigame.onFail = bindings.onRescueFail // reuse rescue's fail pipeline
         minigame.onLootChest = bindings.onLootChest
+        // Task 5.2 will register the real handler; stub is a no-op for now.
+        minigame.onOrganDispensed = bindings.onOrganDispensed ?? undefined
         bindings.onInstallCombatDropObserver?.(minigame)
         this.add(minigame)
       } else if (objective.type === 'collect') {

@@ -11,6 +11,19 @@
  * @date 2026-04-27
  * @spec docs/superpowers/specs/2026-04-27-bunker-mission-design.md
  */
+
+/** Archetypes that use a suspension cylinder instead of the data terminal. */
+const YAMADA_CYLINDER_ARCHETYPES: ReadonlySet<string> = new Set(['bunker-protect', 'bunker-extract'])
+
+/**
+ * Whether the given archetype string uses a suspension cylinder.
+ *
+ * @param archetype - Mission archetype string, if any.
+ * @returns `true` when the archetype should display a {@link SuspensionCylinderModel}.
+ */
+function isYamadaCylinderArchetype(archetype: string | undefined): boolean {
+  return archetype !== undefined && YAMADA_CYLINDER_ARCHETYPES.has(archetype)
+}
 import * as THREE from 'three'
 import { EnemyDirector, type EnemyHandle } from '@/lib/fps/enemyDirector'
 import {
@@ -145,8 +158,8 @@ export interface BunkerSceneControllerOptions {
   enemyVariant?: import('@/lib/missions/types').BunkerEnemyVariant
   /**
    * Yamada mission archetype for this bunker, if any. When
-   * `'bunker-protect'`, the extract terminal is replaced with a
-   * {@link SuspensionCylinderModel}. Omit for standard bunker missions.
+   * `'bunker-protect'` or `'bunker-extract'`, the extract terminal is replaced
+   * with a {@link SuspensionCylinderModel}. Omit for standard bunker missions.
    */
   missionArchetype?: string
 }
@@ -222,11 +235,10 @@ export class BunkerSceneController {
     this.lootDoor.group.position.copy(this.geometry.lootRoom.doorAnchor.position)
     this.lootDoor.group.rotation.copy(this.geometry.lootRoom.doorAnchor.rotation)
 
-    // Conditionally swap the central interactable for Yamada bunker-protect missions
-    this.table =
-      opts.missionArchetype === 'bunker-protect'
-        ? new SuspensionCylinderModel()
-        : new BunkerTableModel()
+    // Use suspension cylinder for any Yamada archetype that involves the cylinder
+    this.table = isYamadaCylinderArchetype(opts.missionArchetype)
+      ? new SuspensionCylinderModel()
+      : new BunkerTableModel()
 
     // Position table at the far end of the loot room
     const doorZ = this.geometry.lootRoom.doorAnchor.position.z
