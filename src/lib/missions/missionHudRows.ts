@@ -30,6 +30,9 @@ export type MissionTrackerFocus =
   | { kind: 'planet'; planetId: string }
   | { kind: 'world'; worldX: number; worldZ: number }
 
+/** Color tone for a status row — drives CSS class selection in the Vue layer. */
+export type MissionTrackerStatusTone = 'ok' | 'warn' | 'danger'
+
 /** A single row inside a tracker group. */
 export interface MissionTrackerRow {
   /** Stable id used for v-for keying. */
@@ -40,6 +43,24 @@ export interface MissionTrackerRow {
   objectiveType?: string
   /** Optional progress line (e.g. mining `"180 / 350 kg of Olivine"`). */
   progress?: string
+  /** Optional countdown timer (seconds remaining). Rendered as `mm:ss`. */
+  timerSeconds?: number
+  /** Optional integrity / progress bar. */
+  bar?: {
+    /** Current value (0..max). */
+    value: number
+    /** Max value (typically 100 for integrity). */
+    max: number
+    /** Display label above or beside the bar. */
+    label: string
+  }
+  /** Optional categorical status indicator (e.g. SAFE / HOT / COLD). */
+  status?: {
+    /** Short label shown in the indicator. */
+    label: string
+    /** Tone driving the color of the indicator. */
+    tone: MissionTrackerStatusTone
+  }
   /** Where clicking the row should park the camera. */
   focus: MissionTrackerFocus
 }

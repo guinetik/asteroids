@@ -7,6 +7,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import { buildMissionTrackerGroups } from '@/lib/missions/missionHudRows'
+import type { MissionTrackerRow } from '@/lib/missions/missionHudRows'
 import type {
   ShuttleMissionBoard,
   ActiveShuttleMission,
@@ -282,5 +283,37 @@ describe('buildMissionTrackerGroups', () => {
     const board = emptyBoard()
     board.activeEvaMissions = [evaActive()]
     expect(buildMissionTrackerGroups(board).map((g) => g.key)).toEqual(['eva'])
+  })
+})
+
+describe('MissionTrackerRow optional bar/timer/status fields', () => {
+  it('supports a timerSeconds field for countdown rows', () => {
+    const row: MissionTrackerRow = {
+      id: 'lapse-timer',
+      title: 'Suspension',
+      timerSeconds: 360,
+      focus: { kind: 'world', worldX: 0, worldZ: 0 },
+    }
+    expect(row.timerSeconds).toBe(360)
+  })
+
+  it('supports a bar field for integrity rows', () => {
+    const row: MissionTrackerRow = {
+      id: 'integrity',
+      title: 'Cargo',
+      bar: { value: 80, max: 100, label: 'Integrity' },
+      focus: { kind: 'world', worldX: 0, worldZ: 0 },
+    }
+    expect(row.bar?.value).toBe(80)
+  })
+
+  it('supports a status field for thermal-zone rows', () => {
+    const row: MissionTrackerRow = {
+      id: 'thermal',
+      title: 'Thermal',
+      status: { label: 'SAFE', tone: 'ok' },
+      focus: { kind: 'world', worldX: 0, worldZ: 0 },
+    }
+    expect(row.status?.label).toBe('SAFE')
   })
 })
