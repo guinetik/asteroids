@@ -1636,6 +1636,11 @@ function handleDeliverMission(missionId: string) {
   uiAudio.notifyMissionComplete()
 }
 
+function handleDeliverAsteroidMission(missionId: string) {
+  viewController.deliverAsteroidMission(missionId)
+  uiAudio.notifyMissionComplete()
+}
+
 function dockedPlanetId(): string | null {
   if (orbitState.state !== 'orbiting' || !orbitState.nearestBodyName) return null
   const planet = PLANETS.find((p) => p.name === orbitState.nearestBodyName)
@@ -2082,6 +2087,7 @@ watch(
       @purchase-upgrade="handlePurchaseUpgrade"
       @accept-mission="handleAcceptMission"
       @deliver-mission="handleDeliverMission"
+      @deliver-asteroid-mission="handleDeliverAsteroidMission"
       @accept-asteroid-mission="handleAcceptAsteroidMission"
       @accept-eva-mission="handleAcceptEvaMission"
       @accept-mining-mission="handleAcceptMiningMission"

@@ -132,7 +132,7 @@ import {
 } from '@/lib/journeys'
 import { MapJourneyFacade } from '@/lib/map/journeys/MapJourneyFacade'
 import { orbitBodyKeyFromCaptureName } from '@/lib/player/orbitBodyKey'
-import { addItem, getStack, consumeItem } from '@/lib/inventory/inventory'
+import { addItem, getStack, consumeItem, removeItem } from '@/lib/inventory/inventory'
 import {
   applyCargoBayLimits as applyCargoBayLimitsHelper,
   createInventoryForCargoBay,
@@ -166,6 +166,7 @@ import {
   saveMissionBoard,
 } from '@/lib/missions/missionStorage'
 import { offerTurretMiningMission } from '@/lib/missions/turretMiningSession'
+import { persistCompletedAsteroidMissionRewards } from '@/lib/missions/asteroidMissionRewards'
 import '@/lib/missions/missionMaterials'
 import { MapIntroFacade } from '@/lib/map/intro/MapIntroFacade'
 import { MapLifeCycleFacade } from '@/lib/map/lifecycle/MapLifeCycleFacade'
@@ -3785,6 +3786,58 @@ export class MapViewController implements Tickable {
       this.persistPlayerProfile()
       this.onCreditsUpdate?.(this.playerProfile.credits)
     }
+  }
+
+  /**
+   * Deliver an active Bunker Extract mission at its pinned destination planet.
+   *
+   * Mirrors the shuttle delivery flow but routes payout through the asteroid
+   * reward path. Removes the organ from inventory, runs the asteroid payout
+   * (persists profile/inventory, clears active mission, clears the board's
+   * `activeAsteroidMission`, and notifies the contract system), then resyncs
+   * local state and clears cargo HUD tick state.
+   *
+   * Idempotent at the storage layer — bails early if preconditions fail.
+   *
+   * @author guinetik
+   * @date 2026-05-11
+   * @spec docs/asteroid-lander-gdd.md
+   * @param missionId - Active mission id (must match `activeAsteroidMission.id`).
+   */
+  deliverAsteroidMission(missionId: string): void {
+    const mission = this.missionFacade.board.activeAsteroidMission
+    if (!mission || mission.id !== missionId) return
+    const yamada = mission.yamada
+    if (yamada?.archetype !== 'bunker-extract') return
+    if (yamada.organDispensed !== true) return
+
+    // 1) Remove organ from inventory (best-effort; payout proceeds even if not found).
+    const removed = removeItem(this.playerInventory, yamada.organItemId, 1)
+    if (removed.ok) {
+      this.playerInventory = removed.inventory
+      saveInventory(this.playerInventory)
+    } else {
+      console.warn('[yamada] deliverAsteroidMission: organ not found in inventory:', removed.reason)
+    }
+
+    // 2) Run the asteroid payout — persists profile, inventory, clears active mission,
+    //    sets board.activeAsteroidMission = null, notifies contract system.
+    hydratePlayerUpgradeLevelsFromStorage()
+    const scienceMult =
+      getCurrentUpgradeValue('shuttleScienceStation') * getCurrentUpgradeValue('multitoolScience')
+    persistCompletedAsteroidMissionRewards(mission, scienceMult)
+
+    // 3) Refresh local profile snapshot from storage.
+    this.refreshPlayerProfileFromStorage()
+
+    // 4) Clear cargo tick state so the HUD no longer renders.
+    this.cargoState = null
+    this.cargoDeliveryTimer = null
+    this.cargoCurrentZone = null
+    this.emitCargoState()
+
+    // 5) Re-hydrate mission facade so the Vue layer sees activeAsteroidMission: null.
+    this.missionFacade.hydrateFromStorage(this.onMissionBoardUpdate)
   }
 
   /** Open the mission overlay (called by Vue OrbitPrompt click). */

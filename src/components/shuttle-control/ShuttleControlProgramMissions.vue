@@ -123,6 +123,7 @@ const emit = defineEmits<{
   acceptEvaMission: []
   acceptMiningMission: []
   deliverMiningMission: [missionId: string]
+  deliverAsteroidMission: [missionId: string]
 }>()
 
 /**
@@ -205,6 +206,21 @@ function statusLabel(mission: ActiveShuttleMission): string {
 function canDeliver(mission: ActiveShuttleMission): boolean {
   return mission.status === 'ready-to-deliver' && props.dockedPlanet === mission.giverPlanet
 }
+
+/**
+ * Whether the active Bunker Extract asteroid mission is eligible for delivery at the current planet.
+ *
+ * Returns `true` only when the organ has been dispensed, the player is docked at
+ * the pinned destination planet, and the board holds an active bunker-extract mission.
+ */
+const canDeliverAsteroidMission = computed(() => {
+  const mission = props.board?.activeAsteroidMission
+  if (!mission) return false
+  const yamada = mission.yamada
+  if (yamada?.archetype !== 'bunker-extract') return false
+  if (yamada.organDispensed !== true) return false
+  return props.dockedPlanet === yamada.destinationPlanetId
+})
 
 function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60)
@@ -618,6 +634,14 @@ function evaTypeLabel(poiType: EvaMissionPoiType): string {
             {{ objectiveSummary(board.activeAsteroidMission) }}
             &middot; {{ buffedAsteroidRewardCr(board.activeAsteroidMission.totalReward) }} CR
           </div>
+          <button
+            v-if="canDeliverAsteroidMission"
+            type="button"
+            class="mission-board-active__deliver-btn"
+            @click="emit('deliverAsteroidMission', board!.activeAsteroidMission!.id)"
+          >
+            Deliver
+          </button>
         </div>
       </div>
     </ShuttleProgramCover>

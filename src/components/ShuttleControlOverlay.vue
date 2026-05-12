@@ -77,6 +77,7 @@ const emit = defineEmits<{
   acceptEvaMission: []
   acceptMiningMission: []
   deliverMiningMission: [missionId: string]
+  deliverAsteroidMission: [missionId: string]
   useItem: [itemId: string]
   mailChanged: []
 }>()
@@ -347,6 +348,7 @@ onBeforeUnmount(releaseControlPanelHeight)
               @deliver-mining-mission="
                 (missionId: string) => $emit('deliverMiningMission', missionId)
               "
+              @deliver-asteroid-mission="(id: string) => $emit('deliverAsteroidMission', id)"
               @use-item="(itemId: string) => $emit('useItem', itemId)"
               @mail-changed="onMailProgramChanged"
               @purchase-upgrade="emitPurchaseUpgrade"
@@ -372,6 +374,7 @@ onBeforeUnmount(releaseControlPanelHeight)
               @deliver-mining-mission="
                 (missionId: string) => $emit('deliverMiningMission', missionId)
               "
+              @deliver-asteroid-mission="(id: string) => $emit('deliverAsteroidMission', id)"
               @use-item="(itemId: string) => $emit('useItem', itemId)"
               @mail-changed="onMailProgramChanged"
               @purchase-upgrade="emitPurchaseUpgrade"
