@@ -2602,7 +2602,12 @@ export class LevelViewController implements Tickable {
     this.clearLanderHullPersistTimer()
     this.flushLanderHullToProfile()
 
+    const isBunkerExtractDelivery =
+      this.mission?.yamada?.archetype === 'bunker-extract' &&
+      this.mission.yamada.organDispensed === true
+
     if (
+      !isBunkerExtractDelivery &&
       this.persistShuttleMissionRewards &&
       this.mission &&
       (this.minigames.areAllComplete() || this.prospectusObjectiveComplete)
