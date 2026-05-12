@@ -127,6 +127,19 @@ export class Heightmap {
     return this.heightAt(x, z)
   }
 
+  /**
+   * Adapter for the {@link FpsGroundSource} interface. Returns the bilinear
+   * height at world coordinates so the FPS controller can sample ground Y
+   * uniformly whether it's standing on terrain or a station-interior floor.
+   *
+   * @param x - World X coordinate.
+   * @param z - World Z coordinate.
+   * @returns Bilinear-interpolated terrain height.
+   */
+  groundedYAt(x: number, z: number): number {
+    return this.heightAt(x, z)
+  }
+
   /** Bilinear-interpolated height at world coordinates. */
   heightAt(x: number, z: number): number {
     const half = this.worldSize / 2

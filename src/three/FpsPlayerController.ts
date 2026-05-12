@@ -17,12 +17,65 @@ import type { FpsCamera } from './FpsCamera'
 import { PlatformerBody } from '@/lib/physics/platformerBody'
 import { ThrusterSystem } from '@/lib/physics/thrusterSystem'
 import type { ThrusterSystemConfig } from '@/lib/physics/thrusterSystem'
-import type { Heightmap } from '@/lib/terrain/heightmap'
+import { Heightmap } from '@/lib/terrain/heightmap'
 import {
   CollisionWorld,
   type CharacterCollisionConfig,
   type SupportSurfaceResult,
 } from '@/lib/physics/worldCollision'
+
+/**
+ * Pluggable ground/wall source the FPS player controller queries each tick.
+ *
+ * The asteroid scenes (`/fps`, `/level`) pass a {@link Heightmap}, which only
+ * implements {@link groundedYAt} — wall collision goes through the existing
+ * {@link CollisionWorld}. The station-interior scene (`/station`) passes a
+ * `StationCollider`, which also implements {@link resolveLateralMove}, so the
+ * controller routes XZ motion through axis-aligned wall AABBs instead of the
+ * asteroid `CollisionWorld`.
+ *
+ * @author guinetik
+ * @date 2026-05-12
+ * @spec docs/superpowers/specs/2026-05-12-yamada-station-interior-design.md
+ */
+export interface FpsGroundSource {
+  /**
+   * Floor / terrain Y at the given world (x, z). Required.
+   *
+   * @param x - World X coordinate.
+   * @param z - World Z coordinate.
+   * @returns Ground surface Y.
+   */
+  groundedYAt(x: number, z: number): number
+  /**
+   * Optional wall-collision resolver. When present, the controller clamps
+   * each tick's desired lateral move through this method instead of going
+   * through the asteroid `CollisionWorld`. Implementations must slide along
+   * walls per-axis so the player capsule never enters a wall AABB.
+   *
+   * @param fromX - Current X.
+   * @param fromZ - Current Z.
+   * @param toX - Desired X.
+   * @param toZ - Desired Z.
+   * @param radius - Player capsule radius in world units.
+   * @returns Clamped destination `{ x, z }`.
+   */
+  resolveLateralMove?(
+    fromX: number,
+    fromZ: number,
+    toX: number,
+    toZ: number,
+    radius: number,
+  ): { x: number; z: number }
+}
+
+/**
+ * Capsule radius used when routing lateral motion through
+ * {@link FpsGroundSource.resolveLateralMove}. Sized to match the human-scale
+ * footprint of the station-interior corridors so the player slides cleanly
+ * past wall corners without snagging.
+ */
+const PLAYER_RADIUS = 0.4
 
 /** How long after leaving the ground the player can still jump (coyote time). */
 const COYOTE_TIME = 0.15
@@ -199,6 +252,14 @@ export class FpsPlayerController implements Tickable {
   private readonly camera: FpsCamera
   private readonly config: FpsPlayerConfig
   private readonly collisionWorld: CollisionWorld
+  /**
+   * Pluggable ground / wall source. Heightmap-backed scenes only use
+   * {@link FpsGroundSource.groundedYAt} (lateral collision goes through
+   * {@link collisionWorld}); station-interior scenes also implement
+   * {@link FpsGroundSource.resolveLateralMove}, which the tick body picks up
+   * automatically to drive wall sliding.
+   */
+  private readonly _ground: FpsGroundSource
   private readonly lateralVelocity = new THREE.Vector3()
   private _hp: number
   private _dead = false
@@ -267,13 +328,21 @@ export class FpsPlayerController implements Tickable {
     inputManager: InputManager,
     camera: FpsCamera,
     config: FpsPlayerConfig,
-    heightmap: Heightmap,
+    ground: FpsGroundSource,
     collisionWorld?: CollisionWorld,
   ) {
     this.inputManager = inputManager
     this.camera = camera
     this.config = config
-    this.collisionWorld = collisionWorld ?? new CollisionWorld(heightmap)
+    this._ground = ground
+    // Heightmap-backed scenes keep using the existing `CollisionWorld` for
+    // wall + analytic collider support. Station-interior scenes pass a
+    // `StationCollider` (no heightmap), in which case we still allocate an
+    // empty `CollisionWorld` so existing references stay non-null, but the
+    // tick body switches to the `resolveLateralMove` / `groundedYAt` path
+    // and never queries this world.
+    const heightmapSource = ground instanceof Heightmap ? ground : null
+    this.collisionWorld = collisionWorld ?? new CollisionWorld(heightmapSource)
 
     this._hp = config.health.maxHp
     this.body = new PlatformerBody({ gravity: config.movement.gravity })
@@ -661,18 +730,40 @@ export class FpsPlayerController implements Tickable {
     }
 
     // --- Apply lateral velocity ---
-    const horizontalMove = this.collisionWorld.moveCharacterXZ(
-      this.group.position,
-      this.lateralVelocity.x * dt,
-      this.lateralVelocity.z * dt,
-      this.group.position.y,
-      this.group.position.y + this.config.camera.eyeHeight,
-      PLAYER_COLLISION_CONFIG,
-    )
-    this.group.position.x = horizontalMove.x
-    this.group.position.z = horizontalMove.z
+    // When the ground source supplies its own wall resolver (station interior),
+    // skip the asteroid CollisionWorld and clamp the desired move directly
+    // against axis-aligned wall AABBs. The heightmap path keeps the existing
+    // character sweep through `collisionWorld`.
+    if (this._ground.resolveLateralMove) {
+      const desiredX = this.group.position.x + this.lateralVelocity.x * dt
+      const desiredZ = this.group.position.z + this.lateralVelocity.z * dt
+      const resolved = this._ground.resolveLateralMove(
+        this.group.position.x,
+        this.group.position.z,
+        desiredX,
+        desiredZ,
+        PLAYER_RADIUS,
+      )
+      this.group.position.x = resolved.x
+      this.group.position.z = resolved.z
+    } else {
+      const horizontalMove = this.collisionWorld.moveCharacterXZ(
+        this.group.position,
+        this.lateralVelocity.x * dt,
+        this.lateralVelocity.z * dt,
+        this.group.position.y,
+        this.group.position.y + this.config.camera.eyeHeight,
+        PLAYER_COLLISION_CONFIG,
+      )
+      this.group.position.x = horizontalMove.x
+      this.group.position.z = horizontalMove.z
+    }
 
     // --- Gravity + grounding ---
+    // Station-interior scenes (resolver present) sample the floor directly
+    // from the ground source. Heightmap-backed scenes keep the existing
+    // analytic-collider support query so props (lander, beacons, etc.) still
+    // act as stand-on surfaces.
     const support: SupportSurfaceResult =
       this.groundYOverride !== null
         ? {
@@ -680,13 +771,19 @@ export class FpsPlayerController implements Tickable {
             normal: { x: 0, y: 1, z: 0 },
             colliderId: null,
           }
-        : this.collisionWorld.getHighestSupportUnderDisc(
-            this.group.position.x,
-            this.group.position.z,
-            this.group.position.y - PLAYER_COLLISION_CONFIG.airborneClearance,
-            this.group.position.y + PLAYER_COLLISION_CONFIG.maxStepHeight,
-            PLAYER_COLLISION_CONFIG.radius,
-          )
+        : this._ground.resolveLateralMove
+          ? {
+              height: this._ground.groundedYAt(this.group.position.x, this.group.position.z),
+              normal: { x: 0, y: 1, z: 0 },
+              colliderId: null,
+            }
+          : this.collisionWorld.getHighestSupportUnderDisc(
+              this.group.position.x,
+              this.group.position.z,
+              this.group.position.y - PLAYER_COLLISION_CONFIG.airborneClearance,
+              this.group.position.y + PLAYER_COLLISION_CONFIG.maxStepHeight,
+              PLAYER_COLLISION_CONFIG.radius,
+            )
     const wantsMovementBoots = wishLen > 0 && this.knockbackTimer <= 0
     const shouldBreakBoots =
       canJump ||
