@@ -336,6 +336,7 @@ export class LevelMinigameFacade {
           projectileSystem,
           difficulty: mission.difficulty,
           lightPool: enemyLightPool ?? null,
+          missionArchetype: mission.yamada?.archetype,
         })
         this.applySharedBindings(minigame, bindings)
         minigame.onDamagePlayer = bindings.onDamagePlayer

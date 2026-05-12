@@ -36,6 +36,7 @@ import { EnemyProjectileMeshPool } from '@/three/EnemyProjectileMeshPool'
 import type { EnemyVisualTier } from '@/three/enemyVisualPalette'
 import { BunkerTableModel } from './BunkerTableModel'
 import { BunkerChestModel } from './BunkerChestModel'
+import { SuspensionCylinderModel } from '@/three/SuspensionCylinderModel'
 
 /** Distance for the per-corner arena lights (world units). */
 const CORNER_LIGHT_DISTANCE = 14
@@ -142,6 +143,12 @@ export interface BunkerSceneControllerOptions {
    * astronaut rider. Combat stats are unchanged. Defaults to `'standard'`.
    */
   enemyVariant?: import('@/lib/missions/types').BunkerEnemyVariant
+  /**
+   * Yamada mission archetype for this bunker, if any. When
+   * `'bunker-protect'`, the extract terminal is replaced with a
+   * {@link SuspensionCylinderModel}. Omit for standard bunker missions.
+   */
+  missionArchetype?: string
 }
 
 /** Interior scene wrapper — the level view treats this as a black box. */
@@ -158,8 +165,8 @@ export class BunkerSceneController {
   readonly enemyDoors: readonly BunkerDoorController[]
   /** Door to the loot room, opens after waves clear. */
   readonly lootDoor: BunkerDoorController
-  /** Extract terminal inside the loot room. */
-  readonly table = new BunkerTableModel()
+  /** Extract terminal or suspension cylinder inside the loot room. */
+  readonly table: BunkerTableModel | SuspensionCylinderModel
   /** Chests inside the loot room. */
   readonly chests: [BunkerChestModel, BunkerChestModel] = [
     new BunkerChestModel(),
@@ -214,6 +221,12 @@ export class BunkerSceneController {
     this.lootDoor = new BunkerDoorController(opts.tint)
     this.lootDoor.group.position.copy(this.geometry.lootRoom.doorAnchor.position)
     this.lootDoor.group.rotation.copy(this.geometry.lootRoom.doorAnchor.rotation)
+
+    // Conditionally swap the central interactable for Yamada bunker-protect missions
+    this.table =
+      opts.missionArchetype === 'bunker-protect'
+        ? new SuspensionCylinderModel()
+        : new BunkerTableModel()
 
     // Position table at the far end of the loot room
     const doorZ = this.geometry.lootRoom.doorAnchor.position.z

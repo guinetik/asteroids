@@ -84,6 +84,13 @@ export interface BunkerMinigameCreateOptions {
    * recompile stall that otherwise hits on every wave spawn.
    */
   lightPool?: import('@/three/EnemyLightPool').EnemyLightPool | null
+  /**
+   * Yamada mission archetype, if this bunker belongs to a Yamada mission.
+   * When `'bunker-protect'`, the central terminal is replaced with a
+   * suspension cylinder and the interact label reads `'[E] REBOOT SUSPENSION'`.
+   * Omit for standard (non-Yamada) bunker missions.
+   */
+  missionArchetype?: string
 }
 
 /** Bunker minigame implementation. */
@@ -102,6 +109,8 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
   private _terminalInteracted = false
   private surfaceHatch: BunkerHatchModel | null = null
   private surfaceHatchPos: { x: number; z: number } | null = null
+
+  private readonly missionArchetype: string | undefined
 
   private readonly _steps: MiniGameStep[] = [
     { label: 'Land in the bunker zone', complete: false, active: true },
@@ -172,6 +181,7 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
       interiorMaterials,
       lightPool: params.lightPool ?? null,
       enemyVariant: params.objective.enemyVariant,
+      missionArchetype: params.missionArchetype,
     })
     return new BunkerMinigame(
       params.objectiveIndex,
@@ -179,6 +189,7 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
       params.missionId,
       scene,
       params.difficulty,
+      params.missionArchetype,
     )
   }
 
@@ -203,11 +214,13 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
     missionId: string,
     scene: BunkerSceneController | null,
     difficulty: number,
+    missionArchetype?: string,
   ) {
     this.objectiveIndex = objectiveIndex
     this.objective = objective
     this.missionId = missionId
     this.scene = scene
+    this.missionArchetype = missionArchetype
     this.tier = difficultyToTier(difficulty)
     this.totalWaves = totalWavesForTier(this.tier)
     this.state = new BunkerSceneState({ totalWaves: this.totalWaves })
@@ -525,7 +538,11 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
         const dz = pz - tz
         if (dx * dx + dz * dz <= 5 * 5) {
           this._isPlayerNear = true
-          this.onPrompt?.('[E] EXTRACT DATA')
+          const promptLabel =
+            this.missionArchetype === 'bunker-protect'
+              ? '[E] REBOOT SUSPENSION'
+              : '[E] EXTRACT DATA'
+          this.onPrompt?.(promptLabel)
           if (ctx.terminalInteractPressed) {
             this._terminalInteracted = true
             this.advanceStep(3) // Advance 'Extract data from terminal'
