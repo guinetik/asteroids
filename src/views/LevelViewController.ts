@@ -159,6 +159,12 @@ import {
   computeRelativeDamageAngle,
   stepDamageFlash,
 } from '@/lib/fps/fpsPresentation'
+import {
+  createSuspensionLapseTimer,
+  tickSuspensionLapseTimer,
+  type SuspensionLapseTimerState,
+} from '@/lib/level/suspensionLapseTimer'
+import { clearActiveMission } from '@/lib/missions/missionStorage'
 
 const LEVEL_TERRAIN_CONFIG = LEVEL_VIEW_CONTROLLER_CONFIG.terrain
 const LEVEL_OBJECTIVE_CONFIG = LEVEL_VIEW_CONTROLLER_CONFIG.objectivePlacement
@@ -453,6 +459,12 @@ export class LevelViewController implements Tickable {
   private danPlacement: DanCraterPlacement | null = null
   private asteroidName = ''
   private missionAnnounced = false
+  /**
+   * Suspension-lapse timer for Bunker Protect missions. Non-null only when
+   * the active mission's archetype is `'bunker-protect'`. Counts down from
+   * arrival on the asteroid; expiry triggers a hard reload (mission cleared).
+   */
+  private suspensionLapseTimer: SuspensionLapseTimerState | null = null
 
   /** Runtime owner for objective minigame sessions in this level. */
   private readonly minigames = new LevelMinigameFacade()
@@ -480,6 +492,13 @@ export class LevelViewController implements Tickable {
 
   /** Called each frame during EVA with terminal prompt text (null to hide). */
   onTerminalPrompt: ((text: string | null) => void) | null = null
+
+  /**
+   * Notifies the Vue layer of the current suspension-lapse timer state, or
+   * `null` when there is no active timer. Called every frame the timer
+   * updates so the HUD can re-render.
+   */
+  public onSuspensionLapseTimer: ((state: SuspensionLapseTimerState | null) => void) | undefined
 
   /**
    * Fired when the player presses E while in range of the prospectus terminal.
@@ -877,6 +896,11 @@ export class LevelViewController implements Tickable {
     this.mission = mission
     this.missionObjectives = mission.objectives
     this.asteroidName = asteroid.name
+
+    if (mission.yamada?.archetype === 'bunker-protect') {
+      this.suspensionLapseTimer = createSuspensionLapseTimer(mission.yamada.suspensionLapseSeconds)
+      this.onSuspensionLapseTimer?.(this.suspensionLapseTimer)
+    }
 
     // ── DAN crater placement (mission-driven rotation override) ───
     // Resolved before `createAsteroidSurface` so the rotation chosen by the
@@ -2660,6 +2684,16 @@ export class LevelViewController implements Tickable {
     this.captureLevelInventoryBaseline()
   }
 
+  /**
+   * Hard-fail a Bunker Protect mission whose suspension cycle has lapsed.
+   * Clears the active mission from localStorage and reloads the window —
+   * the page reset is the fail UX (no overlay, no state-machine state).
+   */
+  private failBunkerProtect(): void {
+    clearActiveMission()
+    window.location.reload()
+  }
+
   private failLanderRun(
     cause: string,
     options: { explode?: boolean; hideLander?: boolean } = {},
@@ -2709,6 +2743,17 @@ export class LevelViewController implements Tickable {
   tick(dt: number): void {
     this.elapsed += dt
     this.updateMiningSizzle()
+
+    // Tick suspension-lapse countdown for Bunker Protect missions.
+    if (this.suspensionLapseTimer && !this.suspensionLapseTimer.expired) {
+      const next = tickSuspensionLapseTimer(this.suspensionLapseTimer, dt)
+      this.suspensionLapseTimer = next
+      this.onSuspensionLapseTimer?.(next)
+      if (next.expired && !this.minigames.areAllComplete()) {
+        this.failBunkerProtect()
+        return
+      }
+    }
 
     // Heal-pulse emissive decay — runs always so the green flash fades
     // even when the lander is not registered for ticking (EVA mode).
@@ -3979,5 +4024,7 @@ export class LevelViewController implements Tickable {
     this.sceneManager?.dispose()
     this.inputManager?.dispose()
     this.levelInventoryBaseline = null
+    this.suspensionLapseTimer = null
+    this.onSuspensionLapseTimer = undefined
   }
 }

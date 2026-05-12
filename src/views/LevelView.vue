@@ -63,6 +63,8 @@ import { OBJECTIVE_LABELS } from '@/lib/minigame/MiniGame'
 import RescueSurvivorPanel from '@/components/RescueSurvivorPanel.vue'
 import DanScanPanel from '@/components/DanScanPanel.vue'
 import BunkerWaveHud from '@/components/BunkerWaveHud.vue'
+import MissionTimerHud from '@/components/MissionTimerHud.vue'
+import type { SuspensionLapseTimerState } from '@/lib/level/suspensionLapseTimer'
 import { RescueMinigame } from '@/lib/minigame/RescueMinigame'
 import { DanMinigame } from '@/lib/minigame/DanMinigame'
 import { BunkerMinigame } from '@/lib/minigame/BunkerMinigame'
@@ -336,6 +338,8 @@ interface BunkerHudSnapshot {
 
 const bunkerHudProps = ref<BunkerHudSnapshot | null>(null)
 const inBunker = computed(() => stateInfo.state === 'bunker-interior')
+/** Suspension-lapse timer state for Bunker Protect missions; null when no timer is active. */
+const suspensionLapseTimer = ref<SuspensionLapseTimerState | null>(null)
 
 /** True when the bunker FSM is in a phase the wave HUD knows how to render. */
 function isBunkerHudPhase(phase: BunkerSubState): phase is BunkerWaveHudPhase {
@@ -736,6 +740,9 @@ onMounted(async () => {
     }
     viewController.onTerminalPrompt = (text) => {
       terminalPrompt.value = text
+    }
+    viewController.onSuspensionLapseTimer = (state) => {
+      suspensionLapseTimer.value = state
     }
     viewController.onProspectusOpen = () => {
       prospectusVisible.value = true
@@ -1170,6 +1177,11 @@ function handleToggleMusic(): void {
     :total-waves="bunkerHudProps.totalWaves"
     :hostiles="bunkerHudProps.hostiles"
     :phase="bunkerHudProps.phase"
+  />
+  <MissionTimerHud
+    v-if="suspensionLapseTimer"
+    title="SUSPENSION CYCLE"
+    :remaining-seconds="suspensionLapseTimer.remaining"
   />
   <LevelMinimap
     v-if="showMap && !inBunker"
