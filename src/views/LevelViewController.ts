@@ -103,7 +103,7 @@ import {
   createContractLootPolicy,
 } from '@/lib/fps/lootSystem'
 import { TRADE_GOODS } from '@/lib/shop/tradeGoods'
-import { addItem } from '@/lib/inventory/inventory'
+import { addItem, createInventory } from '@/lib/inventory/inventory'
 import {
   cloneInventory,
   inventoryQuantitiesGainedSince,
@@ -164,7 +164,7 @@ import {
   tickSuspensionLapseTimer,
   type SuspensionLapseTimerState,
 } from '@/lib/level/suspensionLapseTimer'
-import { clearActiveMission } from '@/lib/missions/missionStorage'
+import { clearActiveMission, saveActiveMission } from '@/lib/missions/missionStorage'
 
 const LEVEL_TERRAIN_CONFIG = LEVEL_VIEW_CONTROLLER_CONFIG.terrain
 const LEVEL_OBJECTIVE_CONFIG = LEVEL_VIEW_CONTROLLER_CONFIG.objectivePlacement
@@ -1517,6 +1517,7 @@ export class LevelViewController implements Tickable {
         onRegisterObjectiveColliders: (colliders: readonly WorldCollider[]) => {
           this.collision.registerObjectiveColliders(colliders)
         },
+        onOrganDispensed: () => this.handleOrganDispensed(),
       },
     })
 
@@ -3496,6 +3497,34 @@ export class LevelViewController implements Tickable {
     this.onResourcePickup(randomKey, quantity, tradeGood.label)
 
     return true
+  }
+
+  /**
+   * Handle the Bunker Extract organ dispense completion. Grants the organ to
+   * the unified inventory and stamps `organDispensed: true` on the active
+   * mission so the map view (Phase 6) and shuttle deliver button (Phase 7)
+   * can react to it. Idempotent on the inventory + persisted state, but the
+   * underlying minigame fires the callback exactly once.
+   */
+  private handleOrganDispensed(): void {
+    const mission = this.mission
+    if (!mission || mission.yamada?.archetype !== 'bunker-extract') return
+    if (mission.yamada.organDispensed) return
+
+    const inventory = loadInventory() ?? createInventory()
+    const result = addItem(inventory, mission.yamada.organItemId, 1)
+    if (result.ok) {
+      saveInventory(result.inventory)
+    } else {
+      console.warn('[yamada] Failed to grant organ to inventory:', result.reason)
+    }
+
+    const updated: GeneratedAsteroidMission = {
+      ...mission,
+      yamada: { ...mission.yamada, organDispensed: true },
+    }
+    this.mission = updated
+    saveActiveMission(updated)
   }
 
   /**

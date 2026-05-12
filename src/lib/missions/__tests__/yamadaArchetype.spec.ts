@@ -83,3 +83,30 @@ describe('pickSuspensionLapseSeconds', () => {
     expect(pickSuspensionLapseSeconds(9)).toBe(300)
   })
 })
+
+describe('YamadaBunkerExtractState.organDispensed', () => {
+  it('defaults to undefined on a freshly stamped state', () => {
+    const state = stampYamadaState({
+      archetype: 'bunker-extract',
+      difficulty: 5,
+      destinationPlanetId: 'uranus',
+      deliveryTimerSeconds: 240,
+    })
+    expect(state).toBeDefined()
+    expect(state?.archetype).toBe('bunker-extract')
+    // Cast after asserting discriminator — organDispensed is optional and absent by default.
+    const extract = state as YamadaBunkerExtractState
+    expect(extract.organDispensed).toBeUndefined()
+  })
+
+  it('preserves an explicitly-set organDispensed flag in a literal state value', () => {
+    const state = {
+      archetype: 'bunker-extract' as const,
+      destinationPlanetId: 'uranus',
+      deliveryTimerSeconds: 240,
+      organItemId: 'yamada-organ-case',
+      organDispensed: true,
+    }
+    expect(state.organDispensed).toBe(true)
+  })
+})

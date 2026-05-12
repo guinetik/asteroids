@@ -2,11 +2,17 @@ import { describe, it, expect } from 'vitest'
 import { ITEM_CATALOG, getItemDefinition, getItemsByCategory } from '../catalog'
 import type { ItemCategory } from '../types'
 
-const VALID_CATEGORIES = new Set<ItemCategory>(['mineral', 'consumable', 'equipment', 'trade-good'])
+const VALID_CATEGORIES = new Set<ItemCategory>([
+  'mineral',
+  'consumable',
+  'equipment',
+  'trade-good',
+  'mission-material',
+])
 
 describe('ITEM_CATALOG', () => {
-  it('contains 36 items', () => {
-    expect(Object.keys(ITEM_CATALOG)).toHaveLength(36)
+  it('contains 37 items', () => {
+    expect(Object.keys(ITEM_CATALOG)).toHaveLength(37)
   })
 
   it('all items have valid category', () => {

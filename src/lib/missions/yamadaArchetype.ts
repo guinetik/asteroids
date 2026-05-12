@@ -35,6 +35,13 @@ export interface YamadaBunkerExtractState {
   deliveryTimerSeconds: number
   /** Inventory item id granted by the cylinder dispense beat. */
   organItemId: string
+  /**
+   * Set true after the dispense beat completes. Persists across the map↔level
+   * boundary via `saveActiveMission`. Consumers branch on this to enable the
+   * Deliver button at the destination planet (Phase 7) and to drive the cargo
+   * HUD readouts during flight (Phase 6).
+   */
+  organDispensed?: boolean
 }
 
 /** Patient Rescue runtime state. */

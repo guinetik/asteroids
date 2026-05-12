@@ -358,5 +358,15 @@
     "weightPerUnit": 1,
     "maxStack": 1,
     "sellable": false
+  },
+  {
+    "id": "yamada-organ-case",
+    "category": "mission-material",
+    "label": "Yamada Organ Case",
+    "description": "Refrigerated medical case from a Yamada Farms patient-pig cylinder. Contains a freshly-harvested organ. Temperature-and-time sensitive.",
+    "icon": "yamada-organ-case.png",
+    "weightPerUnit": 2,
+    "maxStack": 1,
+    "sellable": false
   }
 ]
