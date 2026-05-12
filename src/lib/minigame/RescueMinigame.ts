@@ -20,6 +20,7 @@ import type {
   MiniGameStep,
 } from './MiniGame'
 import type { ConcreteObjective } from '@/lib/missions/types'
+import { clearActiveMission } from '@/lib/missions/missionStorage'
 import { Timer, type TimerHandle } from '@/lib/Timer'
 import type { Heightmap } from '@/lib/terrain/heightmap'
 import { FLAT_ZONE_RADIUS } from '@/lib/terrain/terrainGenerator'
@@ -158,6 +159,12 @@ const ENCOUNTER_SECONDS_PER_ENEMY = 3
 /** How long the "VIROID HIVE RESISTS" alert stays on screen (s). */
 const CHASE_ALERT_DURATION = 4.0
 
+/** Yamada VIP patient suit color — visually distinct from standard rescue operators. */
+const YAMADA_VIP_SUIT_COLOR = 0xf2c14b
+
+/** Sentinel value meaning "no VIP" — treat as non-Yamada patient-rescue run. */
+const NO_VIP_OPERATOR_INDEX = -1
+
 const explosionFlashMat = new THREE.MeshBasicMaterial({
   color: 0x66ffcc,
   transparent: true,
@@ -247,6 +254,11 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
   private encounterStarted = false
   private armed = false
   private releaseTimerHandle: TimerHandle | null = null
+  /**
+   * 0-based spawn index of the Yamada VIP operator. {@link NO_VIP_OPERATOR_INDEX}
+   * means this is not a patient-rescue run — the VIP death branch is a no-op.
+   */
+  private readonly vipOperatorIndex: number
   private countdownRemaining = COUNTDOWN_DURATION
   private explosionFlashTimer = 0
   private virusBaseY = 0
@@ -384,6 +396,7 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
     missionDifficulty: number,
     virus: VirusModel,
     enemyControllerPool: EnemyControllerPool,
+    vipOperatorIndex: number,
   ) {
     this.objectiveIndex = objectiveIndex
     this.objective = objective
@@ -392,6 +405,7 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
     this.projectileSystem = projectileSystem
     this.missionDifficulty = missionDifficulty
     this.enemyControllerPool = enemyControllerPool
+    this.vipOperatorIndex = vipOperatorIndex
     this.enemyVisualTier = enemyVisualTierForDifficulty(missionDifficulty)
     const playerDamageMultiplier = playerDamageMultiplierForTier(this.enemyVisualTier)
     this.enemyDirector.setPlayerDamageMultiplier(playerDamageMultiplier)
@@ -424,6 +438,7 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
     projectileSystem: ProjectileSystem,
     missionDifficulty: number,
     enemyControllerPool: EnemyControllerPool,
+    vipOperatorIndex = NO_VIP_OPERATOR_INDEX,
   ): Promise<RescueMinigame> {
     await HostageModel.preload()
     const virus = await VirusModel.create({ scale: VIRUS_SCALE })
@@ -436,6 +451,7 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
       missionDifficulty,
       virus,
       enemyControllerPool,
+      vipOperatorIndex,
     )
     await minigame.createContainedHostageVisuals()
     return minigame
@@ -832,6 +848,47 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
       })
     }
     await this.hostages.spawnAtPositions(positions)
+    this.applyVipSuitIfNeeded(colonistCount)
+  }
+
+  /**
+   * Apply the Yamada VIP yellow suit and wire the hard-fail death hook for the
+   * designated VIP operator. No-op when:
+   * - {@link vipOperatorIndex} is {@link NO_VIP_OPERATOR_INDEX} (non-Yamada run), or
+   * - the index is out of range for the actual colonist count (degenerate roll guard).
+   *
+   * Called once, immediately after `spawnAtPositions` completes, so the
+   * hostage entities are fully registered before we subscribe to `onDeath`.
+   *
+   * @param colonistCount - Total operators spawned this run.
+   */
+  private applyVipSuitIfNeeded(colonistCount: number): void {
+    if (this.vipOperatorIndex < 0 || this.vipOperatorIndex >= colonistCount) return
+    const vipHostage = this.hostages.getHostageByIndex(this.vipOperatorIndex)
+    if (!vipHostage) return
+    const vipInst = this.hostages.getInstanceFor(vipHostage)
+    if (!vipInst) return
+
+    vipInst.model.setSuitColor(YAMADA_VIP_SUIT_COLOR)
+
+    const prevOnDeath = vipHostage.onDeath
+    vipHostage.onDeath = () => {
+      prevOnDeath?.()
+      this.failPatientRescueOnVipDeath()
+    }
+  }
+
+  /**
+   * Hard-fail the Yamada patient-rescue mission when the VIP operator dies.
+   * Clears the active mission from localStorage and reloads the page — the
+   * same "immediate reload" pattern used by Phase 3.5 (bunker-protect lapse).
+   * No banner or fade: the reload IS the fail.
+   */
+  private failPatientRescueOnVipDeath(): void {
+    if (this._status !== 'active') return
+    this._status = 'failed'
+    clearActiveMission()
+    window.location.reload()
   }
 
   /**

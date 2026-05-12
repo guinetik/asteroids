@@ -147,6 +147,23 @@ export class HostageModel {
   private feedbackTimer = 0
 
   /**
+   * Override the base diffuse color on every skinned-mesh material. Used by
+   * the Yamada patient-rescue variant to tint the VIP operator's suit yellow
+   * so the player can identify them visually.
+   *
+   * Call once after {@link create} — the color persists for the lifetime of
+   * this instance. Feedback pulses (heal/damage emissive) are unaffected.
+   *
+   * @param hex - 24-bit RGB color (e.g. `0xf2c14b`)
+   */
+  setSuitColor(hex: number): void {
+    const c = new THREE.Color(hex)
+    for (const mat of this.feedbackMaterials) {
+      mat.color.copy(c)
+    }
+  }
+
+  /**
    * Energy cuffs parented to the wrist bones. Visible only while the hostage
    * is in the `'praying'` state (captive); hidden the moment the player
    * presses E (state → `'standing-up'`) — that snap-off is the visual payoff

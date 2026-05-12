@@ -524,6 +524,19 @@ export class FpsHostageController implements Tickable {
   }
 
   /**
+   * Return the {@link Hostage} domain entity at spawn index `index`, or
+   * `undefined` when the index is out of range. Hostages are appended to the
+   * internal list in spawn order, so index 0 is the first operator spawned,
+   * index 1 the second, etc. Used by the Yamada patient-rescue variant to
+   * identify the VIP operator by their pre-rolled `vipOperatorIndex`.
+   *
+   * @param index - 0-based spawn order index.
+   */
+  getHostageByIndex(index: number): Hostage | undefined {
+    return this.hostageRefs[index]
+  }
+
+  /**
    * World-space (X, Z) anchors for active (alive, not-aboard) hostages. Used by
    * the level HUD to mark survivors on the compass strip and tactical map so
    * the player can find them in rough terrain. Allocates a fresh array per

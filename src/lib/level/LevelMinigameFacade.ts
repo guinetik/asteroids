@@ -317,6 +317,10 @@ export class LevelMinigameFacade {
         bindings.onInstallCombatDropObserver?.(minigame)
         this.add(minigame)
       } else if (objective.type === 'rescue') {
+        const vipOperatorIndex =
+          mission.yamada?.archetype === 'patient-rescue'
+            ? mission.yamada.vipOperatorIndex
+            : undefined
         const minigame = await RescueMinigame.create(
           i,
           objective,
@@ -325,6 +329,7 @@ export class LevelMinigameFacade {
           projectileSystem,
           mission.difficulty,
           enemyControllerPool,
+          vipOperatorIndex,
         )
         this.applySharedBindings(minigame, bindings)
         minigame.onDamagePlayer = bindings.onDamagePlayer
