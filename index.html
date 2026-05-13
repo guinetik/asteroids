@@ -1700,10 +1700,11 @@
         ShuttleGame.REAR_THRUSTER_SPAWN_CHANCE = 0.9;
         ShuttleGame.REAR_THRUSTER_VY = 220;
 
-        // Route gateway. /level → outbound ShuttleGame (full asteroid finale).
-        // /map with a pending mission-return handoff in localStorage →
-        // return-flow ShuttleGame (no big asteroid, "RETURNING FROM MISSION"
-        // header). Everything else → LanderGame.
+        // Route gateway. /level and /station → outbound ShuttleGame (full
+        // asteroid finale / station approach). /map with a pending
+        // mission-return handoff in localStorage → return-flow ShuttleGame
+        // (no big asteroid, "RETURNING FROM MISSION" header). Everything
+        // else → LanderGame.
         // We check both pathname and hash so it works whether router is in
         // history or hash mode (Vue Router default is history, but hash
         // routes still match). The localStorage peek does NOT consume the
@@ -1711,7 +1712,12 @@
         function isLevelRoute() {
           const path = window.location.pathname || '';
           const hash = window.location.hash || '';
-          return path.includes('/level') || hash.includes('/level');
+          return (
+            path.includes('/level') ||
+            hash.includes('/level') ||
+            path.includes('/station') ||
+            hash.includes('/station')
+          );
         }
         function isReturningFromLevel() {
           try {

@@ -16,6 +16,19 @@ onMounted(async () => {
   const stationId = Array.isArray(raw) ? (raw[0] ?? '') : (raw ?? '')
   const resolved = stationId ? String(stationId) : DEFAULT_STATION_ID
   await controller.init(container.value, resolved, router)
+  // /station shares the shuttle-arrival prelude with /level. Once the
+  // scene is mounted, tell the prelude it can play its outbound finale;
+  // when the shuttle clears the top edge, the IIFE dispatches
+  // `prelude-play` and the overlay dismisses itself. On SPA nav the
+  // prelude has already stopped — synthesize the event so anything
+  // listening still fires.
+  if (typeof window !== 'undefined' && window.Prelude) {
+    if (window.Prelude.isActive?.()) {
+      window.Prelude.ready()
+    } else {
+      window.dispatchEvent(new Event('prelude-play'))
+    }
+  }
 })
 
 onBeforeUnmount(() => {
