@@ -88,6 +88,37 @@ const TICK_OFFSET_PRE_RENDER = 1
 /** Camera tick offset — just before the renderer. */
 const TICK_OFFSET_CAMERA = 2
 
+// ---------------------------------------------------------------------------
+// Starfield constants.
+// ---------------------------------------------------------------------------
+
+/**
+ * Star count used inside station interiors. The open-shuttle default (3000)
+ * spreads stars over the whole celestial sphere, but stations view space
+ * through small window apertures — a typical pane only covers ~1–2 % of the
+ * sky, so only a few dozen stars land inside it and the window reads as
+ * empty. Packing the sphere ~10× denser puts hundreds of stars in each
+ * aperture without any per-window placement logic.
+ */
+const STATION_STAR_COUNT = 9000
+
+/**
+ * Point size (in pixels) for station-interior stars. Bumped above the
+ * default so single stars remain readable on high-DPI displays when filtered
+ * by a small window cutout.
+ */
+const STATION_STAR_SIZE = 4
+
+/**
+ * Radius of the station's celestial sphere. Must sit inside the FPS camera's
+ * `far` clip (5000 in {@link FpsCamera}) — the default `StarFieldController`
+ * radius of 10000 puts every star past the far plane, producing inconsistent
+ * clipping artefacts. Stations are small (the player drifts at most ~20 m
+ * from the centre), so a 2 km sphere is still far enough that parallax is
+ * imperceptible while staying well clear of the far plane.
+ */
+const STATION_STAR_RADIUS = 2000
+
 /**
  * Vue lifecycle bridge for the `/station` route.
  */
@@ -159,8 +190,14 @@ export class StationViewController implements Tickable {
     this.sceneManager.addToScene(ambient)
     this.sceneManager.addToScene(dir)
 
-    // Starfield visible above the open ground.
-    this.starfield = new StarFieldController()
+    // Dense starfield — stations view the sky through small window cutouts,
+    // so we pack the sphere ~10× denser than the open-shuttle default. Radius
+    // is shrunk to stay well inside the FPS camera's far plane.
+    this.starfield = new StarFieldController({
+      count: STATION_STAR_COUNT,
+      size: STATION_STAR_SIZE,
+      radius: STATION_STAR_RADIUS,
+    })
     this.sceneManager.addToScene(this.starfield.points)
 
     const collider = new StationCollider(this.station.floors, this.station.passages)
