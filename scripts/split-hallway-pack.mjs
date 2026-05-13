@@ -56,9 +56,15 @@ function slug(name) {
 /**
  * Build the per-piece optimization transform chain.
  *
+ * @param {boolean} raw - When true, skip simplification, texture compression,
+ *   and meshopt compression so the resulting GLBs are openable in Blender for
+ *   manual editing. Resulting files are large but uncompressed.
  * @returns {import('@gltf-transform/core').Transform[]}
  */
-function pieceTransforms() {
+function pieceTransforms(raw) {
+  if (raw) {
+    return [center({ pivot: 'center' })]
+  }
   return [
     center({ pivot: 'center' }),
     dedup(),
@@ -86,7 +92,10 @@ function pieceTransforms() {
  * @returns {Promise<void>}
  */
 async function main() {
-  mkdirSync(OUTPUT_DIR, { recursive: true })
+  const raw = process.argv.includes('--raw')
+  const outDir = raw ? pathJoin(REPO_ROOT, 'tmp', 'pieces-raw') : OUTPUT_DIR
+  mkdirSync(outDir, { recursive: true })
+  if (raw) console.info('[raw] skipping meshopt/texture/simplify; writing to tmp/pieces-raw/')
 
   const io = new NodeIO()
     .registerExtensions(ALL_EXTENSIONS)
@@ -126,17 +135,17 @@ async function main() {
       continue
     }
 
-    for (const t of pieceTransforms()) {
+    for (const t of pieceTransforms(raw)) {
       await doc.transform(t)
     }
 
-    const outPath = pathJoin(OUTPUT_DIR, `${id}.glb`)
+    const outPath = pathJoin(outDir, `${id}.glb`)
     await io.write(outPath, doc)
     manifest.push({ id, name, file: `pieces/${id}.glb` })
     console.info(`  wrote ${id}.glb`)
   }
 
-  console.info(`\nDone — ${manifest.length} pieces written to ${OUTPUT_DIR}`)
+  console.info(`\nDone — ${manifest.length} pieces written to ${outDir}`)
 }
 
 main().catch((err) => {

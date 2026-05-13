@@ -104,7 +104,7 @@ export interface Vec2 {
 }
 
 /** Modular corridor piece kinds bundled in the asset pack. */
-export type CorridorKind = 'cross' | 'corner' | 'window'
+export type CorridorKind = 'cross' | 'corner' | 'window' | 'straight'
 
 /**
  * Half-extents of each corridor piece along its native (yaw=0) X and Z
@@ -113,26 +113,33 @@ export type CorridorKind = 'cross' | 'corner' | 'window'
  * - `cross` is square (5.30 × 5.30).
  * - `corner` is square (4.86 × 4.86).
  * - `window` is rectangular — X long (5.30), Z short (4.86).
+ * - `straight` is a narrow 2-way corridor — X short (2.20), Z long (4.46).
  */
 export const CORRIDOR_HALF_EXTENTS: Readonly<Record<CorridorKind, Vec2>> = {
   cross: { x: 2.65, z: 2.65 },
   corner: { x: 2.43, z: 2.43 },
   window: { x: 2.65, z: 2.43 },
+  straight: { x: 1.099, z: 2.231 },
 }
 
 /**
- * Sides where each piece kind has a native (yaw=0) port opening:
+ * Sides where each piece kind has a native (yaw=0) port opening. These
+ * match the orientation the GLBs ship with: when a piece is dropped at
+ * the origin with yaw=0, the listed sides are where the openings
+ * physically appear, *not* where math conveniences place them.
  *
- * - `cross` opens on all four sides.
- * - `corner` opens on `N` + `E` — a 90° elbow whose inside angle faces
- *   the +X +Z quadrant.
- * - `window` is a T whose long bar runs along X, opening on `W`, `E`,
- *   and `S` (the stem of the T sticks out on `S`).
+ * - `cross` opens on all four sides (just four columns, no walls).
+ * - `corner` opens on `S` + `W` — a 90° elbow whose inside angle faces
+ *   the −X −Z quadrant. The curved exterior window wall is on the `N`
+ *   face; the remaining solid wall is on `E`.
+ * - `window` is a T whose long bar runs along X, opening on `N`, `W`,
+ *   and `E`. The stem of the T closes off the `S` face.
  */
 export const CORRIDOR_NATIVE_PORTS: Readonly<Record<CorridorKind, ReadonlyArray<EntranceSide>>> = {
   cross: ['N', 'E', 'S', 'W'],
-  corner: ['N', 'E'],
-  window: ['W', 'E', 'S'],
+  corner: ['S', 'W'],
+  window: ['N', 'W', 'E'],
+  straight: ['N', 'S'],
 }
 
 /** Ordered cardinal cycle used for yaw rotation math. */
@@ -190,6 +197,16 @@ export function rotateVec2(v: Vec2, turns: YawTurns): Vec2 {
 /**
  * Anchor of a native (yaw=0) port relative to the piece centre. The port
  * sits at the piece's half-extent along the side's outward normal.
+ *
+ * Note: the corner GLB's actual corridor centreline is offset ~0.36 from
+ * the bbox centre (its elbow sits in the +X+Z quadrant), but we leave
+ * that lateral offset *out* of the math here on purpose: passing it in
+ * makes layout-math correct but forces adjacent corners to step
+ * visibly along the perpendicular axis (their bboxes shift by twice the
+ * offset). With the offset omitted, the bbox-aligned anchors keep the
+ * floor outlines continuous at the cost of a ~0.36-wide doorway misread
+ * at each corner port. Until the GLB is rebaked with the corridor at
+ * its origin, that's the lesser of two evils.
  *
  * @param kind - Corridor piece kind.
  * @param side - Native side the port opens on.

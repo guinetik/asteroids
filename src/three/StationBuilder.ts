@@ -33,6 +33,7 @@ const CORRIDOR_URL: Readonly<Record<CorridorKind, string>> = {
   cross: '/models/station/pieces/corridor.glb',
   corner: '/models/station/pieces/corridor_corner.glb',
   window: '/models/station/pieces/corridor_window.glb',
+  straight: '/models/station/pieces/corridor_straight.glb',
 }
 
 /** Per-piece ceiling/roof GLB urls. */
@@ -40,6 +41,10 @@ const ROOF_URL: Readonly<Record<CorridorKind, string>> = {
   cross: '/models/station/pieces/roof_corridor.glb',
   corner: '/models/station/pieces/roof_corridor_corner.glb',
   window: '/models/station/pieces/roof_corridor_window.glb',
+  // No dedicated roof for the straight piece yet — reuse the cross roof
+  // (it's wider than the straight corridor; player won't notice unless
+  // they look up at the seams). Replace when a matching asset ships.
+  straight: '/models/station/pieces/roof_corridor.glb',
 }
 
 /**
@@ -85,7 +90,11 @@ export interface BuiltStation {
 }
 
 /**
- * Place a corridor piece at its layout anchor + yaw.
+ * Place a corridor piece at its layout anchor + yaw. Trusts the GLB
+ * origin: whatever the asset author set as the model pivot is what the
+ * layout maths sees as the piece centre, so authoring tweaks (e.g.
+ * moving a corner's elbow off the bbox centre to fix port alignment)
+ * survive into the runtime.
  *
  * @param node - Corridor placement description.
  * @returns Group containing the corridor's floor + roof clones.

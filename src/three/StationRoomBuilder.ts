@@ -118,7 +118,7 @@ const DOOR_HINGE_OFFSET_X = -0.65
  * Positive values move the entrance further away from the room interior
  * along the side's outward normal.
  */
-const ENTRANCE_PUSH = 0.85
+const ENTRANCE_PUSH = 0
 /** Vertical raise applied to entrance slots, in addition to the storey wallY. */
 const ENTRANCE_RAISE = 0.2
 /**
@@ -249,16 +249,24 @@ export async function buildStationRoom(layout: StationRoomLayout): Promise<Stati
 
         // Porch floor — one extra floor tile just outside the door so
         // the player sees solid floor through the open hatch instead of
-        // an empty void. Only emitted on the ground storey.
-        if (storey === 0) {
+        // an empty void. Only emitted on the ground storey, and only
+        // when the entrance is a standalone terminator: when it targets
+        // a corridor/room, the connected piece already supplies its own
+        // floor and stacking a porch on top creates a visible double
+        // layer.
+        if (storey === 0 && !spec.target) {
           const porchOutX =
-            side === 'E' ? halfWidth + ENTRANCE_PORCH_OFFSET
-            : side === 'W' ? -halfWidth - ENTRANCE_PORCH_OFFSET
-            : x
+            side === 'E'
+              ? halfWidth + ENTRANCE_PORCH_OFFSET
+              : side === 'W'
+                ? -halfWidth - ENTRANCE_PORCH_OFFSET
+                : x
           const porchOutZ =
-            side === 'N' ? halfDepth + ENTRANCE_PORCH_OFFSET
-            : side === 'S' ? -halfDepth - ENTRANCE_PORCH_OFFSET
-            : z
+            side === 'N'
+              ? halfDepth + ENTRANCE_PORCH_OFFSET
+              : side === 'S'
+                ? -halfDepth - ENTRANCE_PORCH_OFFSET
+                : z
           const porch = tileSrc.clone(true)
           porch.position.set(porchOutX, -TILE_HALF_THICK + FLOOR_RAISE, porchOutZ)
           group.add(porch)

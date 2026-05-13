@@ -14,14 +14,16 @@ describe('Yamada station layout', () => {
     const ids = plan.map((p) => p.id).sort()
     expect(ids).toEqual([
       'c-e-corner',
+      'c-e-straight',
       'c-hub',
-      'c-n-window',
+      'c-n-straight',
       'c-w-corner',
+      'c-w-straight',
       'r-bridge',
       'r-east-bay',
       'r-west-bay',
     ])
     const kinds = new Set(plan.map((p) => p.kind))
-    expect(kinds).toEqual(new Set(['room', 'cross', 'corner', 'window']))
+    expect(kinds).toEqual(new Set(['room', 'cross', 'corner', 'straight']))
   })
 })

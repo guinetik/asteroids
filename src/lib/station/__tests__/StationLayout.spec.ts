@@ -59,8 +59,8 @@ describe('nativePortAnchor', () => {
   })
 
   it('throws when the side has no native port', () => {
-    // Corner piece's native ports are N + E; S is closed.
-    expect(() => nativePortAnchor('corner', 'S')).toThrow(/no native port/)
+    // Corner piece's native ports are S + W; N is closed (window wall).
+    expect(() => nativePortAnchor('corner', 'N')).toThrow(/no native port/)
   })
 })
 
@@ -70,21 +70,22 @@ describe('corridorWorldPorts', () => {
     expect(corridorWorldPorts(node).sort()).toEqual(['E', 'N', 'S', 'W'])
   })
 
-  it('rotates corner native ports (N, E) by 90° clockwise to (E, S)', () => {
+  it('rotates corner native ports (S, W) by 90° clockwise to (W, N)', () => {
     const node: CorridorNode = { id: 'c1', kind: 'corner', anchor: { x: 0, z: 0 }, yaw: 1 }
-    expect(corridorWorldPorts(node).sort()).toEqual(['E', 'S'])
+    expect(corridorWorldPorts(node).sort()).toEqual(['N', 'W'])
   })
 
-  it('rotates window native ports (W, E, S) by 180° to (E, W, N)', () => {
+  it('rotates window native ports (N, W, E) by 180° to (S, E, W)', () => {
     const node: CorridorNode = { id: 'c1', kind: 'window', anchor: { x: 0, z: 0 }, yaw: 2 }
-    expect(corridorWorldPorts(node).sort()).toEqual(['E', 'N', 'W'])
+    expect(corridorWorldPorts(node).sort()).toEqual(['E', 'S', 'W'])
   })
 })
 
 describe('corridorPortWorldAnchor', () => {
   it('returns null when the corridor has no port on the requested side', () => {
     const corner: CorridorNode = { id: 'c1', kind: 'corner', anchor: { x: 0, z: 0 } }
-    expect(corridorPortWorldAnchor(corner, 'S')).toBeNull()
+    // Corner's native ports are S + W; the N face is the window wall.
+    expect(corridorPortWorldAnchor(corner, 'N')).toBeNull()
   })
 
   it('places the cross N port at anchor + +Z half-extent', () => {
@@ -110,9 +111,9 @@ describe('corridorPortWorldAnchor', () => {
       x: CORRIDOR_HALF_EXTENTS.window.x,
       z: 0,
     })
-    expect(corridorPortWorldAnchor(node, 'S')?.anchor).toEqual({
+    expect(corridorPortWorldAnchor(node, 'N')?.anchor).toEqual({
       x: 0,
-      z: -CORRIDOR_HALF_EXTENTS.window.z,
+      z: CORRIDOR_HALF_EXTENTS.window.z,
     })
   })
 })
@@ -309,7 +310,7 @@ describe('validateLayout', () => {
           id: 'c1',
           kind: 'corner',
           anchor: { x: 0, z: 0 },
-          ports: { S: { kind: 'sealed' } }, // corner has N+E natively
+          ports: { N: { kind: 'sealed' } }, // corner has S+W natively; N is the window wall
         },
       ],
     }
@@ -475,7 +476,7 @@ describe('resolveLayout', () => {
           id: 'c1',
           kind: 'corner',
           anchor: { x: 0, z: 0 },
-          ports: { S: { kind: 'sealed' } }, // S is closed on a corner
+          ports: { N: { kind: 'sealed' } }, // N is the window wall on a corner
         },
       ],
     }

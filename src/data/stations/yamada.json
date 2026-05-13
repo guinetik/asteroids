@@ -4,15 +4,15 @@
   "rooms": [
     {
       "id": "r-west-bay",
-      "width": 1,
+      "width": 3,
       "depth": 2,
       "height": 2,
-      "anchor": { "x": -5.08, "z": 6.28 },
+      "anchor": { "x": -9.542, "z": 6.28 },
       "yaw": 0,
       "entrances": [
         {
           "side": "S",
-          "index": 0,
+          "index": 1,
           "storey": 0,
           "prompt": "F  Enter West Bay",
           "event": "enter:r-west-bay",
@@ -23,15 +23,15 @@
     },
     {
       "id": "r-east-bay",
-      "width": 1,
+      "width": 3,
       "depth": 2,
       "height": 2,
-      "anchor": { "x": 5.08, "z": 6.28 },
+      "anchor": { "x": 9.542, "z": 6.28 },
       "yaw": 0,
       "entrances": [
         {
           "side": "S",
-          "index": 0,
+          "index": 1,
           "storey": 0,
           "prompt": "F  Enter East Bay",
           "event": "enter:r-east-bay",
@@ -45,7 +45,7 @@
       "width": 1,
       "depth": 3,
       "height": 2,
-      "anchor": { "x": 0, "z": 13.725 },
+      "anchor": { "x": 0, "z": 12.887 },
       "yaw": 0,
       "entrances": [
         {
@@ -55,7 +55,7 @@
           "prompt": "F  Enter Bridge",
           "event": "enter:r-bridge",
           "openStyle": "full",
-          "target": { "kind": "corridor", "nodeId": "c-n-window", "worldSide": "N" }
+          "target": { "kind": "corridor", "nodeId": "c-n-straight", "worldSide": "N" }
         }
       ]
     }
@@ -68,40 +68,59 @@
       "yaw": 0,
       "ports": {
         "S": { "kind": "exit", "prompt": "F  Leave", "event": "station:exit" },
-        "W": { "kind": "corridor", "nodeId": "c-w-corner", "worldSide": "E" },
-        "E": { "kind": "corridor", "nodeId": "c-e-corner", "worldSide": "W" },
-        "N": { "kind": "corridor", "nodeId": "c-n-window", "worldSide": "S" }
+        "W": { "kind": "corridor", "nodeId": "c-w-straight", "worldSide": "E" },
+        "E": { "kind": "corridor", "nodeId": "c-e-straight", "worldSide": "W" },
+        "N": { "kind": "corridor", "nodeId": "c-n-straight", "worldSide": "S" }
+      }
+    },
+    {
+      "id": "c-w-straight",
+      "kind": "straight",
+      "anchor": { "x": -4.881, "z": 0 },
+      "yaw": 1,
+      "ports": {
+        "E": { "kind": "corridor", "nodeId": "c-hub", "worldSide": "W" },
+        "W": { "kind": "corridor", "nodeId": "c-w-corner", "worldSide": "E" }
       }
     },
     {
       "id": "c-w-corner",
       "kind": "corner",
-      "anchor": { "x": -5.08, "z": 0 },
-      "yaw": 0,
+      "anchor": { "x": -9.542, "z": 0 },
+      "yaw": 2,
       "ports": {
-        "E": { "kind": "corridor", "nodeId": "c-hub", "worldSide": "W" },
+        "E": { "kind": "corridor", "nodeId": "c-w-straight", "worldSide": "W" },
         "N": { "kind": "room", "roomId": "r-west-bay", "entranceIndex": 0 }
+      }
+    },
+    {
+      "id": "c-e-straight",
+      "kind": "straight",
+      "anchor": { "x": 4.881, "z": 0 },
+      "yaw": 1,
+      "ports": {
+        "W": { "kind": "corridor", "nodeId": "c-hub", "worldSide": "E" },
+        "E": { "kind": "corridor", "nodeId": "c-e-corner", "worldSide": "W" }
       }
     },
     {
       "id": "c-e-corner",
       "kind": "corner",
-      "anchor": { "x": 5.08, "z": 0 },
-      "yaw": 3,
+      "anchor": { "x": 9.542, "z": 0 },
+      "yaw": 1,
       "ports": {
-        "W": { "kind": "corridor", "nodeId": "c-hub", "worldSide": "E" },
+        "W": { "kind": "corridor", "nodeId": "c-e-straight", "worldSide": "E" },
         "N": { "kind": "room", "roomId": "r-east-bay", "entranceIndex": 0 }
       }
     },
     {
-      "id": "c-n-window",
-      "kind": "window",
-      "anchor": { "x": 0, "z": 5.30 },
-      "yaw": 1,
+      "id": "c-n-straight",
+      "kind": "straight",
+      "anchor": { "x": 0, "z": 4.881 },
+      "yaw": 0,
       "ports": {
         "S": { "kind": "corridor", "nodeId": "c-hub", "worldSide": "N" },
-        "N": { "kind": "room", "roomId": "r-bridge", "entranceIndex": 0 },
-        "W": { "kind": "sealed" }
+        "N": { "kind": "room", "roomId": "r-bridge", "entranceIndex": 0 }
       }
     }
   ]

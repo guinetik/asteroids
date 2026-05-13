@@ -42,8 +42,8 @@ import yamadaLayoutRaw from '@/data/stations/yamada.json'
 /** Floor surface Y, used by the player collider. Matches the visible
  * top of the raised floor tiles in the room builder. */
 const FLOOR_Y = 0.25
-/** Spawn yaw facing +Z. */
-const SPAWN_YAW = 0
+/** Spawn yaw facing the exit hatch at the south end of the hub corridor. */
+const SPAWN_YAW = Math.PI
 /** Maximum distance for an entrance to show its interact prompt. */
 const ENTRANCE_INTERACT_DISTANCE = 2.5
 /** Padding (world units) around the bounding box of every piece used
