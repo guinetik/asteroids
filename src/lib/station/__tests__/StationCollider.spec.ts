@@ -30,6 +30,12 @@ describe('StationCollider', () => {
       expect(c.groundedYAt(-10, 0)).toBe(0)
     })
 
+    it('keeps passage grounding at the station floor height', () => {
+      const raisedFloors: StationFloor[] = FLOORS.map((floor) => ({ ...floor, y: 0.25 }))
+      const c = new StationCollider(raisedFloors, PASSAGES)
+      expect(c.groundedYAt(-5.2, 0)).toBe(0.25)
+    })
+
     it('returns 0 as a safe fallback when the point is outside every floor', () => {
       const c = new StationCollider(FLOORS, PASSAGES)
       expect(c.groundedYAt(100, 100)).toBe(0)

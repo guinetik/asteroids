@@ -90,12 +90,13 @@ const CORNER_BASE_YAW = Math.PI
 const CEILING_CENTER_Y = WALL_HEIGHT
 
 /**
- * Extra yaw applied to every entrance instance so the door-hole face
- * points into the room. The entrance asset's long axis is X (vs wall's
- * Z), so it lines up on N/S sides at 0° and on E/W sides at ±90° — this
- * constant handles any 180° flip needed beyond that base mapping.
+ * Extra yaw applied to every entrance instance so the detailed Floor-B
+ * side faces the connected corridor, matching the corridor pipe runs.
+ * The entrance asset's long axis is X (vs wall's Z), so it lines up on
+ * N/S sides at 0° and on E/W sides at ±90° — this constant handles the
+ * front/back asset orientation beyond that base mapping.
  */
-const ENTRANCE_BASE_YAW = 0
+const ENTRANCE_BASE_YAW = Math.PI
 /**
  * Local-frame Y offset applied to the door child so it sits in the
  * entrance's hole with its bottom near the floor. Tune empirically once
@@ -118,9 +119,9 @@ const DOOR_HINGE_OFFSET_X = -0.65
  * Positive values move the entrance further away from the room interior
  * along the side's outward normal.
  */
-const ENTRANCE_PUSH = 0
+const ENTRANCE_PUSH = 0.25
 /** Vertical raise applied to entrance slots, in addition to the storey wallY. */
-const ENTRANCE_RAISE = 0.2
+const ENTRANCE_RAISE = 0.25
 /**
  * Outward distance (measured from the room edge along the entrance side's
  * normal) where the porch floor tile is dropped. Lets the player step out

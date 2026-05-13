@@ -54,6 +54,7 @@ const MOVE_SAMPLE_COUNT = 4
 export class StationCollider {
   private readonly _floors: readonly StationFloor[]
   private readonly _passages: readonly StationRect[]
+  private readonly _floorY: number
   private _blockers: readonly StationRect[] = []
 
   /**
@@ -68,6 +69,7 @@ export class StationCollider {
   constructor(floors: readonly StationFloor[], passages: readonly StationRect[]) {
     this._floors = floors
     this._passages = passages
+    this._floorY = floors[0]?.y ?? FLOOR_FALLBACK_Y
   }
 
   /**
@@ -83,9 +85,9 @@ export class StationCollider {
   }
 
   /**
-   * Floor surface Y at the given (x, z). Falls back to 0 when no floor
-   * rect contains the point — the player should not normally be there,
-   * but the fallback keeps physics finite.
+   * Floor surface Y at the given (x, z). Station interiors are flat, so
+   * doorway passages and fallback points use the same floor Y as the
+   * first floor rectangle instead of dipping to world zero.
    *
    * @param x - World X.
    * @param z - World Z.
@@ -97,7 +99,7 @@ export class StationCollider {
         return f.y
       }
     }
-    return FLOOR_FALLBACK_Y
+    return this._floorY
   }
 
   /**
