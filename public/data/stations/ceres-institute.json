@@ -1,0 +1,77 @@
+{
+  "id": "ceres-institute",
+  "name": "Ceres Institute for Eternal Biology",
+  "rooms": [
+    {
+      "id": "r-west",
+      "width": 3,
+      "depth": 3,
+      "height": 2,
+      "anchor": { "x": -14.467, "z": 0 },
+      "yaw": 0,
+      "entrances": [
+        {
+          "side": "E",
+          "index": 1,
+          "storey": 0,
+          "prompt": "F  Enter West Wing",
+          "event": "enter:r-west",
+          "openStyle": "full",
+          "target": { "kind": "corridor", "nodeId": "c-w-straight", "worldSide": "W" }
+        }
+      ]
+    },
+    {
+      "id": "r-east",
+      "width": 3,
+      "depth": 3,
+      "height": 2,
+      "anchor": { "x": 14.467, "z": 0 },
+      "yaw": 0,
+      "entrances": [
+        {
+          "side": "W",
+          "index": 1,
+          "storey": 0,
+          "prompt": "F  Enter East Wing",
+          "event": "enter:r-east",
+          "openStyle": "full",
+          "target": { "kind": "corridor", "nodeId": "c-e-straight", "worldSide": "E" }
+        }
+      ]
+    }
+  ],
+  "corridors": [
+    {
+      "id": "c-hub",
+      "kind": "window",
+      "anchor": { "x": 0, "z": 0 },
+      "yaw": 2,
+      "ports": {
+        "S": { "kind": "exit", "prompt": "F  Leave", "event": "station:exit" },
+        "W": { "kind": "corridor", "nodeId": "c-w-straight", "worldSide": "E" },
+        "E": { "kind": "corridor", "nodeId": "c-e-straight", "worldSide": "W" }
+      }
+    },
+    {
+      "id": "c-w-straight",
+      "kind": "straight",
+      "anchor": { "x": -4.881, "z": 0 },
+      "yaw": 1,
+      "ports": {
+        "E": { "kind": "corridor", "nodeId": "c-hub", "worldSide": "W" },
+        "W": { "kind": "room", "roomId": "r-west", "entranceIndex": 0 }
+      }
+    },
+    {
+      "id": "c-e-straight",
+      "kind": "straight",
+      "anchor": { "x": 4.881, "z": 0 },
+      "yaw": 1,
+      "ports": {
+        "W": { "kind": "corridor", "nodeId": "c-hub", "worldSide": "E" },
+        "E": { "kind": "room", "roomId": "r-east", "entranceIndex": 0 }
+      }
+    }
+  ]
+}

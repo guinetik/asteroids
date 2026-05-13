@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import yamadaRaw from '@/data/stations/yamada.json'
+import yamadaRaw from '../../../../public/data/stations/yamada-titania.json'
+import ceresRaw from '../../../../public/data/stations/ceres-institute.json'
 import { loadStationLayout } from '@/lib/station/loadStationLayout'
 import { resolveLayout } from '@/lib/station/StationLayout'
 
@@ -31,5 +32,20 @@ describe('Yamada station layout', () => {
     ])
     const kinds = new Set(plan.map((p) => p.kind))
     expect(kinds).toEqual(new Set(['room', 'cross', 'corner', 'straight']))
+  })
+})
+
+describe('Ceres Institute station layout', () => {
+  it('loads + validates without throwing', () => {
+    expect(() => loadStationLayout(ceresRaw)).not.toThrow()
+  })
+
+  it('resolves into the 2-isle T-hub placement plan', () => {
+    const layout = loadStationLayout(ceresRaw)
+    const plan = resolveLayout(layout)
+    const ids = plan.map((p) => p.id).sort()
+    expect(ids).toEqual(['c-e-straight', 'c-hub', 'c-w-straight', 'r-east', 'r-west'])
+    const kinds = new Set(plan.map((p) => p.kind))
+    expect(kinds).toEqual(new Set(['room', 'window', 'straight']))
   })
 })

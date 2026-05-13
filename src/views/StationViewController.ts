@@ -33,7 +33,14 @@ import { StationCollider, type StationRect } from '@/lib/station/StationCollider
 import { buildStation, type BuiltStation } from '@/three/StationBuilder'
 import type { StationEntrance } from '@/three/StationEntrance'
 import { loadStationLayout } from '@/lib/station/loadStationLayout'
-import yamadaLayoutRaw from '@/data/stations/yamada.json'
+import type { StationLayout } from '@/lib/station/StationLayout'
+
+/**
+ * URL prefix where station-interior layouts are served as static JSON.
+ * Files live under `public/data/stations/<stationId>.json` and are loaded
+ * at runtime by {@link StationViewController.fetchLayout}.
+ */
+const STATION_LAYOUT_URL_PREFIX = '/data/stations'
 
 // ---------------------------------------------------------------------------
 // Room layout constants.
@@ -113,10 +120,10 @@ export class StationViewController implements Tickable {
    * Mount the scene into the given container.
    *
    * @param container - HTML element to render into.
-   * @param _stationId - Unused while layout is being redesigned.
+   * @param stationId - Layout id to fetch (`<stationId>.json` under `/data/stations/`).
    * @param router - Vue router used to navigate back to `/` on exit.
    */
-  async init(container: HTMLElement, _stationId: string, router: Router): Promise<void> {
+  async init(container: HTMLElement, stationId: string, router: Router): Promise<void> {
     this.router = router
 
     const config = buildFpsPlayerConfig()
@@ -137,8 +144,8 @@ export class StationViewController implements Tickable {
     this.sceneManager = new SceneManager()
     this.sceneManager.mount(container)
 
-    // Whole station from the authored Yamada layout.
-    const layout = loadStationLayout(yamadaLayoutRaw)
+    // Whole station from the authored layout fetched by id.
+    const layout = await this.fetchLayout(stationId)
     this.station = await buildStation(layout)
     this.sceneManager.addToScene(this.station.group)
 
@@ -260,6 +267,26 @@ export class StationViewController implements Tickable {
       activeEntrance.triggerOpen(pos, () => this.onInteract?.(event))
       this.updateDoorBlockers()
     }
+  }
+
+  /**
+   * Fetch the station layout JSON for the given id from `public/data/stations/`
+   * and validate it via {@link loadStationLayout}.
+   *
+   * @param stationId - Layout id (`<stationId>.json`).
+   * @returns A validated {@link StationLayout}.
+   * @throws If the fetch fails or the JSON does not pass layout validation.
+   */
+  private async fetchLayout(stationId: string): Promise<StationLayout> {
+    const url = `${STATION_LAYOUT_URL_PREFIX}/${stationId}.json`
+    const res = await fetch(url)
+    if (!res.ok) {
+      throw new Error(
+        `Failed to load station layout "${stationId}" from ${url}: ${res.status} ${res.statusText}`,
+      )
+    }
+    const raw: unknown = await res.json()
+    return loadStationLayout(raw)
   }
 
   /** Refresh door collision blockers from the current entrance animation states. */
