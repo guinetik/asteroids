@@ -12,7 +12,7 @@
  * @author guinetik
  * @date 2026-05-13
  */
-import { Group } from 'three'
+import { Group, Mesh, type Material } from 'three'
 import { loadGLB } from '@/three/loadGLB'
 import { buildStationRoom, type StationRoom } from '@/three/StationRoomBuilder'
 import { StationEntrance } from '@/three/StationEntrance'
@@ -94,6 +94,15 @@ const PASSAGE_HALF_DEPTH = 0.45
 const ROOM_PASSAGE_HALF_DEPTH = ROOM_WALL_OUTER_FACE_OFFSET + PASSAGE_HALF_DEPTH
 /** Half-width of a corridor arm, reused to make corner collision L-shaped. */
 const CORRIDOR_ARM_HALF_WIDTH = CORRIDOR_HALF_EXTENTS.straight.x
+/**
+ * Opacity applied at runtime to GLB materials whose name contains "glass".
+ * The asset author tagged window panes with a `Glass`-prefixed material, but
+ * the glTF compression toolchain dropped `alphaMode: BLEND`, leaving them
+ * rendering opaque-black. Re-applying transparency in {@link patchGlassTransparency}
+ * keeps the fix in code so we do not need an art re-export every time pieces
+ * are recompressed.
+ */
+const GLASS_OPACITY = 0.18
 
 /**
  * Result of {@link buildStation}: scene group, runtime entrances, and
@@ -350,6 +359,28 @@ function placeExitCap(
 }
 
 /**
+ * Restore transparency on any GLB material whose name marks it as window
+ * glass. Targets materials named `Glass*` (case-insensitive); other materials
+ * are untouched. Run on the assembled station group after every piece has
+ * been cloned in so a single traversal covers corridors + room walls.
+ *
+ * @param group - Scene group to traverse.
+ */
+function patchGlassTransparency(group: Group): void {
+  group.traverse((child) => {
+    if (!(child instanceof Mesh)) return
+    const mats: Material[] = Array.isArray(child.material) ? child.material : [child.material]
+    for (const mat of mats) {
+      if (!mat || !mat.name.toLowerCase().includes('glass')) continue
+      mat.transparent = true
+      mat.opacity = GLASS_OPACITY
+      mat.depthWrite = false
+      mat.needsUpdate = true
+    }
+  })
+}
+
+/**
  * Build the entire station from a validated layout.
  *
  * @param layout - Validated station layout.
@@ -423,5 +454,6 @@ export async function buildStation(layout: StationLayout): Promise<BuiltStation>
     }
   }
 
+  patchGlassTransparency(group)
   return { group, entrances, floors, passages }
 }
