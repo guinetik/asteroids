@@ -46,10 +46,6 @@ const FLOOR_Y = 0.25
 const SPAWN_YAW = Math.PI
 /** Maximum distance for an entrance to show its interact prompt. */
 const ENTRANCE_INTERACT_DISTANCE = 2.5
-/** Padding (world units) around the bounding box of every piece used
- * for the temporary unified collider — gives the player a little room
- * around the outermost floor edges. */
-const COLLIDER_BOUNDS_PADDING = 1
 
 // ---------------------------------------------------------------------------
 // Lighting constants.
@@ -160,33 +156,7 @@ export class StationViewController implements Tickable {
     this.starfield = new StarFieldController()
     this.sceneManager.addToScene(this.starfield.points)
 
-    // Temporary collider: one big rect covering the bounding box of
-    // every piece. Lets the player walk through every room + corridor
-    // freely; walls are still rendered but don't physically block yet.
-    // A future pass will replace this with per-piece rects + per-edge
-    // passage rects between connected pieces.
-    let minX = Infinity
-    let maxX = -Infinity
-    let minZ = Infinity
-    let maxZ = -Infinity
-    for (const f of this.station.floors) {
-      if (f.minX < minX) minX = f.minX
-      if (f.maxX > maxX) maxX = f.maxX
-      if (f.minZ < minZ) minZ = f.minZ
-      if (f.maxZ > maxZ) maxZ = f.maxZ
-    }
-    const collider = new StationCollider(
-      [
-        {
-          minX: minX - COLLIDER_BOUNDS_PADDING,
-          maxX: maxX + COLLIDER_BOUNDS_PADDING,
-          minZ: minZ - COLLIDER_BOUNDS_PADDING,
-          maxZ: maxZ + COLLIDER_BOUNDS_PADDING,
-          y: FLOOR_Y,
-        },
-      ],
-      [],
-    )
+    const collider = new StationCollider(this.station.floors, this.station.passages)
     this.stationCollider = collider
     this.updateDoorBlockers()
 
