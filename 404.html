@@ -150,6 +150,121 @@
         margin-right: -0.8em;
         animation: alienTitle 5s cubic-bezier(0.2, 0, 0.2, 1) forwards;
       }
+      #prelude-changelog {
+        position: absolute;
+        top: 1.25rem;
+        right: 1.25rem;
+        z-index: 12;
+        display: none;
+        width: min(23rem, calc(100vw - 2.5rem));
+        padding: 0.75rem;
+        border: 1px solid rgba(125, 211, 252, 0.22);
+        border-radius: 1rem;
+        background:
+          linear-gradient(180deg, rgba(8, 13, 24, 0.82), rgba(2, 6, 23, 0.62)),
+          radial-gradient(circle at 15% 0%, rgba(45, 212, 191, 0.14), transparent 34%);
+        box-shadow:
+          0 1.5rem 4rem rgba(0, 0, 0, 0.42),
+          inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        backdrop-filter: blur(14px);
+        color: rgba(226, 232, 240, 0.78);
+        font-family: 'Datatype', ui-sans-serif, system-ui, sans-serif;
+        pointer-events: auto;
+      }
+      #prelude-changelog.is-visible {
+        display: block;
+      }
+      .prelude-changelog__header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 0.2rem 0.15rem 0.65rem;
+      }
+      .prelude-changelog__eyebrow {
+        color: rgba(236, 254, 255, 0.94);
+        font-size: 0.74rem;
+        font-weight: 700;
+        letter-spacing: 0.24em;
+        text-transform: uppercase;
+      }
+      .prelude-changelog__count {
+        color: rgba(125, 211, 252, 0.68);
+        font-size: 0.66rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+      .prelude-changelog__list {
+        display: grid;
+        gap: 0.75rem;
+        max-height: min(32rem, calc(100vh - 7rem));
+        padding-right: 0.2rem;
+        overflow-y: auto;
+        scrollbar-color: rgba(125, 211, 252, 0.42) rgba(15, 23, 42, 0.38);
+      }
+      .prelude-changelog-card {
+        overflow: hidden;
+        border: 1px solid rgba(186, 230, 253, 0.16);
+        border-radius: 0.85rem;
+        background: rgba(15, 23, 42, 0.58);
+      }
+      .prelude-changelog-card__image {
+        min-height: 7.5rem;
+        background-color: rgba(15, 23, 42, 0.82);
+        background-position: center;
+        background-size: cover;
+        box-shadow: inset 0 -4rem 3rem rgba(2, 6, 23, 0.72);
+      }
+      .prelude-changelog-card__body {
+        display: grid;
+        gap: 0.55rem;
+        padding: 0.85rem;
+      }
+      .prelude-changelog-card__title {
+        margin: 0;
+        color: rgba(240, 253, 250, 0.96);
+        font-size: 0.98rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+      .prelude-changelog-card__date {
+        color: rgba(125, 211, 252, 0.72);
+        font-size: 0.65rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+      .prelude-changelog-card__description {
+        margin: 0;
+        color: rgba(207, 250, 254, 0.76);
+        font-size: 0.75rem;
+        line-height: 1.45;
+      }
+      .prelude-changelog-card__changes {
+        display: grid;
+        gap: 0.38rem;
+        margin: 0;
+        padding-left: 1rem;
+        font-size: 0.7rem;
+        list-style: disc outside;
+        line-height: 1.35;
+      }
+      .prelude-changelog-card__changes li::marker {
+        color: rgba(45, 212, 191, 0.9);
+      }
+      @media (max-width: 900px) {
+        #prelude-changelog {
+          top: auto;
+          right: 1rem;
+          bottom: 1rem;
+          left: 1rem;
+          width: auto;
+        }
+        .prelude-changelog__list {
+          max-height: 16rem;
+        }
+      }
       @keyframes alienTitle {
         0% {
           opacity: 0;
@@ -171,13 +286,14 @@
         100% { opacity: 1; }
       }
     </style>
-    <script type="module" crossorigin src="/assets/index-B4yPZJ3O.js"></script>
-    <link rel="modulepreload" crossorigin href="/assets/specialMissions-COOLXxMf.js">
+    <script type="module" crossorigin src="/assets/index-DCISBVrP.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/specialMissions-D7UUGcge.js">
     <link rel="modulepreload" crossorigin href="/assets/vendor-pinia-DSmCRyVf.js">
     <link rel="modulepreload" crossorigin href="/assets/vendor-vue-iVKUiCKN.js">
     <link rel="modulepreload" crossorigin href="/assets/vendor-vue-router-BzB1D7NX.js">
-    <link rel="modulepreload" crossorigin href="/assets/profile-CI3_CRnt.js">
-    <link rel="stylesheet" crossorigin href="/assets/index-uxdaeSY4.css">
+    <link rel="modulepreload" crossorigin href="/assets/catalog-CMhxMWoC.js">
+    <link rel="modulepreload" crossorigin href="/assets/profile-Cs-kyFpz.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-D3wYnQ63.css">
   </head>
   <body>
     <div id="prelude-container">
@@ -188,6 +304,13 @@
         <div id="prelude-title">ASTEROID LANDER</div>
         <button id="prelude-play-btn">PLAY</button>
       </div>
+      <aside id="prelude-changelog" aria-label="Change Log">
+        <div class="prelude-changelog__header">
+          <span class="prelude-changelog__eyebrow">Change Log</span>
+          <span id="prelude-changelog-count" class="prelude-changelog__count"></span>
+        </div>
+        <div id="prelude-changelog-list" class="prelude-changelog__list"></div>
+      </aside>
     </div>
 
     <script>
@@ -201,6 +324,9 @@
             this.canvas = elements.canvas;
             this.playBtn = elements.playBtn;
             this.title = elements.title;
+            this.changelog = elements.changelog;
+            this.changelogList = elements.changelogList;
+            this.changelogCount = elements.changelogCount;
             this.ctx = this.canvas.getContext('2d');
             this.width = 0;
             this.height = 0;
@@ -212,6 +338,7 @@
 
           start() {
             this._initCanvas();
+            this._loadChangelog();
             window.addEventListener('resize', this._boundResize);
             this._attachInput();
             this.animationFrameId = requestAnimationFrame(this._boundLoop);
@@ -225,6 +352,75 @@
           }
 
           ready() {}
+
+          _showReadyUi() {
+            this.playBtn.style.display = 'block';
+            if (this.title) this.title.style.display = 'block';
+            if (this.changelog && this.changelogList && this.changelogList.children.length > 0) {
+              this.changelog.classList.add('is-visible');
+            }
+          }
+
+          async _loadChangelog() {
+            if (!this.changelog || !this.changelogList || !this.changelogCount) return;
+            try {
+              const res = await fetch('/data/changelog/home-updates.json', { cache: 'no-cache' });
+              if (!res.ok) return;
+              const updates = await res.json();
+              if (!Array.isArray(updates) || updates.length === 0) return;
+              this._renderChangelog(updates);
+            } catch (_e) {
+              // Changelog is optional; the prelude should never block on content.
+            }
+          }
+
+          _renderChangelog(updates) {
+            const safeUpdates = updates.filter((u) =>
+              u &&
+              typeof u.title === 'string' &&
+              typeof u.date === 'string' &&
+              typeof u.backgroundImage === 'string' &&
+              typeof u.description === 'string' &&
+              Array.isArray(u.changes)
+            );
+            if (safeUpdates.length === 0) return;
+            this.changelogCount.textContent = safeUpdates.length === 1
+              ? '1 update'
+              : `${safeUpdates.length.toLocaleString()} updates`;
+            this.changelogList.innerHTML = safeUpdates.map((update) => `
+              <article class="prelude-changelog-card">
+                <div
+                  class="prelude-changelog-card__image"
+                  style="background-image: url('${this._escapeAttribute(update.backgroundImage)}')"
+                  aria-hidden="true"
+                ></div>
+                <div class="prelude-changelog-card__body">
+                  <h2 class="prelude-changelog-card__title">${this._escapeHtml(update.title)}</h2>
+                  <span class="prelude-changelog-card__date">${this._escapeHtml(update.date)}</span>
+                  <p class="prelude-changelog-card__description">${this._escapeHtml(update.description)}</p>
+                  <ul class="prelude-changelog-card__changes">
+                    ${update.changes.map((change) => `<li>${this._escapeHtml(String(change))}</li>`).join('')}
+                  </ul>
+                </div>
+              </article>
+            `).join('');
+            if (this.playBtn.style.display === 'block') {
+              this.changelog.classList.add('is-visible');
+            }
+          }
+
+          _escapeHtml(value) {
+            return String(value)
+              .replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;')
+              .replace(/"/g, '&quot;')
+              .replace(/'/g, '&#039;');
+          }
+
+          _escapeAttribute(value) {
+            return this._escapeHtml(value).replace(/\)/g, '&#041;');
+          }
 
           _initCanvas() {
             const dpr = window.devicePixelRatio || 1;
@@ -545,8 +741,7 @@
                   this.terrainVisible = true;
                   this.terrainPadY = padFinalY;
                   this.state = 'landed';
-                  this.playBtn.style.display = 'block';
-                  if (this.title) this.title.style.display = 'block';
+                  this._showReadyUi();
                 } else {
                   this.state = 'landing';
                   this.landingTime = 0;
@@ -615,16 +810,14 @@
                 this.landerVelocityY = 0;
                 this.landerVelocityX = 0;
                 this.landingFrozen = true;
-                this.playBtn.style.display = 'block';
-                if (this.title) this.title.style.display = 'block';
+                this._showReadyUi();
               } else if (landerFootY >= groundYHere && this.landerVelocityY >= 0) {
                 this.landerY = groundYHere - LanderGame.LANDER_HEIGHT / 2;
                 this.landerVelocityY = 0;
                 this.landerVelocityX = 0;
                 this.landerRotation = this._terrainSlopeAt(this.landerX);
                 this.state = 'landed';
-                this.playBtn.style.display = 'block';
-                if (this.title) this.title.style.display = 'block';
+                this._showReadyUi();
               }
 
               }
@@ -1515,10 +1708,11 @@
         ShuttleGame.REAR_THRUSTER_SPAWN_CHANCE = 0.9;
         ShuttleGame.REAR_THRUSTER_VY = 220;
 
-        // Route gateway. /level → outbound ShuttleGame (full asteroid finale).
-        // /map with a pending mission-return handoff in localStorage →
-        // return-flow ShuttleGame (no big asteroid, "RETURNING FROM MISSION"
-        // header). Everything else → LanderGame.
+        // Route gateway. /level and /station → outbound ShuttleGame (full
+        // asteroid finale / station approach). /map with a pending
+        // mission-return handoff in localStorage → return-flow ShuttleGame
+        // (no big asteroid, "RETURNING FROM MISSION" header). Everything
+        // else → LanderGame.
         // We check both pathname and hash so it works whether router is in
         // history or hash mode (Vue Router default is history, but hash
         // routes still match). The localStorage peek does NOT consume the
@@ -1526,7 +1720,12 @@
         function isLevelRoute() {
           const path = window.location.pathname || '';
           const hash = window.location.hash || '';
-          return path.includes('/level') || hash.includes('/level');
+          return (
+            path.includes('/level') ||
+            hash.includes('/level') ||
+            path.includes('/station') ||
+            hash.includes('/station')
+          );
         }
         function isReturningFromLevel() {
           try {
@@ -1542,6 +1741,9 @@
           canvas: document.getElementById('prelude-canvas'),
           playBtn: document.getElementById('prelude-play-btn'),
           title: document.getElementById('prelude-title'),
+          changelog: document.getElementById('prelude-changelog'),
+          changelogList: document.getElementById('prelude-changelog-list'),
+          changelogCount: document.getElementById('prelude-changelog-count'),
         };
 
         let game;
