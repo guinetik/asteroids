@@ -11,8 +11,18 @@ import * as THREE from 'three'
 import { loadGLB, wrapSceneAtBoundingBoxCenter } from '@/three/loadGLB'
 import { hashToKuiperPosition } from '@/lib/math/deterministicPositioning'
 
-/** Default uniform scale applied to the station model. */
-const DEFAULT_STATION_SCALE = 1
+/**
+ * Default uniform scale applied to the station model on the solar map.
+ *
+ * The map uses AU units (Mercury at 0.387, Earth at 1.0). The station GLB is
+ * authored at near-real-world size, so at scale 1 it occupies ~0.5 AU and
+ * dwarfs the inner planets. This default sizes it roughly like the procedural
+ * asteroid-mission preview rock — a small navigation target that reads
+ * clearly without overlapping orbital geometry. Override per-instance via
+ * `PinnedStationControllerOptions.scale` if a specific station needs to be
+ * larger or smaller.
+ */
+const DEFAULT_STATION_SCALE = 0.02
 
 /** Constructor options for {@link PinnedStationController}. */
 export interface PinnedStationControllerOptions {
@@ -31,7 +41,7 @@ export interface PinnedStationControllerOptions {
   positionSeed: string
   /**
    * Uniform world-unit scale applied to the loaded model.
-   * @default 1
+   * @default DEFAULT_STATION_SCALE
    */
   scale?: number
 }
