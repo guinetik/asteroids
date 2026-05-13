@@ -76,6 +76,14 @@ const CORNER_UPPER_STOREY_PUSH = 0.5
  */
 const CORNER_UPPER_STOREY_DROP = 0.29
 /**
+ * Downward offset applied to the ceiling tile per storey above the
+ * ground floor. The ceiling-tile asset's bottom face sits a hair above
+ * the wall top in stacked configurations, leaving a thin sky-leak seam
+ * when looking up. Dropping the tile by this amount per added storey
+ * lets the ceiling underside overlap the wall top and seal the join.
+ */
+const CEILING_UPPER_STOREY_DROP = 0.4
+/**
  * Extra yaw applied to every corner instance because the asset's natural
  * forward direction (column-body side) loaded backwards in the GLB
  * viewer. Tune in 90° steps if the column ends up pointing the wrong way.
@@ -119,7 +127,7 @@ const DOOR_HINGE_OFFSET_X = -0.65
  * Positive values move the entrance further away from the room interior
  * along the side's outward normal.
  */
-const ENTRANCE_PUSH = 0.25
+const ENTRANCE_PUSH = 0.1
 /** Vertical raise applied to entrance slots, in addition to the storey wallY. */
 const ENTRANCE_RAISE = 0.25
 /**
@@ -212,7 +220,13 @@ export async function buildStationRoom(layout: StationRoomLayout): Promise<Stati
       group.add(floor)
 
       const ceiling = tileSrc.clone(true)
-      ceiling.position.set(x, CEILING_CENTER_Y + (stackHeight - 1) * WALL_HEIGHT, z)
+      ceiling.position.set(
+        x,
+        CEILING_CENTER_Y +
+          (stackHeight - 1) * WALL_HEIGHT -
+          (stackHeight - 1) * CEILING_UPPER_STOREY_DROP,
+        z,
+      )
       group.add(ceiling)
     }
   }

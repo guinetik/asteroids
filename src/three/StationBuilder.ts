@@ -76,8 +76,13 @@ const DOOR_URL = '/models/station/pieces/door.glb'
 
 // Door-cap placement constants. Kept in sync with `StationRoomBuilder`
 // so corridor exit caps read identically to room entrances.
-/** Outward push from the corridor port toward the world exterior. */
-const EXIT_CAP_PUSH = 0.85
+/**
+ * Outward push from the corridor port toward the world exterior. Kept
+ * in lock-step with `StationRoomBuilder`'s `ENTRANCE_PUSH` so the
+ * station's exit hatch seats flush against the corridor port plane —
+ * larger values open a visible black gap behind the door frame.
+ */
+const EXIT_CAP_PUSH = 0.1
 /** Vertical raise of the cap slot above the port-Y. */
 const EXIT_CAP_RAISE = 0.2
 /** Door child Y offset within the slot. */
