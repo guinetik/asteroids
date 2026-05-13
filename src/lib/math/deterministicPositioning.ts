@@ -13,9 +13,13 @@
  * @spec docs/superpowers/specs/2026-05-05-ceres-station-dock-system-design.md
  */
 import * as THREE from 'three'
+import { ORBIT_SCALE } from '@/lib/planets/constants'
 
-/** Nominal world-unit radius for Kuiper-belt pinned assets (midpoint of inner 30 – outer 50). */
-const KUIPER_RADIUS_NOMINAL = 40
+/** Nominal Kuiper-belt radius in AU (midpoint of inner 30 – outer 50). */
+const KUIPER_RADIUS_AU = 40
+
+/** Nominal world-unit radius for Kuiper-belt pinned assets (AU × {@link ORBIT_SCALE}). */
+const KUIPER_RADIUS_NOMINAL = KUIPER_RADIUS_AU * ORBIT_SCALE
 
 /**
  * Hash a string to an unsigned 32-bit integer using the xmur3 algorithm.

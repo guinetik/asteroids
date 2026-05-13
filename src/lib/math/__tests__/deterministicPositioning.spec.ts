@@ -9,12 +9,13 @@
  */
 import { describe, expect, it } from 'vitest'
 import { hashToKuiperPosition } from '@/lib/math/deterministicPositioning'
+import { ORBIT_SCALE } from '@/lib/planets/constants'
 
-/** Inner edge of the Kuiper belt in `planetarium.json` (AU world units). */
-const KUIPER_INNER_RADIUS = 30
+/** Inner edge of the Kuiper belt in `planetarium.json` (AU), converted to world units. */
+const KUIPER_INNER_RADIUS = 30 * ORBIT_SCALE
 
-/** Outer edge of the Kuiper belt in `planetarium.json` (AU world units). */
-const KUIPER_OUTER_RADIUS = 50
+/** Outer edge of the Kuiper belt in `planetarium.json` (AU), converted to world units. */
+const KUIPER_OUTER_RADIUS = 50 * ORBIT_SCALE
 
 describe('hashToKuiperPosition', () => {
   it('places yamada-titania-station inside the Kuiper belt', () => {
