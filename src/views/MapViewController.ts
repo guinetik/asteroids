@@ -2372,6 +2372,23 @@ export class MapViewController implements Tickable {
     // Sync pinned station Three.js controllers against active contracts.
     this.syncPinnedStations()
 
+    // Tick the find-me waypoint beam attached to every pinned station so the
+    // beam stays at a stable apparent size on the solar map (mirrors the
+    // mission-waypoint rescale above).
+    if (this.vehicleCamera && this.shuttleController) {
+      const camera = this.vehicleCamera.camera
+      const shuttlePos = this.shuttleController.position
+      for (const controller of this.pinnedStationControllers.values()) {
+        controller.tickWaypoint(
+          camera,
+          MAP_CONFIG.WAYPOINT_APPARENT_SIZE,
+          this.simTime,
+          shuttlePos.x,
+          shuttlePos.z,
+        )
+      }
+    }
+
     if (this.shuttleController && !this.shuttleController.dead) {
       const beginMissionPressed =
         this.inputManager?.wasActionPressed('beginMission') ?? false

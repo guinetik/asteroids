@@ -4,12 +4,19 @@
  * celestial body — the orbit detector never sees it.
  *
  * @author guinetik
- * @date 2026-05-05
- * @spec docs/superpowers/specs/2026-05-05-ceres-station-dock-system-design.md
+ * @date 2026-05-12
+ * @spec docs/superpowers/specs/2026-05-12-yamada-station-interior-design.md
  */
 import * as THREE from 'three'
 import { loadGLB, wrapSceneAtBoundingBoxCenter } from '@/three/loadGLB'
 import { hashToKuiperPosition } from '@/lib/math/deterministicPositioning'
+import {
+  createWaypointMarkerGroup,
+  disposeWaypointMarkerGroup,
+  ORBIT_MAP_WAYPOINT_SCALE_REFERENCE,
+  tickWaypointMarkerGroup,
+  WAYPOINT_MARKER_DEFAULT_COLOR,
+} from '@/three/WaypointMarkers'
 
 /**
  * Default uniform scale applied to the station model on the solar map.
@@ -51,13 +58,16 @@ export interface PinnedStationControllerOptions {
  *
  * Loads a GLB asynchronously and places it at a deterministic position derived
  * from `positionSeed` so the same contract always shows the station at the same
- * spot. Exposes `getWorldPosition()` for the proximity loop and `dispose()` for
- * clean contract teardown.
+ * spot. Also spawns a constant-screen-size waypoint beam at the station so it
+ * remains findable from anywhere on the solar map. Exposes `getWorldPosition()`
+ * for the proximity loop and `dispose()` for clean contract teardown.
  */
 export class PinnedStationController {
   private readonly _scene: THREE.Scene
   private readonly _worldPosition: THREE.Vector3
   private _group: THREE.Group | null = null
+  private _waypointRoot: THREE.Group | null = null
+  private _waypointMarker: THREE.Group | null = null
   private _disposed = false
 
   constructor(opts: PinnedStationControllerOptions) {
@@ -66,6 +76,17 @@ export class PinnedStationController {
 
     const scale = opts.scale ?? DEFAULT_STATION_SCALE
     const path = opts.modelPath.startsWith('/') ? opts.modelPath : `/${opts.modelPath}`
+
+    // Spawn waypoint beam immediately so the station is findable even before the
+    // async GLB load resolves. The beam is auto-rescaled per frame via
+    // `tickWaypoint` for constant apparent screen size.
+    const waypointRoot = new THREE.Group()
+    waypointRoot.position.copy(this._worldPosition)
+    const waypointMarker = createWaypointMarkerGroup(WAYPOINT_MARKER_DEFAULT_COLOR, 'orbitMap')
+    waypointRoot.add(waypointMarker)
+    this._scene.add(waypointRoot)
+    this._waypointRoot = waypointRoot
+    this._waypointMarker = waypointMarker
 
     loadGLB(path).then((scene) => {
       if (this._disposed) return
@@ -98,14 +119,54 @@ export class PinnedStationController {
   }
 
   /**
-   * Remove the model from the scene and dispose all geometries and materials.
-   * Safe to call before the async load resolves — in that case the load
-   * callback bails immediately and nothing is added to the scene.
+   * Per-frame waypoint rescale + animation. Mirrors the math used by
+   * `MapMissionFacade.tickWaypointVisuals` so the station beam stays at a
+   * stable apparent size from any zoom level on the solar map.
+   *
+   * @param camera - The map's perspective camera. Distance to the waypoint
+   *   together with the camera's vertical FOV drives the uniform scale.
+   * @param apparentSize - Target on-screen height as a fraction of viewport
+   *   height (e.g. `MAP_CONFIG.WAYPOINT_APPARENT_SIZE`).
+   * @param simTime - Accumulated simulation seconds, drives pulse/rotate VFX.
+   * @param shuttleX - Shuttle world-space X (used by proximity fade in the
+   *   `surface` preset; harmless for the `orbitMap` preset used here).
+   * @param shuttleZ - Shuttle world-space Z (mirrors `shuttleX`).
+   */
+  tickWaypoint(
+    camera: THREE.PerspectiveCamera,
+    apparentSize: number,
+    simTime: number,
+    shuttleX: number,
+    shuttleZ: number,
+  ): void {
+    if (!this._waypointRoot || !this._waypointMarker) return
+    const halfFovRad = THREE.MathUtils.degToRad(camera.fov / 2)
+    const tanHalfFov = Math.tan(halfFovRad)
+    const dist = camera.position.distanceTo(this._waypointRoot.position)
+    const targetScreenHeight = apparentSize * 2 * dist * tanHalfFov
+    const uniformScale = targetScreenHeight / ORBIT_MAP_WAYPOINT_SCALE_REFERENCE
+    this._waypointRoot.scale.setScalar(uniformScale)
+    tickWaypointMarkerGroup(this._waypointMarker, simTime, shuttleX, shuttleZ)
+  }
+
+  /**
+   * Remove the model and waypoint from the scene and dispose all geometries
+   * and materials. Safe to call before the async load resolves — in that case
+   * the load callback bails immediately and nothing is added to the scene.
    * Safe to call more than once (guarded by a disposed flag).
    */
   dispose(): void {
     if (this._disposed) return
     this._disposed = true
+
+    if (this._waypointMarker) {
+      disposeWaypointMarkerGroup(this._waypointMarker)
+      this._waypointMarker = null
+    }
+    if (this._waypointRoot) {
+      this._scene.remove(this._waypointRoot)
+      this._waypointRoot = null
+    }
 
     if (this._group) {
       this._scene.remove(this._group)
