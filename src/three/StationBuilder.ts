@@ -22,18 +22,15 @@ import type {
   StationLayout,
   YawTurns,
 } from '@/lib/station/StationLayout'
-import {
-  CORRIDOR_HALF_EXTENTS,
-  corridorPortWorldAnchor,
-} from '@/lib/station/StationLayout'
+import { CORRIDOR_HALF_EXTENTS, corridorPortWorldAnchor } from '@/lib/station/StationLayout'
 import type { StationFloor } from '@/lib/station/StationCollider'
 
 /** Per-piece GLB urls. */
 const CORRIDOR_URL: Readonly<Record<CorridorKind, string>> = {
-  cross: '/models/station/pieces/corridor.glb',
-  corner: '/models/station/pieces/corridor_corner.glb',
-  window: '/models/station/pieces/corridor_window.glb',
-  straight: '/models/station/pieces/corridor_straight.glb',
+  cross: '/models/station/pieces/corridor_C.glb',
+  corner: '/models/station/pieces/corridor_L.glb',
+  window: '/models/station/pieces/corridor_T.glb',
+  straight: '/models/station/pieces/corridor.glb',
 }
 
 /** Per-piece ceiling/roof GLB urls. */
@@ -41,10 +38,7 @@ const ROOF_URL: Readonly<Record<CorridorKind, string>> = {
   cross: '/models/station/pieces/roof_corridor.glb',
   corner: '/models/station/pieces/roof_corridor_corner.glb',
   window: '/models/station/pieces/roof_corridor_window.glb',
-  // No dedicated roof for the straight piece yet — reuse the cross roof
-  // (it's wider than the straight corridor; player won't notice unless
-  // they look up at the seams). Replace when a matching asset ships.
-  straight: '/models/station/pieces/roof_corridor.glb',
+  straight: '/models/station/pieces/roof_entrance.glb',
 }
 
 /**
@@ -58,6 +52,12 @@ const CORRIDOR_FLOOR_CENTER_Y = WALL_HEIGHT / 2
 const CORRIDOR_ROOF_CENTER_Y = WALL_HEIGHT
 /** Floor surface Y (shared with the room builder). */
 const STATION_FLOOR_Y = 0.25
+/**
+ * Local-space nudge for the L corridor asset. Its visible port markers
+ * are slightly off the logical bbox centerline; shifting the clone keeps
+ * marker seams aligned without changing graph validation anchors.
+ */
+const CORNER_VISUAL_ALIGNMENT_OFFSET = 0.21
 /** Entrance piece URL — reused for corridor exit caps. */
 const ENTRANCE_URL = '/models/station/pieces/entrance.glb'
 /** Door piece URL — reused for corridor exit caps. */
@@ -113,10 +113,18 @@ async function placeCorridor(node: CorridorNode): Promise<Group> {
 
   const floor = floorSrc.clone(true)
   floor.position.y = CORRIDOR_FLOOR_CENTER_Y
+  if (node.kind === 'corner') {
+    floor.position.x = -CORNER_VISUAL_ALIGNMENT_OFFSET
+    floor.position.z = -CORNER_VISUAL_ALIGNMENT_OFFSET
+  }
   group.add(floor)
 
   const roof = roofSrc.clone(true)
   roof.position.y = CORRIDOR_ROOF_CENTER_Y
+  if (node.kind === 'corner') {
+    roof.position.x = -CORNER_VISUAL_ALIGNMENT_OFFSET
+    roof.position.z = -CORNER_VISUAL_ALIGNMENT_OFFSET
+  }
   group.add(roof)
 
   return group
@@ -253,10 +261,7 @@ export async function buildStation(layout: StationLayout): Promise<BuiltStation>
     if (!entranceSrc || !doorSrc) continue
     for (const [side, target] of Object.entries(corridor.ports)) {
       if (target.kind !== 'exit') continue
-      const portWorld = corridorPortWorldAnchor(
-        corridor,
-        side as 'N' | 'S' | 'E' | 'W',
-      )
+      const portWorld = corridorPortWorldAnchor(corridor, side as 'N' | 'S' | 'E' | 'W')
       if (!portWorld) continue
       const cap = placeExitCap(
         portWorld.anchor,

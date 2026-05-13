@@ -62,6 +62,7 @@ describe('nativePortAnchor', () => {
     // Corner piece's native ports are S + W; N is closed (window wall).
     expect(() => nativePortAnchor('corner', 'N')).toThrow(/no native port/)
   })
+
 })
 
 describe('corridorWorldPorts', () => {

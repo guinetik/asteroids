@@ -198,15 +198,9 @@ export function rotateVec2(v: Vec2, turns: YawTurns): Vec2 {
  * Anchor of a native (yaw=0) port relative to the piece centre. The port
  * sits at the piece's half-extent along the side's outward normal.
  *
- * Note: the corner GLB's actual corridor centreline is offset ~0.36 from
- * the bbox centre (its elbow sits in the +X+Z quadrant), but we leave
- * that lateral offset *out* of the math here on purpose: passing it in
- * makes layout-math correct but forces adjacent corners to step
- * visibly along the perpendicular axis (their bboxes shift by twice the
- * offset). With the offset omitted, the bbox-aligned anchors keep the
- * floor outlines continuous at the cost of a ~0.36-wide doorway misread
- * at each corner port. Until the GLB is rebaked with the corridor at
- * its origin, that's the lesser of two evils.
+ * Note: this describes logical layout anchors, not visual decal/marker
+ * alignment. Asset-specific visual nudges belong in the Three.js builder
+ * so the authored graph can stay geometrically stable.
  *
  * @param kind - Corridor piece kind.
  * @param side - Native side the port opens on.
@@ -533,9 +527,7 @@ export function validateLayout(layout: StationLayout): void {
       if (t.kind === 'corridor') {
         const c = corridorsById.get(t.nodeId)
         if (!c) {
-          throw new Error(
-            `Room ${room.id} entrance #${i} targets unknown corridor "${t.nodeId}"`,
-          )
+          throw new Error(`Room ${room.id} entrance #${i} targets unknown corridor "${t.nodeId}"`)
         }
         const portTarget = c.ports[t.worldSide]
         if (!portTarget) {
@@ -613,10 +605,7 @@ export function validateLayout(layout: StationLayout): void {
 
   // 6: no-overlap — every pair of pieces (rooms + corridors) must have
   // axis-aligned bboxes that at worst share an edge.
-  const bboxes: PieceBBox[] = [
-    ...layout.rooms.map(roomBBox),
-    ...layout.corridors.map(corridorBBox),
-  ]
+  const bboxes: PieceBBox[] = [...layout.rooms.map(roomBBox), ...layout.corridors.map(corridorBBox)]
   for (let i = 0; i < bboxes.length; i++) {
     for (let j = i + 1; j < bboxes.length; j++) {
       if (bboxOverlapsInterior(bboxes[i]!, bboxes[j]!)) {
