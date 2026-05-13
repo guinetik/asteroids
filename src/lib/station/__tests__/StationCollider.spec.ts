@@ -14,6 +14,7 @@ const FLOORS: StationFloor[] = [FOYER, MARGARET]
 // Passage from foyer -xCurve / margaret +xCap centred at x=-5, z=0.
 const PASSAGE_FOYER_MARGARET: StationRect = { minX: -5.6, maxX: -4.4, minZ: -0.9, maxZ: 0.9 }
 const PASSAGES: StationRect[] = [PASSAGE_FOYER_MARGARET]
+const CLOSED_DOOR_BLOCKER: StationRect = { minX: -5.45, maxX: -4.55, minZ: -0.8, maxZ: 0.8 }
 
 const RADIUS = 0.3
 
@@ -56,6 +57,23 @@ describe('StationCollider', () => {
       const c = new StationCollider(FLOORS, PASSAGES)
       // Moving from foyer interior at x=-4, z=0 to margaret interior at x=-6, z=0
       // crosses the passage rectangle at x=-5.
+      const out = c.resolveLateralMove(-4, 0, -6, 0, RADIUS)
+      expect(out.x).toBeCloseTo(-6)
+      expect(out.z).toBeCloseTo(0)
+    })
+
+    it('blocks a passage when a dynamic door blocker covers it', () => {
+      const c = new StationCollider(FLOORS, PASSAGES)
+      c.setBlockers([CLOSED_DOOR_BLOCKER])
+      const out = c.resolveLateralMove(-4, 0, -6, 0, RADIUS)
+      expect(out.x).toBeCloseTo(-4)
+      expect(out.z).toBeCloseTo(0)
+    })
+
+    it('allows the same passage again after the door blocker is cleared', () => {
+      const c = new StationCollider(FLOORS, PASSAGES)
+      c.setBlockers([CLOSED_DOOR_BLOCKER])
+      c.setBlockers([])
       const out = c.resolveLateralMove(-4, 0, -6, 0, RADIUS)
       expect(out.x).toBeCloseTo(-6)
       expect(out.z).toBeCloseTo(0)

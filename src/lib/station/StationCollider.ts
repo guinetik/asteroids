@@ -54,6 +54,7 @@ const MOVE_SAMPLE_COUNT = 4
 export class StationCollider {
   private readonly _floors: readonly StationFloor[]
   private readonly _passages: readonly StationRect[]
+  private _blockers: readonly StationRect[] = []
 
   /**
    * Construct a collider over a fixed list of room floors and doorway
@@ -67,6 +68,18 @@ export class StationCollider {
   constructor(floors: readonly StationFloor[], passages: readonly StationRect[]) {
     this._floors = floors
     this._passages = passages
+  }
+
+  /**
+   * Replace the dynamic solid rectangles layered over the walkable union.
+   * Used by station doors: closed / moving panels block the doorway, while
+   * fully-open panels remove their blocker so the player can pass through the
+   * model's visible hole.
+   *
+   * @param blockers - World-space XZ rectangles that are currently solid.
+   */
+  setBlockers(blockers: readonly StationRect[]): void {
+    this._blockers = blockers
   }
 
   /**
@@ -153,6 +166,17 @@ export class StationCollider {
    * any doorway passage (not shrunk).
    */
   private _isInsideUnion(x: number, z: number, radius: number): boolean {
+    for (const b of this._blockers) {
+      if (
+        x >= b.minX - radius - INSIDE_EPSILON &&
+        x <= b.maxX + radius + INSIDE_EPSILON &&
+        z >= b.minZ - radius - INSIDE_EPSILON &&
+        z <= b.maxZ + radius + INSIDE_EPSILON
+      ) {
+        return false
+      }
+    }
+
     for (const f of this._floors) {
       if (
         x >= f.minX + radius - INSIDE_EPSILON &&

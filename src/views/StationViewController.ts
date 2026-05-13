@@ -29,7 +29,7 @@ import { FpsPlayerController } from '@/three/FpsPlayerController'
 import { FpsAudioDirector } from '@/audio/FpsAudioDirector'
 import { FpsPointerLockSession } from '@/lib/fps/FpsPointerLockSession'
 import { buildFpsPlayerConfig } from '@/lib/fps/buildFpsPlayerConfig'
-import { StationCollider } from '@/lib/station/StationCollider'
+import { StationCollider, type StationRect } from '@/lib/station/StationCollider'
 import { buildStation, type BuiltStation } from '@/three/StationBuilder'
 import type { StationEntrance } from '@/three/StationEntrance'
 import { loadStationLayout } from '@/lib/station/loadStationLayout'
@@ -73,6 +73,8 @@ const DIR_LIGHT_COLOR = 0xffffff
  * Human-scale for indoor habitat scenes.
  */
 const STATION_EYE_HEIGHT = 1.7
+/** Indoor movement scale applied to the FPS suit config for station interiors. */
+const STATION_MOVEMENT_SPEED_SCALE = 0.35
 
 // ---------------------------------------------------------------------------
 // Tick priority offsets.
@@ -94,6 +96,7 @@ export class StationViewController implements Tickable {
   private fpsCamera: FpsCamera | null = null
   private playerController: FpsPlayerController | null = null
   private station: BuiltStation | null = null
+  private stationCollider: StationCollider | null = null
   private spawnPos: Vector3 = new Vector3()
   private starfield: StarFieldController | null = null
   private readonly fpsAudio = new FpsAudioDirector()
@@ -122,6 +125,12 @@ export class StationViewController implements Tickable {
 
     const config = buildFpsPlayerConfig()
     config.camera = { ...config.camera, eyeHeight: STATION_EYE_HEIGHT }
+    config.movement = {
+      ...config.movement,
+      moveThrust: config.movement.moveThrust * STATION_MOVEMENT_SPEED_SCALE,
+      maxSpeed: config.movement.maxSpeed * STATION_MOVEMENT_SPEED_SCALE,
+      maxSprintSpeed: config.movement.maxSprintSpeed * STATION_MOVEMENT_SPEED_SCALE,
+    }
 
     // Merge FPS movement (WASD + jump + sprint + tools) with habitat's
     // F-key interact binding so the entrance prompt can fire.
@@ -178,6 +187,8 @@ export class StationViewController implements Tickable {
       ],
       [],
     )
+    this.stationCollider = collider
+    this.updateDoorBlockers()
 
     // Camera + player.
     this.fpsCamera = new FpsCamera(config.camera)
@@ -244,9 +255,10 @@ export class StationViewController implements Tickable {
   private updateEntrancePrompt(dt: number): void {
     if (!this.station || !this.playerController || !this.inputManager) return
 
-    for (const entrance of this.station.entrances) entrance.tick(dt)
-
     const pos = this.playerController.group.position
+    for (const entrance of this.station.entrances) entrance.tick(dt, pos)
+    this.updateDoorBlockers()
+
     let activePrompt: string | null = null
     let activeEntrance: StationEntrance | null = null
     let bestDistSq = ENTRANCE_INTERACT_DISTANCE * ENTRANCE_INTERACT_DISTANCE
@@ -275,8 +287,19 @@ export class StationViewController implements Tickable {
         this.currentPrompt = null
         this.onPrompt?.(null)
       }
-      activeEntrance.triggerOpen(() => this.onInteract?.(event))
+      activeEntrance.triggerOpen(pos, () => this.onInteract?.(event))
+      this.updateDoorBlockers()
     }
+  }
+
+  /** Refresh door collision blockers from the current entrance animation states. */
+  private updateDoorBlockers(): void {
+    if (!this.station || !this.stationCollider) return
+    const blockers: StationRect[] = []
+    for (const entrance of this.station.entrances) {
+      if (!entrance.isPassable) blockers.push(entrance.getBlockerRect())
+    }
+    this.stationCollider.setBlockers(blockers)
   }
 
   /** Request pointer lock on the renderer canvas. */
