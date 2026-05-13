@@ -13,6 +13,8 @@ import {
   roomBBox,
   roomEntranceWorldAnchor,
   ROOM_TILE_SIZE,
+  ROOM_WALL_HALF_THICK,
+  ROOM_WALL_OUTER_FACE_OFFSET,
   type RoomSpec,
   rotateSide,
   rotateVec2,
@@ -162,7 +164,7 @@ describe('roomEntranceWorldAnchor', () => {
     // width=4 → col centres at −1.5T, −0.5T, +0.5T, +1.5T (T = tile pitch).
     const expectedX = (1 - (4 - 1) / 2) * ROOM_TILE_SIZE
     expect(roomEntranceWorldAnchor(room, entrance)).toEqual({
-      anchor: { x: expectedX, z: -halfD },
+      anchor: { x: expectedX, z: -halfD - ROOM_WALL_OUTER_FACE_OFFSET },
       outwardYaw: sideToYaw('S'),
     })
   })
@@ -172,7 +174,7 @@ describe('roomEntranceWorldAnchor', () => {
     const halfW = (room.width * ROOM_TILE_SIZE) / 2
     const expectedZ = (0 - (room.depth - 1) / 2) * ROOM_TILE_SIZE
     expect(roomEntranceWorldAnchor(room, entrance)).toEqual({
-      anchor: { x: halfW, z: expectedZ },
+      anchor: { x: halfW + ROOM_WALL_OUTER_FACE_OFFSET, z: expectedZ },
       outwardYaw: sideToYaw('E'),
     })
   })
@@ -189,10 +191,9 @@ describe('roomEntranceWorldAnchor', () => {
     const entrance: EntranceSpec = { side: 'N', index: 2, prompt: '', event: '' }
     const halfD = (offset.depth * ROOM_TILE_SIZE) / 2
     const expectedX = (2 - (offset.width - 1) / 2) * ROOM_TILE_SIZE
-    expect(roomEntranceWorldAnchor(offset, entrance).anchor).toEqual({
-      x: 100 + expectedX,
-      z: -50 + halfD,
-    })
+    const anchor = roomEntranceWorldAnchor(offset, entrance).anchor
+    expect(anchor.x).toBeCloseTo(100 + expectedX)
+    expect(anchor.z).toBeCloseTo(-50 + halfD + ROOM_WALL_OUTER_FACE_OFFSET)
   })
 
   it('mates with a corridor port placed at the same world anchor', () => {
@@ -222,8 +223,8 @@ describe('roomEntranceWorldAnchor', () => {
 describe('bbox helpers', () => {
   it('roomBBox returns the AABB around the room anchor', () => {
     const room: RoomSpec = { id: 'r', width: 3, depth: 2, anchor: { x: 10, z: -5 } }
-    const halfW = (3 * ROOM_TILE_SIZE) / 2
-    const halfD = (2 * ROOM_TILE_SIZE) / 2
+    const halfW = (3 * ROOM_TILE_SIZE) / 2 + ROOM_WALL_HALF_THICK
+    const halfD = (2 * ROOM_TILE_SIZE) / 2 + ROOM_WALL_HALF_THICK
     expect(roomBBox(room)).toEqual({
       id: 'r',
       minX: 10 - halfW,
@@ -235,8 +236,8 @@ describe('bbox helpers', () => {
 
   it('roomBBox swaps X/Z when yaw is odd', () => {
     const room: RoomSpec = { id: 'r', width: 3, depth: 2, anchor: { x: 0, z: 0 }, yaw: 1 }
-    const halfW = (3 * ROOM_TILE_SIZE) / 2
-    const halfD = (2 * ROOM_TILE_SIZE) / 2
+    const halfW = (3 * ROOM_TILE_SIZE) / 2 + ROOM_WALL_HALF_THICK
+    const halfD = (2 * ROOM_TILE_SIZE) / 2 + ROOM_WALL_HALF_THICK
     // X half-extent comes from depth tiles after the 90° rotation.
     expect(roomBBox(room).maxX - roomBBox(room).minX).toBeCloseTo(2 * halfD)
     expect(roomBBox(room).maxZ - roomBBox(room).minZ).toBeCloseTo(2 * halfW)
@@ -416,7 +417,7 @@ describe('validateLayout', () => {
     // Room sits south of a cross corridor. The room's N entrance world
     // anchor must coincide with the corridor's S port world anchor.
     const halfRoomD = (3 * ROOM_TILE_SIZE) / 2
-    const corridorZ = halfRoomD + CORRIDOR_HALF_EXTENTS.cross.z
+    const corridorZ = halfRoomD + ROOM_WALL_OUTER_FACE_OFFSET + CORRIDOR_HALF_EXTENTS.cross.z
     const layout: StationLayout = {
       rooms: [
         {

@@ -7,7 +7,7 @@
       "width": 3,
       "depth": 2,
       "height": 2,
-      "anchor": { "x": -14.004, "z": 10.742 },
+      "anchor": { "x": -14.004, "z": 12.322 },
       "yaw": 0,
       "entrances": [
         {
@@ -26,7 +26,7 @@
       "width": 3,
       "depth": 2,
       "height": 2,
-      "anchor": { "x": 14.004, "z": 10.742 },
+      "anchor": { "x": 14.004, "z": 12.322 },
       "yaw": 0,
       "entrances": [
         {
@@ -45,7 +45,7 @@
       "width": 3,
       "depth": 3,
       "height": 2,
-      "anchor": { "x": 0, "z": 21.811 },
+      "anchor": { "x": 0, "z": 23.391 },
       "yaw": 0,
       "entrances": [
         {

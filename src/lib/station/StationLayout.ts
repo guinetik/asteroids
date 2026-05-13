@@ -32,6 +32,19 @@ export type YawTurns = 0 | 1 | 2 | 3
 export const ROOM_TILE_SIZE = 3.85
 
 /**
+ * Room wall half-thickness in world units. Matches
+ * `StationRoomBuilder`'s wall placement offset so room ports mate at
+ * the rendered doorway plane instead of at the inner floor tile edge.
+ */
+export const ROOM_WALL_HALF_THICK = 0.79
+/**
+ * Distance from a room's floor edge to the outside face of its rendered
+ * wall. Corridors should mate here so their side walls stop before
+ * entering the room interior.
+ */
+export const ROOM_WALL_OUTER_FACE_OFFSET = ROOM_WALL_HALF_THICK * 2
+
+/**
  * How wide an entrance door opens when interacted with. `'crack'` is for
  * exits the player leaves through (room is about to unload); `'full'` is
  * for doors the player walks through into another room/corridor.
@@ -293,19 +306,21 @@ export function roomEntranceWorldAnchor(
   const tile = ROOM_TILE_SIZE
   const halfW = (room.width * tile) / 2
   const halfD = (room.depth * tile) / 2
+  const portHalfW = halfW + ROOM_WALL_OUTER_FACE_OFFSET
+  const portHalfD = halfD + ROOM_WALL_OUTER_FACE_OFFSET
   let local: Vec2
   switch (entrance.side) {
     case 'N':
-      local = { x: (entrance.index - (room.width - 1) / 2) * tile, z: halfD }
+      local = { x: (entrance.index - (room.width - 1) / 2) * tile, z: portHalfD }
       break
     case 'S':
-      local = { x: (entrance.index - (room.width - 1) / 2) * tile, z: -halfD }
+      local = { x: (entrance.index - (room.width - 1) / 2) * tile, z: -portHalfD }
       break
     case 'E':
-      local = { x: halfW, z: (entrance.index - (room.depth - 1) / 2) * tile }
+      local = { x: portHalfW, z: (entrance.index - (room.depth - 1) / 2) * tile }
       break
     case 'W':
-      local = { x: -halfW, z: (entrance.index - (room.depth - 1) / 2) * tile }
+      local = { x: -portHalfW, z: (entrance.index - (room.depth - 1) / 2) * tile }
       break
   }
   const yaw = room.yaw ?? 0
@@ -349,8 +364,8 @@ export interface PieceBBox {
  */
 export function roomBBox(room: RoomSpec): PieceBBox {
   const tile = ROOM_TILE_SIZE
-  const halfW = (room.width * tile) / 2
-  const halfD = (room.depth * tile) / 2
+  const halfW = (room.width * tile) / 2 + ROOM_WALL_HALF_THICK
+  const halfD = (room.depth * tile) / 2 + ROOM_WALL_HALF_THICK
   const yaw = room.yaw ?? 0
   const swapped = yaw === 1 || yaw === 3
   const hx = swapped ? halfD : halfW
