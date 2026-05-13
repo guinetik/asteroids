@@ -11,8 +11,8 @@ const VALID_CATEGORIES = new Set<ItemCategory>([
 ])
 
 describe('ITEM_CATALOG', () => {
-  it('contains 37 items', () => {
-    expect(Object.keys(ITEM_CATALOG)).toHaveLength(37)
+  it('contains 30 items', () => {
+    expect(Object.keys(ITEM_CATALOG)).toHaveLength(30)
   })
 
   it('all items have valid category', () => {
@@ -46,7 +46,7 @@ describe('ITEM_CATALOG', () => {
     }
   })
 
-  it('equipment has maxStack of 1', () => {
+  it('equipment has maxStack of 1 when present', () => {
     const nonStackable = Object.values(ITEM_CATALOG).filter((item) => item.category === 'equipment')
     for (const item of nonStackable) {
       expect(item.maxStack).toBe(1)
@@ -85,7 +85,7 @@ describe('getItemsByCategory', () => {
 
   it('returns only consumables for consumable category', () => {
     const consumables = getItemsByCategory('consumable')
-    expect(consumables.length).toBe(11)
+    expect(consumables.length).toBe(7)
     for (const item of consumables) {
       expect(item.category).toBe('consumable')
     }
@@ -93,7 +93,7 @@ describe('getItemsByCategory', () => {
 
   it('returns only equipment for equipment category', () => {
     const equipment = getItemsByCategory('equipment')
-    expect(equipment.length).toBe(3)
+    expect(equipment.length).toBe(0)
     for (const item of equipment) {
       expect(item.category).toBe('equipment')
     }

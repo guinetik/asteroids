@@ -20,7 +20,7 @@ export type ItemCategory =
 
 /** An item definition from the JSON manifest. */
 export interface ItemDefinition {
-  /** Unique key, e.g. "olivine", "fuel-cell", "minigun". */
+  /** Unique key, e.g. "olivine", "fuel-cell", "grid-coupling-module". */
   id: string
   /** Classification: mineral, upgrade, consumable, or equipment. */
   category: ItemCategory

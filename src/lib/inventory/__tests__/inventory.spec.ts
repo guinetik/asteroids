@@ -111,8 +111,8 @@ describe('addItem', () => {
 
   it('fails when maxStack would be exceeded', () => {
     const inv = createInventory()
-    const r1 = addItem(inv, 'drill', 1)
-    const r2 = addItem(r1.inventory, 'drill', 1)
+    const r1 = addItem(inv, 'grid-coupling-module', 1)
+    const r2 = addItem(r1.inventory, 'grid-coupling-module', 1)
 
     expect(r2.ok).toBe(false)
     expect(r2.reason).toContain('stack')

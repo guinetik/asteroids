@@ -566,7 +566,7 @@ export const VIROID_ENVOY_INITIAL_CONTACT: ShipMessageDefinition = {
   ],
 }
 
-/** Viroid Envoy's follow-up after installing the Dark Lattice Coupler. */
+/** Viroid Envoy follow-up after the Gravity Surfing Module (`grid-coupling-module`) is installed. */
 export const VIROID_ENVOY_CERES_RENDEZVOUS: ShipMessageDefinition = {
   id: 'viroid-envoy-ceres-rendezvous',
   from: '— — —',
