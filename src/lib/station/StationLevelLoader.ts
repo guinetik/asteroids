@@ -51,7 +51,7 @@ const WALL_TEX_REPEATS_PER_UNIT_U = 0.18
 /** Wall texture tile density along the cylinder axis (repeats per world unit). */
 const WALL_TEX_REPEATS_PER_UNIT_V = 0.18
 /** End-cap texture tile density (repeats per world unit). */
-const CAP_TEX_REPEATS_PER_UNIT = 0.18
+const CAP_TEX_REPEATS_PER_UNIT = 0.12
 /** Floor albedo URL — checker pattern shared with the habitat. */
 const FLOOR_COLOR_URL = '/textures/checkers/color.webp'
 /** Floor normal URL. */
@@ -76,9 +76,24 @@ const PLATES_NORMAL_SCALE = 0.85
  * emissive component pushes painted tones toward off-white the way the
  * habitat interior does (see `HABITAT_PAINT_WALL_EMISSIVE_INTENSITY`).
  */
-const PLATES_EMISSIVE_INTENSITY = 0.18
+const PLATES_EMISSIVE_INTENSITY = 0.08
 /** Emissive lift for the deck so saturated palette tones don't read as washed-out grey. */
-const FLOOR_EMISSIVE_INTENSITY = 0.28
+const FLOOR_EMISSIVE_INTENSITY = 0.12
+
+// ---------------------------------------------------------------------------
+// Door-frame constants.
+// ---------------------------------------------------------------------------
+
+/** Thickness (world units) of each rectangular door-frame jamb. */
+const DOOR_FRAME_THICKNESS = 0.15
+/** Depth (world units) of the door-frame jambs along the wall's normal. */
+const DOOR_FRAME_DEPTH = 0.3
+/** Door-frame albedo (medium-grey metallic jamb). */
+const DOOR_FRAME_COLOR = 0x666666
+/** Door-frame metalness. */
+const DOOR_FRAME_METALNESS = 0.6
+/** Door-frame roughness. */
+const DOOR_FRAME_ROUGHNESS = 0.35
 
 // ---------------------------------------------------------------------------
 // Texture cache — load each map once and reuse across rooms.
@@ -436,24 +451,114 @@ export function buildHabitatStyleRoom(
   group.add(buildFloor(room, mat))
   group.add(buildEndCap(room, true, mat))
   group.add(buildEndCap(room, false, mat))
+  for (const door of room.doors) {
+    group.add(buildDoorFrame(room, door))
+  }
   return group
+}
+
+/**
+ * One contiguous span along the canopy axis (in room-local axis coordinates,
+ * i.e. centred around 0). Each segment becomes its own CylinderGeometry.
+ */
+interface CanopySegment {
+  /** Start position along the axis, room-local (range −length/2..+length/2). */
+  start: number
+  /** End position along the axis, room-local. */
+  end: number
+}
+
+/**
+ * Compute canopy segments along the room's axis, skipping Z-ranges that fall
+ * inside any curved-wall doorway. Returns a single full-length segment if no
+ * curved-wall doors exist.
+ *
+ * @param room - Room definition.
+ * @returns Sorted, non-overlapping segments covering the canopy axis.
+ */
+function computeCanopySegments(room: StationRoomJson): CanopySegment[] {
+  const halfLen = room.length / 2
+  const curveDoors = room.doors.filter((d) => !isCapWall(d.wall))
+  if (curveDoors.length === 0) {
+    return [{ start: -halfLen, end: halfLen }]
+  }
+  // Curved-wall doors are centred on the room's axis-local 0 (the cylinder's
+  // mid-length) by convention, with `width` along the cylinder axis. Compute
+  // each door's [start, end] window and subtract from the full span.
+  const gaps: { start: number; end: number }[] = curveDoors
+    .map((d) => {
+      const half = d.width / 2
+      return { start: -half, end: half }
+    })
+    .sort((a, b) => a.start - b.start)
+  // Merge overlapping gaps.
+  const merged: { start: number; end: number }[] = []
+  for (const g of gaps) {
+    const last = merged[merged.length - 1]
+    if (last && g.start <= last.end) {
+      last.end = Math.max(last.end, g.end)
+    } else {
+      merged.push({ ...g })
+    }
+  }
+  const segments: CanopySegment[] = []
+  let cursor = -halfLen
+  for (const g of merged) {
+    const gStart = Math.max(g.start, -halfLen)
+    const gEnd = Math.min(g.end, halfLen)
+    if (gStart > cursor) segments.push({ start: cursor, end: gStart })
+    cursor = Math.max(cursor, gEnd)
+  }
+  if (cursor < halfLen) segments.push({ start: cursor, end: halfLen })
+  return segments
 }
 
 /**
  * Half-cylinder solid wall/roof. Open-ended (no top/bottom caps), top
  * semicircle only, rotated so its axis maps to the room's chosen world
  * axis. Textured with the `plates` PBR set, tiled around the
- * circumference and along the cylinder axis.
+ * circumference and along the cylinder axis. When the room has curved-wall
+ * doors, the canopy is split into multiple Z-segments leaving floor-to-
+ * ceiling slots where doorways live.
  *
  * @param room - Room definition.
  * @param mat - Resolved material palette (provides wall tint).
- * @returns Wall mesh positioned in world space.
+ * @returns Wall mesh or group positioned in world space.
  */
-function buildCanopy(room: StationRoomJson, mat: StationMaterialJson): THREE.Mesh {
+function buildCanopy(room: StationRoomJson, mat: StationMaterialJson): THREE.Object3D {
+  const segments = computeCanopySegments(room)
+  const group = new THREE.Group()
+  group.name = `station-canopy:${room.id}`
+  for (const seg of segments) {
+    const segLen = seg.end - seg.start
+    if (segLen <= MIN_BOX_DIM) continue
+    const segMid = (seg.start + seg.end) / 2
+    const mesh = buildCanopySegmentMesh(room, mat, segLen, segMid)
+    group.add(mesh)
+  }
+  return group
+}
+
+/**
+ * Build a single half-cylinder canopy segment positioned at `segMid` along
+ * the room's axis (room-local), with `segLen` length.
+ *
+ * @param room - Room definition.
+ * @param mat - Resolved material palette.
+ * @param segLen - Segment length along the cylinder axis.
+ * @param segMid - Segment midpoint along the cylinder axis (room-local).
+ * @returns Canopy segment mesh in world space.
+ */
+function buildCanopySegmentMesh(
+  room: StationRoomJson,
+  mat: StationMaterialJson,
+  segLen: number,
+  segMid: number,
+): THREE.Mesh {
   const geo = new THREE.CylinderGeometry(
     room.radius,
     room.radius,
-    room.length,
+    segLen,
     CYLINDER_RADIAL_SEGMENTS,
     1,
     true,
@@ -462,7 +567,7 @@ function buildCanopy(room: StationRoomJson, mat: StationMaterialJson): THREE.Mes
   )
   const arcLen = Math.PI * room.radius
   const repeatU = Math.max(1, Math.round(arcLen * WALL_TEX_REPEATS_PER_UNIT_U))
-  const repeatV = Math.max(1, Math.round(room.length * WALL_TEX_REPEATS_PER_UNIT_V))
+  const repeatV = Math.max(1, Math.round(segLen * WALL_TEX_REPEATS_PER_UNIT_V))
   const colorMap = tiledTexture(PLATES_COLOR_URL, repeatU, repeatV)
   const normalMap = tiledTexture(PLATES_NORMAL_URL, repeatU, repeatV)
   const roughnessMap = tiledTexture(PLATES_ROUGHNESS_URL, repeatU, repeatV)
@@ -478,16 +583,20 @@ function buildCanopy(room: StationRoomJson, mat: StationMaterialJson): THREE.Mes
     metalness: WALL_METALNESS,
     emissive: new THREE.Color(mat.cap),
     emissiveIntensity: PLATES_EMISSIVE_INTENSITY,
-    side: THREE.BackSide,
+    side: THREE.DoubleSide,
   })
   const mesh = new THREE.Mesh(geo, matl)
   // Rotate so the cylinder's Y (its axis in local space) maps to world axis.
+  // After rotation, world Z (or X) along the cylinder axis comes from the
+  // local Y of the geometry, which is already centred. Offset by `segMid`
+  // along that world axis.
   if (room.axis === 'z') {
     mesh.rotation.x = Math.PI / 2
+    mesh.position.set(room.center[0], FLOOR_Y, room.center[2] + segMid)
   } else {
     mesh.rotation.z = Math.PI / 2
+    mesh.position.set(room.center[0] + segMid, FLOOR_Y, room.center[2])
   }
-  mesh.position.set(room.center[0], FLOOR_Y, room.center[2])
   mesh.receiveShadow = true
   return mesh
 }
@@ -613,6 +722,91 @@ function buildEndCap(
     }
   }
   return mesh
+}
+
+/**
+ * Build a metallic rectangular door frame (three jambs: top, left, right) at
+ * the doorway opening. The frame protrudes from the wall on both sides so it
+ * reads as a clear architectural element. End-cap doors get a frame in the
+ * cap's plane; curved-wall doors get a portal in the X/Z plane perpendicular
+ * to the wall's outward normal.
+ *
+ * @param room - Room hosting the door.
+ * @param door - Door definition.
+ * @returns Group of three jamb meshes positioned in world space.
+ */
+function buildDoorFrame(room: StationRoomJson, door: StationDoorJson): THREE.Group {
+  const group = new THREE.Group()
+  group.name = `station-door-frame:${room.id}:${door.wall}`
+  const halfW = door.width / 2
+  const h = door.height > 0 ? door.height : DEFAULT_DOOR_HEIGHT
+  const t = DOOR_FRAME_THICKNESS
+  const d = DOOR_FRAME_DEPTH
+  const matl = new THREE.MeshStandardMaterial({
+    color: DOOR_FRAME_COLOR,
+    metalness: DOOR_FRAME_METALNESS,
+    roughness: DOOR_FRAME_ROUGHNESS,
+    side: THREE.DoubleSide,
+  })
+
+  // Build the three jambs in a local frame where:
+  //   - local X is across the door (width axis),
+  //   - local Y is up,
+  //   - local Z is the wall normal (depth axis).
+  // Then we translate + rotate the group to align with the door's world
+  // position and orientation.
+  const topGeo = new THREE.BoxGeometry(door.width + t * 2, t, d)
+  const top = new THREE.Mesh(topGeo, matl)
+  top.position.set(0, h + t / 2, 0)
+  group.add(top)
+
+  const sideGeo = new THREE.BoxGeometry(t, h + t, d)
+  const left = new THREE.Mesh(sideGeo, matl)
+  left.position.set(-halfW - t / 2, (h + t) / 2 - t / 2, 0)
+  group.add(left)
+  const right = new THREE.Mesh(sideGeo, matl)
+  right.position.set(halfW + t / 2, (h + t) / 2 - t / 2, 0)
+  group.add(right)
+
+  // Position + orient at the door's world location.
+  const [cx, , cz] = room.center
+  const halfLen = room.length / 2
+  switch (door.wall) {
+    case '+zCap':
+      group.position.set(cx, FLOOR_Y, cz + halfLen)
+      // Local X = world X (across), local Z = world Z (wall normal). No rotation.
+      break
+    case '-zCap':
+      group.position.set(cx, FLOOR_Y, cz - halfLen)
+      break
+    case '+xCap':
+      group.position.set(cx + halfLen, FLOOR_Y, cz)
+      // Wall normal is world +X; rotate around Y so local Z → world X.
+      group.rotation.y = Math.PI / 2
+      break
+    case '-xCap':
+      group.position.set(cx - halfLen, FLOOR_Y, cz)
+      group.rotation.y = -Math.PI / 2
+      break
+    case '+xCurve':
+      // Curved wall door on an axis-'z' room. Door is at world X = cx + radius,
+      // centred along Z at the room centre (z = cz). Wall normal is +X.
+      group.position.set(cx + room.radius, FLOOR_Y, cz)
+      group.rotation.y = Math.PI / 2
+      break
+    case '-xCurve':
+      group.position.set(cx - room.radius, FLOOR_Y, cz)
+      group.rotation.y = -Math.PI / 2
+      break
+    case '+zCurve':
+      // Curved wall door on an axis-'x' room. Door is at world Z = cz + radius.
+      group.position.set(cx, FLOOR_Y, cz + room.radius)
+      break
+    case '-zCurve':
+      group.position.set(cx, FLOOR_Y, cz - room.radius)
+      break
+  }
+  return group
 }
 
 // ---------------------------------------------------------------------------

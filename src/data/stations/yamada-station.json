@@ -45,10 +45,10 @@
     }
   ],
   "materials": {
-    "yamada-foyer":     { "floor": "#cccccc", "cap": "#eeeeee" },
-    "yamada-margaret":  { "floor": "#cccccc", "cap": "#eeeeee" },
-    "yamada-pig":       { "floor": "#c8c8c6", "cap": "#e8e8e8" },
-    "yamada-listening": { "floor": "#b8c2c8", "cap": "#dde2e5" }
+    "yamada-foyer":     { "floor": "#bcb5a8", "cap": "#e0d8c8" },
+    "yamada-margaret":  { "floor": "#bcb09a", "cap": "#e8e0c8" },
+    "yamada-pig":       { "floor": "#b89e9a", "cap": "#e8d6d2" },
+    "yamada-listening": { "floor": "#9aa6b2", "cap": "#cad6e0" }
   },
   "ambient": { "color": "#ffffff", "intensity": 0.7 }
 }
