@@ -222,7 +222,9 @@ export class StationViewController implements Tickable {
       onMouseDelta: (mx, my) => this.fpsCamera?.applyMouseDelta(mx, my),
       onLockChange: (locked) => this.onPointerLockChange?.(locked),
     })
-    this.pointerLock.requestLock()
+    // Browsers reject requestPointerLock() outside a user gesture (mount-time
+    // call throws NotAllowedError on hard refresh). The view's @pointerdown
+    // handler calls requestPointerLock() on the first click instead.
   }
 
   /** Tear down the scene. */
