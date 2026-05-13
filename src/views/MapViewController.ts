@@ -2570,9 +2570,7 @@ export class MapViewController implements Tickable {
   private applyOrbitsVisible(visible: boolean): void {
     this.orbitsVisible = visible
     for (const controller of this.planetControllers) {
-      for (const line of controller.orbitLines) {
-        line.visible = visible
-      }
+      controller.setOrbitLinesVisible(visible)
     }
   }
 

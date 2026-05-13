@@ -147,8 +147,14 @@ export class PlanetSystemController implements GravitySource {
   /** Mass in solar masses (M☉). */
   readonly mass: number
 
-  /** Orbit lines for the planet and moons (added to scene root, not the group). */
+  /**
+   * Heliocentric orbit ring for this body (world space). Added to the scene root —
+   * see {@link MapPlanetariumScene}. Moon rings live under {@link group}.
+   */
   readonly orbitLines: THREE.LineLoop[]
+
+  /** Satellite orbit rings parented to {@link group}; toggled with planet ring via {@link setOrbitLinesVisible}. */
+  private readonly moonOrbitLines: THREE.LineLoop[] = []
 
   private readonly planetMesh: PlanetMeshResult
   private readonly planet: Planet
@@ -211,6 +217,7 @@ export class PlanetSystemController implements GravitySource {
       // Moon orbit line (relative to planet group)
       const moonOrbitLine = createOrbitLine(scaledMoonOrbit, MOON_ORBIT_OPACITY)
       this.group.add(moonOrbitLine)
+      this.moonOrbitLines.push(moonOrbitLine)
 
       this.moonEntries.push({ meshResult, orbit: scaledMoonOrbit })
     }
@@ -299,6 +306,20 @@ export class PlanetSystemController implements GravitySource {
    */
   setIndicatorVisible(visible: boolean): void {
     this.indicatorSprite.visible = visible
+  }
+
+  /**
+   * Shows or hides heliocentric and moon orbit rings together (map "Orbits" toggle).
+   *
+   * @param visible - Whether orbit line meshes should render.
+   */
+  setOrbitLinesVisible(visible: boolean): void {
+    for (const line of this.orbitLines) {
+      line.visible = visible
+    }
+    for (const line of this.moonOrbitLines) {
+      line.visible = visible
+    }
   }
 
   tick(dt: number, simTime: number, camera?: THREE.PerspectiveCamera, labelsVisible = true): void {
