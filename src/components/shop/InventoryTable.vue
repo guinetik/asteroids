@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { InventoryStack } from '@/lib/inventory/types'
+import type { InventoryStack, ItemCategory } from '@/lib/inventory/types'
 import { getItemDefinition } from '@/lib/inventory/catalog'
+import {
+  coerceInventoryItemCategory,
+  getInventoryCategoryBorderUrl,
+} from '@/lib/inventory/itemCategoryBorder'
+import { INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS } from '@/lib/inventory/inventoryCategorySlotLayout'
 import { getDesirabilityPips, computeSellPrice } from '@/lib/shop/planetDemand'
 
 const props = defineProps<{
@@ -18,7 +23,8 @@ const emit = defineEmits<{
 interface DisplayRow {
   itemId: string
   label: string
-  icon: string
+  category: ItemCategory
+  categoryBorderUrl: string
   quantity: number
   weightKg: number
   pips: number
@@ -36,10 +42,12 @@ const rows = computed<DisplayRow[]>(() => {
         : 0
     const sellPrice =
       props.mode === 'sell' && props.planetId ? computeSellPrice(props.planetId, stack.itemId) : 0
+    const category = coerceInventoryItemCategory(def?.category)
     return {
       itemId: stack.itemId,
       label: def?.label ?? stack.itemId,
-      icon: def?.icon ?? '',
+      category,
+      categoryBorderUrl: getInventoryCategoryBorderUrl(category),
       quantity: stack.quantity,
       weightKg: stack.totalWeightKg,
       pips,
@@ -86,7 +94,16 @@ function handleUse(itemId: string) {
     <div v-else class="inventory-table__grid">
       <div v-for="row in rows" :key="row.itemId" class="inventory-table__row">
         <div class="inventory-table__icon-cell">
-          <div class="inventory-table__icon-placeholder">{{ row.label.charAt(0) }}</div>
+          <div class="inventory-table__category-slot" role="img" :aria-label="row.label">
+            <img
+              class="inventory-table__category-border"
+              :src="row.categoryBorderUrl"
+              :width="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
+              :height="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
+              alt=""
+              decoding="async"
+            />
+          </div>
         </div>
         <div class="inventory-table__info">
           <span class="inventory-table__name">{{ row.label }}</span>

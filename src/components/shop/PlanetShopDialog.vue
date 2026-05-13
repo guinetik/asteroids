@@ -12,6 +12,8 @@ import {
   REPAIR_COST,
   getBribeCost,
 } from '@/lib/shop/shopSession'
+import { getInventoryCategoryBorderUrl } from '@/lib/inventory/itemCategoryBorder'
+import { INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS } from '@/lib/inventory/inventoryCategorySlotLayout'
 import InventoryTable from './InventoryTable.vue'
 import { uiAudio } from '@/audio/UiAudioDirector'
 
@@ -65,10 +67,17 @@ function slotDescription(slot: TradeGoodSlot) {
   return tg?.description ?? ''
 }
 
-function slotIcon(slot: TradeGoodSlot) {
-  const tg = getTradeGood(slot.itemId)
-  return tg?.label.charAt(0) ?? '?'
-}
+/** Station services use the equipment (cyan) inventory slot frame, matching the Sell column styling. */
+const shopServiceCategoryBorderUrl = getInventoryCategoryBorderUrl('equipment')
+
+/** Buy-column fuel cells use the consumable (green) inventory slot frame. */
+const shopFuelCategoryBorderUrl = getInventoryCategoryBorderUrl('consumable')
+
+/** Trade-good slots use the trade-good (amber) inventory slot frame. */
+const shopTradeCategoryBorderUrl = getInventoryCategoryBorderUrl('trade-good')
+
+/** Bribe-to-restock uses the mission-material (purple) inventory slot frame. */
+const shopBribeCategoryBorderUrl = getInventoryCategoryBorderUrl('mission-material')
 
 const venusLocalSlots = computed(() => props.session.tradeSlots.filter((slot) => !slot.isImported))
 
@@ -194,8 +203,19 @@ function onKeydown(e: KeyboardEvent): void {
 
                 <div v-show="servicesOpen" class="planet-shop-group__content">
                   <div class="planet-shop-item planet-shop-item--service">
-                    <div class="planet-shop-item__icon-placeholder planet-shop-icon--service">
-                      F
+                    <div
+                      class="planet-shop-item__category-slot"
+                      role="img"
+                      aria-label="Refuel service"
+                    >
+                      <img
+                        class="planet-shop-item__category-border"
+                        :src="shopServiceCategoryBorderUrl"
+                        :width="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
+                        :height="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
+                        alt=""
+                        decoding="async"
+                      />
                     </div>
                     <div class="planet-shop-item__info">
                       <span class="planet-shop-item__name">Refuel</span>
@@ -215,8 +235,19 @@ function onKeydown(e: KeyboardEvent): void {
                   </div>
 
                   <div class="planet-shop-item planet-shop-item--service">
-                    <div class="planet-shop-item__icon-placeholder planet-shop-icon--service">
-                      S
+                    <div
+                      class="planet-shop-item__category-slot"
+                      role="img"
+                      aria-label="Shuttle hull repair"
+                    >
+                      <img
+                        class="planet-shop-item__category-border"
+                        :src="shopServiceCategoryBorderUrl"
+                        :width="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
+                        :height="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
+                        alt=""
+                        decoding="async"
+                      />
                     </div>
                     <div class="planet-shop-item__info">
                       <span class="planet-shop-item__name">Shuttle Hull Repair</span>
@@ -237,8 +268,19 @@ function onKeydown(e: KeyboardEvent): void {
                   </div>
 
                   <div class="planet-shop-item planet-shop-item--service">
-                    <div class="planet-shop-item__icon-placeholder planet-shop-icon--service">
-                      P
+                    <div
+                      class="planet-shop-item__category-slot"
+                      role="img"
+                      aria-label="Lander hull repair"
+                    >
+                      <img
+                        class="planet-shop-item__category-border"
+                        :src="shopServiceCategoryBorderUrl"
+                        :width="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
+                        :height="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
+                        alt=""
+                        decoding="async"
+                      />
                     </div>
                     <div class="planet-shop-item__info">
                       <span class="planet-shop-item__name">Lander Hull Repair</span>
@@ -274,7 +316,20 @@ function onKeydown(e: KeyboardEvent): void {
 
                 <div v-show="fuelOpen" class="planet-shop-group__content">
                   <div class="planet-shop-item planet-shop-item--fuel">
-                    <div class="planet-shop-item__icon-placeholder planet-shop-icon--fuel">S</div>
+                    <div
+                      class="planet-shop-item__category-slot"
+                      role="img"
+                      aria-label="Shuttle fuel cell"
+                    >
+                      <img
+                        class="planet-shop-item__category-border"
+                        :src="shopFuelCategoryBorderUrl"
+                        :width="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
+                        :height="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
+                        alt=""
+                        decoding="async"
+                      />
+                    </div>
                     <div class="planet-shop-item__info">
                       <span class="planet-shop-item__name">Shuttle Fuel Cell</span>
                       <span class="planet-shop-item__desc"
@@ -294,7 +349,20 @@ function onKeydown(e: KeyboardEvent): void {
                   </div>
 
                   <div class="planet-shop-item planet-shop-item--fuel">
-                    <div class="planet-shop-item__icon-placeholder planet-shop-icon--fuel">L</div>
+                    <div
+                      class="planet-shop-item__category-slot"
+                      role="img"
+                      aria-label="Lander fuel cell"
+                    >
+                      <img
+                        class="planet-shop-item__category-border"
+                        :src="shopFuelCategoryBorderUrl"
+                        :width="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
+                        :height="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
+                        alt=""
+                        decoding="async"
+                      />
+                    </div>
                     <div class="planet-shop-item__info">
                       <span class="planet-shop-item__name">Lander Fuel Cell</span>
                       <span class="planet-shop-item__desc"
@@ -340,8 +408,19 @@ function onKeydown(e: KeyboardEvent): void {
                       class="planet-shop-item planet-shop-item--trade"
                       :class="{ 'planet-shop-item--sold-out': slot.stock <= 0 }"
                     >
-                      <div class="planet-shop-item__icon-placeholder planet-shop-icon--trade">
-                        {{ slotIcon(slot) }}
+                      <div
+                        class="planet-shop-item__category-slot"
+                        role="img"
+                        :aria-label="slotLabel(slot)"
+                      >
+                        <img
+                          class="planet-shop-item__category-border"
+                          :src="shopTradeCategoryBorderUrl"
+                          :width="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
+                          :height="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
+                          alt=""
+                          decoding="async"
+                        />
                       </div>
                       <div class="planet-shop-item__info">
                         <span class="planet-shop-item__name">{{ slotLabel(slot) }}</span>
@@ -368,8 +447,19 @@ function onKeydown(e: KeyboardEvent): void {
                       class="planet-shop-item planet-shop-item--trade planet-shop-item--import"
                       :class="{ 'planet-shop-item--sold-out': slot.stock <= 0 }"
                     >
-                      <div class="planet-shop-item__icon-placeholder planet-shop-icon--import">
-                        {{ slotIcon(slot) }}
+                      <div
+                        class="planet-shop-item__category-slot"
+                        role="img"
+                        :aria-label="slotLabel(slot)"
+                      >
+                        <img
+                          class="planet-shop-item__category-border"
+                          :src="shopTradeCategoryBorderUrl"
+                          :width="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
+                          :height="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
+                          alt=""
+                          decoding="async"
+                        />
                       </div>
                       <div class="planet-shop-item__info">
                         <span class="planet-shop-item__name">{{ slotLabel(slot) }}</span>
@@ -400,8 +490,19 @@ function onKeydown(e: KeyboardEvent): void {
                       class="planet-shop-item planet-shop-item--trade"
                       :class="{ 'planet-shop-item--sold-out': slot.stock <= 0 }"
                     >
-                      <div class="planet-shop-item__icon-placeholder planet-shop-icon--trade">
-                        {{ slotIcon(slot) }}
+                      <div
+                        class="planet-shop-item__category-slot"
+                        role="img"
+                        :aria-label="slotLabel(slot)"
+                      >
+                        <img
+                          class="planet-shop-item__category-border"
+                          :src="shopTradeCategoryBorderUrl"
+                          :width="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
+                          :height="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
+                          alt=""
+                          decoding="async"
+                        />
                       </div>
                       <div class="planet-shop-item__info">
                         <span class="planet-shop-item__name">{{ slotLabel(slot) }}</span>
@@ -424,8 +525,19 @@ function onKeydown(e: KeyboardEvent): void {
 
                   <!-- Lucas's signature: bribe the dock master to reroll trade goods. -->
                   <div class="planet-shop-item planet-shop-item--bribe">
-                    <div class="planet-shop-item__icon-placeholder planet-shop-icon--bribe">
-                      &#127183;
+                    <div
+                      class="planet-shop-item__category-slot"
+                      role="img"
+                      aria-label="Bribe to restock trade goods"
+                    >
+                      <img
+                        class="planet-shop-item__category-border"
+                        :src="shopBribeCategoryBorderUrl"
+                        :width="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
+                        :height="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
+                        alt=""
+                        decoding="async"
+                      />
                     </div>
                     <div class="planet-shop-item__info">
                       <span class="planet-shop-item__name">Bribe to Restock</span>

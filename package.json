@@ -22,6 +22,7 @@
     "lint:shaders": "node scripts/lint-shaders.mjs",
     "format": "prettier --write --experimental-cli src/",
     "sound:build": "node scripts/optimize-sound.mjs",
+    "items:borders:webp": "node scripts/build-inventory-category-borders.mjs",
     "textures:webp": "node scripts/build-textures.mjs",
     "og:image": "node scripts/optimize-og-image.mjs",
     "textures:build": "run-s textures:webp og:image",

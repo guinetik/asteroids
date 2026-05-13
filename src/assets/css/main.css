@@ -2799,9 +2799,13 @@ body,
   @apply shrink-0;
 }
 
-.inventory-table__icon-placeholder {
-  @apply flex h-8 w-8 items-center justify-center rounded
-         bg-slate-700 text-xs font-bold text-slate-300;
+.inventory-table__category-slot {
+  /* Keep in sync with `INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS` (inventoryCategorySlotLayout). */
+  @apply relative flex h-12 w-12 shrink-0 overflow-hidden rounded;
+}
+
+.inventory-table__category-border {
+  @apply block h-full w-full object-cover;
 }
 
 .inventory-table__info {
@@ -3022,9 +3026,13 @@ body,
   @apply opacity-40;
 }
 
-.planet-shop-item__icon-placeholder {
-  @apply flex h-10 w-10 shrink-0 items-center justify-center rounded
-         bg-slate-700 text-sm font-bold text-slate-300;
+.planet-shop-item__category-slot {
+  /* Matches shuttle/cargo inventory category slot sizing. */
+  @apply relative flex h-12 w-12 shrink-0 overflow-hidden rounded;
+}
+
+.planet-shop-item__category-border {
+  @apply block h-full w-full object-cover;
 }
 
 .planet-shop-item__info {
@@ -3067,26 +3075,6 @@ body,
 .planet-shop-btn--trade {
   @apply border-amber-400/30 bg-amber-400/10 text-amber-300
          hover:bg-amber-400/20;
-}
-
-.planet-shop-icon--service {
-  @apply bg-green-900/50 text-green-300;
-}
-
-.planet-shop-icon--fuel {
-  @apply bg-blue-900/50 text-blue-300;
-}
-
-.planet-shop-icon--trade {
-  @apply bg-amber-900/50 text-amber-300;
-}
-
-.planet-shop-icon--import {
-  @apply bg-cyan-900/50 text-cyan-300;
-}
-
-.planet-shop-icon--bribe {
-  @apply bg-fuchsia-900/50 text-fuchsia-200;
 }
 
 .planet-shop-btn--bribe {

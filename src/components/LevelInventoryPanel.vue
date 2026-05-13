@@ -22,8 +22,13 @@
  * @date 2026-04-18
  */
 import { computed, ref, watch } from 'vue'
-import type { Inventory, InventoryStack } from '@/lib/inventory/types'
+import type { Inventory, InventoryStack, ItemCategory } from '@/lib/inventory/types'
 import { getItemDefinition } from '@/lib/inventory/catalog'
+import {
+  coerceInventoryItemCategory,
+  getInventoryCategoryBorderUrl,
+} from '@/lib/inventory/itemCategoryBorder'
+import { INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS } from '@/lib/inventory/inventoryCategorySlotLayout'
 
 const props = defineProps<{
   /** Current cargo snapshot. `null` while the inventory hasn't loaded. */
@@ -48,7 +53,8 @@ const splitQty = ref<Record<string, number>>({})
 interface DisplayRow {
   itemId: string
   label: string
-  category: string
+  category: ItemCategory
+  categoryBorderUrl: string
   quantity: number
   weightPerUnit: number
   totalWeightKg: number
@@ -84,10 +90,12 @@ const rows = computed<DisplayRow[]>(() => {
     const def = getItemDefinition(stack.itemId)
     const split = clamp(splitQty.value[stack.itemId] ?? 1, 1, stack.quantity)
     const runGainThisSortie = Math.max(0, Math.floor(runGains.value[stack.itemId] ?? 0))
+    const category = coerceInventoryItemCategory(def?.category)
     return {
       itemId: stack.itemId,
       label: def?.label ?? stack.itemId,
-      category: def?.category ?? 'other',
+      category,
+      categoryBorderUrl: getInventoryCategoryBorderUrl(category),
       quantity: stack.quantity,
       weightPerUnit: def?.weightPerUnit ?? 0,
       totalWeightKg: stack.totalWeightKg,
@@ -213,8 +221,19 @@ function handleBackdropClick(event: MouseEvent): void {
             <p v-if="rows.length === 0" class="inventory-panel__empty">CARGO HOLD EMPTY</p>
             <ul v-else class="inventory-panel__list" role="list">
               <li v-for="row in rows" :key="row.itemId" class="inventory-panel__row">
-                <div class="inventory-panel__icon" aria-hidden="true">
-                  {{ row.label.charAt(0) }}
+                <div
+                  class="inventory-panel__category-slot"
+                  role="img"
+                  :aria-label="row.label"
+                >
+                  <img
+                    class="inventory-panel__category-border"
+                    :src="row.categoryBorderUrl"
+                    :width="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
+                    :height="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
+                    alt=""
+                    decoding="async"
+                  />
                 </div>
                 <div class="inventory-panel__info">
                   <div class="inventory-panel__name">{{ row.label }}</div>
@@ -452,24 +471,29 @@ function handleBackdropClick(event: MouseEvent): void {
 }
 .inventory-panel__row {
   display: grid;
-  grid-template-columns: 2.4rem 1fr minmax(180px, 1.2fr) auto;
+  /* First column equals `INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS` at 16px root (3rem). */
+  grid-template-columns: 3rem 1fr minmax(180px, 1.2fr) auto;
   align-items: center;
   gap: 0.75rem;
   padding: 0.55rem 0.7rem;
   background: rgba(8, 16, 22, 0.55);
   border: 1px solid rgba(102, 255, 238, 0.18);
 }
-.inventory-panel__icon {
-  width: 2.4rem;
-  height: 2.4rem;
+.inventory-panel__category-slot {
+  width: 3rem;
+  height: 3rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.05rem;
-  font-weight: 600;
-  color: rgba(102, 255, 238, 0.95);
-  background: rgba(0, 12, 20, 0.6);
-  border: 1px solid rgba(102, 255, 238, 0.32);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.inventory-panel__category-border {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .inventory-panel__info {
   min-width: 0;
