@@ -24,20 +24,20 @@ import {
 /** Wall thickness used when generating AABBs and box-geometry meshes. */
 const WALL_THICKNESS = 0.2
 
-/** Wall height used for box-geometry meshes. */
-const WALL_MESH_HEIGHT = 3
-
 /** Floor mesh roughness for the standard material. */
 const FLOOR_ROUGHNESS = 0.85
 
 /** Ceiling mesh roughness for the standard material. */
 const CEILING_ROUGHNESS = 0.9
 
-/** Wall mesh tint applied to every wall box-geometry. */
-const WALL_MESH_TINT = 0x5a4a3e
+/** Wall mesh roughness for the standard material. */
+const WALL_ROUGHNESS = 0.85
 
 /** Minimum dimension passed to BoxGeometry so degenerate walls do not crash. */
 const MIN_BOX_DIM = 0.01
+
+/** Tolerance (world units) when checking world-space alignment of mirror openings. */
+const OPENING_ALIGNMENT_EPSILON = 1e-3
 
 /** Result of {@link buildStationColliderGeometry}. */
 export interface StationColliderGeometry {
@@ -64,9 +64,31 @@ export interface StationLevel {
 }
 
 /**
+ * Compute the world-space centre coordinate of an opening along the wall's
+ * perpendicular axis (x for ±z walls, z for ±x walls). Openings declare their
+ * `offset` relative to the parent wall's centre.
+ *
+ * @param room - Room owning the wall.
+ * @param op - Opening on that wall.
+ * @returns World-space centre coordinate along the wall's perpendicular axis.
+ */
+function openingWorldCenter(room: StationRoomJson, op: StationOpeningJson): number {
+  const [w, , d] = room.size
+  const [ox, , oz] = room.origin
+  if (op.wall === '+x' || op.wall === '-x') {
+    // Perpendicular axis is z.
+    return oz + d / 2 + op.offset
+  }
+  // Perpendicular axis is x.
+  return ox + w / 2 + op.offset
+}
+
+/**
  * Throw if the level is structurally invalid. Catches the bugs that JSON
  * editors are most likely to introduce: missing rooms, lopsided openings,
- * dangling material keys.
+ * dangling material keys. Mirror openings must align in world space (same
+ * centre and width) rather than carrying numerically equal `offset` values,
+ * since adjacent rooms generally have different wall-centre coordinates.
  *
  * @param level - Parsed JSON.
  */
@@ -93,15 +115,18 @@ export function validateStationLevel(level: StationLevelJson): void {
       if (!roomIds.has(op.to)) {
         throw new Error(`room "${room.id}" opening leads to unknown room "${op.to}"`)
       }
-      // Mirror exists in the target room.
+      // Mirror exists in the target room with matching world-space centre + width.
       const target = level.rooms.find((r) => r.id === op.to)!
       const oppositeWall = oppositeOf(op.wall)
-      const mirrored = target.openings.find(
-        (o) => o.to === room.id && o.wall === oppositeWall && o.width === op.width,
-      )
+      const myCenter = openingWorldCenter(room, op)
+      const mirrored = target.openings.find((o) => {
+        if (o.to !== room.id || o.wall !== oppositeWall || o.width !== op.width) return false
+        const theirCenter = openingWorldCenter(target, o)
+        return Math.abs(theirCenter - myCenter) <= OPENING_ALIGNMENT_EPSILON
+      })
       if (!mirrored) {
         throw new Error(
-          `opening from "${room.id}" to "${op.to}" is not mirrored back on the "${oppositeWall}" wall of "${op.to}"`,
+          `opening from "${room.id}" to "${op.to}" is not mirrored back on the "${oppositeWall}" wall of "${op.to}" (world-space centre or width mismatch)`,
         )
       }
     }
@@ -222,19 +247,15 @@ function wallSegmentsForWall(
 }
 
 /**
- * Build a Three.js group of meshes for the level: floor, ceiling, and the
- * wall AABBs (drawn as box geometry) per room, plus per-room ambient tint.
- * The actual exit-hatch mesh is owned by `StationHatchController` and is
- * added to the scene separately by the view controller.
+ * Build a Three.js group of meshes for the level: per-room floor + ceiling +
+ * wall segments. Each room contributes its own wall meshes (split around its
+ * openings) tinted by the room's wall material, with mesh height matching the
+ * room's declared `size[1]` so the ceiling actually sits on top of the walls.
  *
  * @param level - Validated JSON.
- * @param geometry - Pre-computed collider geometry.
  * @returns Root group containing every mesh.
  */
-export function buildStationMeshes(
-  level: StationLevelJson,
-  geometry: StationColliderGeometry,
-): THREE.Group {
+export function buildStationMeshes(level: StationLevelJson): THREE.Group {
   const group = new THREE.Group()
   group.name = `station:${level.id}`
 
@@ -242,10 +263,13 @@ export function buildStationMeshes(
     const mat = level.materials[room.material]!
     group.add(buildRoomFloorMesh(room, mat))
     group.add(buildRoomCeilingMesh(room, mat))
-  }
-
-  for (const wall of geometry.walls) {
-    group.add(buildWallMesh(wall))
+    for (const wall of ['+x', '-x', '+z', '-z'] as const) {
+      const openings = room.openings.filter((o) => o.wall === wall)
+      const segments = wallSegmentsForWall(room, wall, openings)
+      for (const seg of segments) {
+        group.add(buildWallMesh(seg, room, mat))
+      }
+    }
   }
 
   return group
@@ -256,7 +280,11 @@ function buildRoomFloorMesh(room: StationRoomJson, mat: StationMaterialJson): TH
   const [w, , d] = room.size
   const [ox, oy, oz] = room.origin
   const geo = new THREE.PlaneGeometry(w, d)
-  const m = new THREE.MeshStandardMaterial({ color: mat.floor, roughness: FLOOR_ROUGHNESS })
+  const m = new THREE.MeshStandardMaterial({
+    color: mat.floor,
+    roughness: FLOOR_ROUGHNESS,
+    side: THREE.DoubleSide,
+  })
   const mesh = new THREE.Mesh(geo, m)
   mesh.rotation.x = -Math.PI / 2
   mesh.position.set(ox + w / 2, oy, oz + d / 2)
@@ -264,27 +292,49 @@ function buildRoomFloorMesh(room: StationRoomJson, mat: StationMaterialJson): TH
   return mesh
 }
 
-/** Build the horizontal ceiling plane mesh for one room. */
+/**
+ * Build the horizontal ceiling plane mesh for one room. The plane is rotated
+ * so its lit face points down into the room, and rendered DoubleSide so the
+ * player never sees a black unlit underside regardless of lighting setup.
+ */
 function buildRoomCeilingMesh(room: StationRoomJson, mat: StationMaterialJson): THREE.Mesh {
   const [w, h, d] = room.size
   const [ox, oy, oz] = room.origin
   const geo = new THREE.PlaneGeometry(w, d)
-  const m = new THREE.MeshStandardMaterial({ color: mat.ceiling, roughness: CEILING_ROUGHNESS })
+  const m = new THREE.MeshStandardMaterial({
+    color: mat.ceiling,
+    roughness: CEILING_ROUGHNESS,
+    side: THREE.DoubleSide,
+  })
   const mesh = new THREE.Mesh(geo, m)
+  // Rotate so the visible face points DOWN into the room (normal = -Y).
   mesh.rotation.x = Math.PI / 2
   mesh.position.set(ox + w / 2, oy + h, oz + d / 2)
   return mesh
 }
 
-/** Build a thin box-geometry mesh for one wall AABB. */
-function buildWallMesh(wall: StationWallAabb): THREE.Mesh {
+/**
+ * Build a box-geometry mesh for one wall segment. The mesh height matches the
+ * parent room's declared height so the ceiling sits flush on top, and the
+ * colour is read from the room's material palette.
+ *
+ * @param wall - World-space AABB of the wall segment.
+ * @param room - Parent room (for height + palette lookup).
+ * @param mat - Resolved material palette for that room.
+ */
+function buildWallMesh(
+  wall: StationWallAabb,
+  room: StationRoomJson,
+  mat: StationMaterialJson,
+): THREE.Mesh {
   const w = wall.maxX - wall.minX
   const d = wall.maxZ - wall.minZ
-  const h = WALL_MESH_HEIGHT
+  const h = room.size[1]
+  const oy = room.origin[1]
   const geo = new THREE.BoxGeometry(Math.max(w, MIN_BOX_DIM), h, Math.max(d, MIN_BOX_DIM))
-  const m = new THREE.MeshStandardMaterial({ color: WALL_MESH_TINT, roughness: FLOOR_ROUGHNESS })
+  const m = new THREE.MeshStandardMaterial({ color: mat.wall, roughness: WALL_ROUGHNESS })
   const mesh = new THREE.Mesh(geo, m)
-  mesh.position.set((wall.minX + wall.maxX) / 2, h / 2, (wall.minZ + wall.maxZ) / 2)
+  mesh.position.set((wall.minX + wall.maxX) / 2, oy + h / 2, (wall.minZ + wall.maxZ) / 2)
   mesh.castShadow = false
   mesh.receiveShadow = true
   return mesh
@@ -300,7 +350,7 @@ export function loadStationLevel(level: StationLevelJson): StationLevel {
   validateStationLevel(level)
   const geometry = buildStationColliderGeometry(level)
   const collider = new StationCollider(geometry.floors, geometry.walls)
-  const group = buildStationMeshes(level, geometry)
+  const group = buildStationMeshes(level)
 
   const spawnPos = new THREE.Vector3(level.spawn.pos[0], level.spawn.pos[1], level.spawn.pos[2])
   const hatchRoom = level.rooms.find((r) => r.id === level.exitHatch.room)!

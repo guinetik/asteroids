@@ -1,11 +1,11 @@
 {
   "id": "yamada-titania",
   "spawn": { "room": "foyer", "pos": [0, 0, -2], "yaw": 0 },
-  "exitHatch": { "room": "foyer", "wall": "-z", "centerY": 1.2 },
+  "exitHatch": { "room": "foyer", "wall": "-z", "centerY": 1.5 },
   "rooms": [
     {
       "id": "foyer",
-      "size": [16, 3, 8],
+      "size": [16, 4, 8],
       "origin": [-8, 0, -4],
       "material": "yamada-foyer",
       "openings": [
@@ -16,31 +16,31 @@
     },
     {
       "id": "margaret",
-      "size": [10, 3, 8],
-      "origin": [-10, 0, 4],
+      "size": [8, 4, 8],
+      "origin": [-11, 0, 4],
       "material": "yamada-margaret",
-      "openings": [{ "to": "foyer", "wall": "-z", "offset": 5, "width": 2 }]
+      "openings": [{ "to": "foyer", "wall": "-z", "offset": 2, "width": 2 }]
     },
     {
       "id": "pig-ward",
-      "size": [16, 3, 12],
-      "origin": [-8, 0, 4],
+      "size": [6, 4, 12],
+      "origin": [-3, 0, 4],
       "material": "yamada-pig",
       "openings": [{ "to": "foyer", "wall": "-z", "offset": 0, "width": 2 }]
     },
     {
       "id": "listening",
-      "size": [10, 3, 10],
-      "origin": [0, 0, 4],
+      "size": [8, 4, 8],
+      "origin": [3, 0, 4],
       "material": "yamada-listening",
-      "openings": [{ "to": "foyer", "wall": "-z", "offset": -5, "width": 2 }]
+      "openings": [{ "to": "foyer", "wall": "-z", "offset": -2, "width": 2 }]
     }
   ],
   "materials": {
-    "yamada-foyer":     { "floor": "#3a2f28", "wall": "#5a4a3e", "ceiling": "#2a2520" },
-    "yamada-margaret":  { "floor": "#3a2f28", "wall": "#5a4a3e", "ceiling": "#2a2520" },
-    "yamada-pig":       { "floor": "#332e2a", "wall": "#4a4642", "ceiling": "#26231f" },
-    "yamada-listening": { "floor": "#252a30", "wall": "#3a4048", "ceiling": "#1c2026" }
+    "yamada-foyer":     { "floor": "#cccccc", "wall": "#e8e8e8", "ceiling": "#f4f4f4" },
+    "yamada-margaret":  { "floor": "#cccccc", "wall": "#eaeae8", "ceiling": "#f4f4f4" },
+    "yamada-pig":       { "floor": "#c8c8c6", "wall": "#e2e2de", "ceiling": "#f0f0ee" },
+    "yamada-listening": { "floor": "#b8c2c8", "wall": "#d4dcdf", "ceiling": "#e8edef" }
   },
-  "ambient": { "color": "#ffdcb0", "intensity": 0.35 }
+  "ambient": { "color": "#ffdcb0", "intensity": 0.6 }
 }
