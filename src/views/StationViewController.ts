@@ -1,12 +1,12 @@
 /**
  * Bridges Vue lifecycle to the station-interior FPS scene.
  *
- * Loads a data-driven station JSON, builds floor/wall meshes and a
- * collider, drops in a gravity-walk FPS player, and places an exit hatch
- * that routes back to `/` when the player presses F within range.
+ * Renders a parametric room assembled from the modular hallway pack:
+ * a `ROOM_WIDTH × ROOM_DEPTH` grid of floor + ceiling tiles surrounded
+ * by perimeter walls.
  *
  * @author guinetik
- * @date 2026-05-12
+ * @date 2026-05-13
  * @spec docs/superpowers/specs/2026-05-12-yamada-station-interior-design.md
  */
 import type { Router } from 'vue-router'
@@ -29,43 +29,55 @@ import { FpsPlayerController } from '@/three/FpsPlayerController'
 import { FpsAudioDirector } from '@/audio/FpsAudioDirector'
 import { FpsPointerLockSession } from '@/lib/fps/FpsPointerLockSession'
 import { buildFpsPlayerConfig } from '@/lib/fps/buildFpsPlayerConfig'
-import { loadStationLevel, type StationLevel } from '@/lib/station/StationLevelLoader'
-import type { StationLevelJson } from '@/lib/station/types'
-import {
-  HATCH_INTERACT_DISTANCE,
-  StationHatchController,
-} from '@/three/StationHatchController'
-import yamadaStation from '@/data/stations/yamada-station.json'
+import { StationCollider } from '@/lib/station/StationCollider'
+import { buildStationRoom, type StationRoom } from '@/three/StationRoomBuilder'
 
-/** Catalog of bundled station-interior JSONs, keyed by `station` query param. */
-const STATION_CATALOG: Record<string, StationLevelJson> = {
-  'yamada-titania': yamadaStation as unknown as StationLevelJson,
-}
+// ---------------------------------------------------------------------------
+// Room layout constants.
+// ---------------------------------------------------------------------------
 
-/** Fallback ambient intensity used when the JSON value is zero or missing. */
-const AMBIENT_LIGHT_INTENSITY_FALLBACK = 0.35
-/** Intensity of the single overhead directional fill light. */
-const DIR_LIGHT_INTENSITY = 0.6
-/** Height of the overhead directional fill light above origin. */
-const DIR_LIGHT_HEIGHT = 10
-/** Color of the overhead directional fill light. */
+/** Number of wall pieces along the room's X axis. */
+const ROOM_WIDTH = 4
+/** Number of wall pieces along the room's Z axis. */
+const ROOM_DEPTH = 3
+/** Number of wall pieces stacked vertically. */
+const ROOM_HEIGHT = 2
+/** Floor surface Y, used by the player collider. Matches the visible
+ * top of the raised floor tiles in {@link buildStationRoom}. */
+const FLOOR_Y = 0.25
+/** Spawn yaw facing +Z. */
+const SPAWN_YAW = 0
+
+// ---------------------------------------------------------------------------
+// Lighting constants.
+// ---------------------------------------------------------------------------
+
+/** Ambient light intensity. */
+const AMBIENT_LIGHT_INTENSITY = 0.5
+/** Directional fill light intensity. */
+const DIR_LIGHT_INTENSITY = 0.8
+/** Directional fill light height. */
+const DIR_LIGHT_HEIGHT = 20
+/** Directional fill light colour. */
 const DIR_LIGHT_COLOR = 0xffffff
+
+// ---------------------------------------------------------------------------
+// Camera constants.
+// ---------------------------------------------------------------------------
+
 /**
  * Player eye height inside the station (world units).
- * Overrides the FPS default (4.5, tuned for asteroid-surface EVA) because
- * the station's pressurised modules are habitat-scale: 5 m cylinder radius,
- * 2.2 m doors. At 1.7 m the player walks under every doorway with clearance.
+ * Human-scale for indoor habitat scenes.
  */
 const STATION_EYE_HEIGHT = 1.7
-/**
- * Tick offset placing per-frame logic and the hatch just before
- * {@link TICK_PRIORITY_RENDER}, after physics but before the camera lerps.
- */
+
+// ---------------------------------------------------------------------------
+// Tick priority offsets.
+// ---------------------------------------------------------------------------
+
+/** Pre-render tick offset for per-frame logic + hatch. */
 const TICK_OFFSET_PRE_RENDER = 1
-/**
- * Tick offset placing the camera right before the renderer, after this
- * controller and the hatch have updated transforms.
- */
+/** Camera tick offset — just before the renderer. */
 const TICK_OFFSET_CAMERA = 2
 
 /**
@@ -78,38 +90,26 @@ export class StationViewController implements Tickable {
   private sceneManager: SceneManager | null = null
   private fpsCamera: FpsCamera | null = null
   private playerController: FpsPlayerController | null = null
-  private level: StationLevel | null = null
-  private hatch: StationHatchController | null = null
+  private room: StationRoom | null = null
+  private spawnPos: Vector3 = new Vector3()
   private starfield: StarFieldController | null = null
   private readonly fpsAudio = new FpsAudioDirector()
   private readonly pointerLock = new FpsPointerLockSession()
   private router: Router | null = null
-  /** Reused scratch for hatch-proximity check. */
-  private readonly _proximityScratch = new Vector3()
-
   /** Called when pointer lock state changes. */
   onPointerLockChange: ((locked: boolean) => void) | null = null
 
   /**
-   * Mount the scene into the given container, loading the station id from
-   * the URL query.
+   * Mount the scene into the given container.
    *
    * @param container - HTML element to render into.
-   * @param stationId - Station JSON id (from `?station=`).
+   * @param _stationId - Unused while layout is being redesigned.
    * @param router - Vue router used to navigate back to `/` on exit.
    */
-  async init(container: HTMLElement, stationId: string, router: Router): Promise<void> {
+  async init(container: HTMLElement, _stationId: string, router: Router): Promise<void> {
     this.router = router
-    const json = STATION_CATALOG[stationId]
-    if (!json) {
-      throw new Error(`Unknown station id: ${stationId}`)
-    }
 
     const config = buildFpsPlayerConfig()
-    // Station interior is pressurised-module scale (R=5m cylinders, 2.2m
-    // doors); the default eye height of 4.5 (tuned for asteroid-surface
-    // EVA suits) puts the player's head above every doorway. Override to
-    // a realistic human eye height for indoor habitat scenes.
     config.camera = { ...config.camera, eyeHeight: STATION_EYE_HEIGHT }
 
     this.inputManager = new InputManager(FPS_BINDINGS)
@@ -119,59 +119,59 @@ export class StationViewController implements Tickable {
     this.sceneManager = new SceneManager()
     this.sceneManager.mount(container)
 
-    // Level
-    this.level = loadStationLevel(json)
-    this.sceneManager.addToScene(this.level.group)
+    // Parametric room.
+    this.room = await buildStationRoom({
+      width: ROOM_WIDTH,
+      depth: ROOM_DEPTH,
+      height: ROOM_HEIGHT,
+    })
+    this.sceneManager.addToScene(this.room.group)
 
-    // Lighting
-    const ambient = new AmbientLight(
-      new Color(json.ambient.color),
-      json.ambient.intensity > 0 ? json.ambient.intensity : AMBIENT_LIGHT_INTENSITY_FALLBACK,
-    )
+    this.spawnPos.set(0, FLOOR_Y, 0)
+
+    // Lighting.
+    const ambient = new AmbientLight(new Color(DIR_LIGHT_COLOR), AMBIENT_LIGHT_INTENSITY)
     const dir = new DirectionalLight(DIR_LIGHT_COLOR, DIR_LIGHT_INTENSITY)
     dir.position.set(0, DIR_LIGHT_HEIGHT, 0)
     this.sceneManager.addToScene(ambient)
     this.sceneManager.addToScene(dir)
 
-    // Starfield seen through the half-cylinder glass canopies.
+    // Starfield visible above the open ground.
     this.starfield = new StarFieldController()
     this.sceneManager.addToScene(this.starfield.points)
 
-    // Camera + player
+    // Collider — single rect covering the room's interior floor.
+    const collider = new StationCollider(
+      [
+        {
+          minX: -this.room.halfWidth,
+          maxX: this.room.halfWidth,
+          minZ: -this.room.halfDepth,
+          maxZ: this.room.halfDepth,
+          y: FLOOR_Y,
+        },
+      ],
+      [],
+    )
+
+    // Camera + player.
     this.fpsCamera = new FpsCamera(config.camera)
-    // Seed yaw directly on the camera — `yaw` is a public property and the
-    // camera applies it via its target's rotation on the first tick. Using
-    // `applyMouseDelta(0, 0)` (as the plan suggested) is a no-op for yaw so
-    // it would leave the player facing the camera's default direction.
-    this.fpsCamera.yaw = this.level.spawnYaw
+    this.fpsCamera.yaw = SPAWN_YAW
     this.playerController = new FpsPlayerController(
       this.inputManager,
       this.fpsCamera,
       config,
-      this.level.collider,
+      collider,
     )
-    // Indoor pressurised modules — disable jumping so the player cannot
-    // hop into the curved ceiling or out through the door arches.
     this.playerController.jumpEnabled = false
-    this.playerController.group.position.copy(this.level.spawnPos)
+    this.playerController.group.position.copy(this.spawnPos)
     this.sceneManager.addToScene(this.playerController.group)
     this.fpsCamera.setTarget(this.playerController.group)
     this.sceneManager.setActiveCamera(this.fpsCamera.camera)
 
-    // Hatch
-    this.hatch = new StationHatchController({
-      position: this.level.hatchPos,
-      yaw: this.level.hatchYaw,
-      onExit: () => {
-        void this.router?.push('/')
-      },
-    })
-    this.sceneManager.addToScene(this.hatch.group)
-
-    // Tick order
+    // Tick order.
     this.tickHandler.register(this.playerController, TICK_PRIORITY_PHYSICS)
     this.tickHandler.register(this, TICK_PRIORITY_RENDER - TICK_OFFSET_PRE_RENDER)
-    this.tickHandler.register(this.hatch, TICK_PRIORITY_RENDER - TICK_OFFSET_PRE_RENDER)
     this.tickHandler.register(this.fpsCamera, TICK_PRIORITY_RENDER - TICK_OFFSET_CAMERA)
     this.tickHandler.register(this.sceneManager, TICK_PRIORITY_RENDER)
 
@@ -189,18 +189,12 @@ export class StationViewController implements Tickable {
   }
 
   /**
-   * Per-frame proximity + interact check for the hatch, plus the audio
-   * director update.
+   * Per-frame audio director update.
    *
    * @param dt - Frame delta in seconds.
    */
   tick(dt: number): void {
-    if (!this.playerController || !this.hatch || !this.level || !this.inputManager) return
-    this._proximityScratch.copy(this.playerController.group.position)
-    const d = this._proximityScratch.distanceTo(this.level.hatchPos)
-    if (d < HATCH_INTERACT_DISTANCE && this.inputManager.wasActionPressed('beginMission')) {
-      this.hatch.triggerExit()
-    }
+    if (!this.playerController) return
 
     this.fpsAudio.update(dt, {
       grounded: this.playerController.grounded,
@@ -225,9 +219,6 @@ export class StationViewController implements Tickable {
       onMouseDelta: (mx, my) => this.fpsCamera?.applyMouseDelta(mx, my),
       onLockChange: (locked) => this.onPointerLockChange?.(locked),
     })
-    // Browsers reject requestPointerLock() outside a user gesture (mount-time
-    // call throws NotAllowedError on hard refresh). The view's @pointerdown
-    // handler calls requestPointerLock() on the first click instead.
   }
 
   /** Tear down the scene. */
@@ -235,7 +226,6 @@ export class StationViewController implements Tickable {
     DevConsole.unregister('StationView')
     this.gameLoop?.stop()
     this.starfield?.dispose()
-    this.hatch?.dispose()
     this.playerController?.dispose()
     this.fpsCamera?.dispose()
     this.pointerLock.releaseLock()
