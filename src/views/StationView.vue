@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import KeyPrompt from '@/components/KeyPrompt.vue'
+import { parseKeyPrompt } from '@/lib/ui/parseKeyPrompt'
 import { StationViewController } from './StationViewController'
 
 const DEFAULT_STATION_ID = 'yamada-titania'
@@ -9,6 +11,19 @@ const container = ref<HTMLElement | null>(null)
 const controller = new StationViewController()
 const route = useRoute()
 const router = useRouter()
+const promptText = ref<string | null>(null)
+const parsedPrompt = computed(() =>
+  promptText.value ? parseKeyPrompt(promptText.value) : null,
+)
+
+controller.onPrompt = (prompt) => {
+  promptText.value = prompt
+}
+controller.onInteract = (event) => {
+  if (event === 'station:exit') {
+    void router.push('/')
+  }
+}
 
 onMounted(async () => {
   if (!container.value) return
@@ -42,4 +57,11 @@ function onPointerDown(): void {
 
 <template>
   <div ref="container" class="station-view" @pointerdown="onPointerDown" />
+  <KeyPrompt
+    v-if="parsedPrompt"
+    :key-label="parsedPrompt.key"
+    :action="parsedPrompt.label"
+    tone="cyan"
+    position="bottom-low"
+  />
 </template>

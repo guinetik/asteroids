@@ -16,7 +16,7 @@ import { DevConsole } from '@/lib/devConsole'
 import { GameLoop } from '@/lib/GameLoop'
 import { TickHandler } from '@/lib/TickHandler'
 import { InputManager } from '@/lib/InputManager'
-import { FPS_BINDINGS } from '@/lib/defaultBindings'
+import { FPS_BINDINGS, HABITAT_BINDINGS } from '@/lib/defaultBindings'
 import {
   TICK_PRIORITY_INPUT,
   TICK_PRIORITY_PHYSICS,
@@ -31,6 +31,7 @@ import { FpsPointerLockSession } from '@/lib/fps/FpsPointerLockSession'
 import { buildFpsPlayerConfig } from '@/lib/fps/buildFpsPlayerConfig'
 import { StationCollider } from '@/lib/station/StationCollider'
 import { buildStationRoom, type StationRoom } from '@/three/StationRoomBuilder'
+import type { EntranceSpec, StationEntrance } from '@/three/StationEntrance'
 
 // ---------------------------------------------------------------------------
 // Room layout constants.
@@ -47,6 +48,19 @@ const ROOM_HEIGHT = 2
 const FLOOR_Y = 0.25
 /** Spawn yaw facing +Z. */
 const SPAWN_YAW = 0
+/** Maximum distance for an entrance to show its interact prompt. */
+const ENTRANCE_INTERACT_DISTANCE = 2.5
+/** Single hard-coded entrance on the south wall — exit back to `/`. */
+const ROOM_ENTRANCES: ReadonlyArray<EntranceSpec> = [
+  {
+    side: 'S',
+    index: 1,
+    storey: 0,
+    prompt: 'F  Leave',
+    event: 'station:exit',
+    openStyle: 'crack',
+  },
+]
 
 // ---------------------------------------------------------------------------
 // Lighting constants.
@@ -98,6 +112,14 @@ export class StationViewController implements Tickable {
   private router: Router | null = null
   /** Called when pointer lock state changes. */
   onPointerLockChange: ((locked: boolean) => void) | null = null
+  /** Prompt callback driven by entrance proximity. `null` clears the HUD. */
+  onPrompt: ((prompt: string | null) => void) | null = null
+  /** Interact callback fired when the player presses F near an entrance. */
+  onInteract: ((event: string) => void) | null = null
+  /** Scratch vector reused for the per-frame entrance proximity check. */
+  private readonly _proximityScratch = new Vector3()
+  /** Cached prompt text so we only fire `onPrompt` when it changes. */
+  private currentPrompt: string | null = null
 
   /**
    * Mount the scene into the given container.
@@ -112,7 +134,9 @@ export class StationViewController implements Tickable {
     const config = buildFpsPlayerConfig()
     config.camera = { ...config.camera, eyeHeight: STATION_EYE_HEIGHT }
 
-    this.inputManager = new InputManager(FPS_BINDINGS)
+    // Merge FPS movement (WASD + jump + sprint + tools) with habitat's
+    // F-key interact binding so the entrance prompt can fire.
+    this.inputManager = new InputManager({ ...FPS_BINDINGS, ...HABITAT_BINDINGS })
     this.tickHandler = new TickHandler()
     this.tickHandler.register(this.inputManager, TICK_PRIORITY_INPUT)
 
@@ -124,6 +148,7 @@ export class StationViewController implements Tickable {
       width: ROOM_WIDTH,
       depth: ROOM_DEPTH,
       height: ROOM_HEIGHT,
+      entrances: ROOM_ENTRANCES.map((e) => ({ ...e })),
     })
     this.sceneManager.addToScene(this.room.group)
 
@@ -189,12 +214,14 @@ export class StationViewController implements Tickable {
   }
 
   /**
-   * Per-frame audio director update.
+   * Per-frame audio director update + entrance proximity check.
    *
    * @param dt - Frame delta in seconds.
    */
   tick(dt: number): void {
     if (!this.playerController) return
+
+    this.updateEntrancePrompt(dt)
 
     this.fpsAudio.update(dt, {
       grounded: this.playerController.grounded,
@@ -204,6 +231,52 @@ export class StationViewController implements Tickable {
       o2Level: this.playerController.o2Level,
       o2Capacity: this.playerController.o2Capacity,
     })
+  }
+
+  /**
+   * Per-frame: advance door animations, find the closest entrance within
+   * range, drive {@link onPrompt}, and trigger the open animation on F.
+   * The interact event is deferred until the door finishes opening so the
+   * player sees a brief egress beat before any scene swap.
+   *
+   * @param dt - Frame delta in seconds.
+   */
+  private updateEntrancePrompt(dt: number): void {
+    if (!this.room || !this.playerController || !this.inputManager) return
+
+    for (const entrance of this.room.entrances) entrance.tick(dt)
+
+    const pos = this.playerController.group.position
+    let activePrompt: string | null = null
+    let activeEntrance: StationEntrance | null = null
+    let bestDistSq = ENTRANCE_INTERACT_DISTANCE * ENTRANCE_INTERACT_DISTANCE
+
+    for (const entrance of this.room.entrances) {
+      if (entrance.isOpening || entrance.isOpened) continue
+      this._proximityScratch.copy(entrance.anchor)
+      this._proximityScratch.y = pos.y
+      const distSq = this._proximityScratch.distanceToSquared(pos)
+      if (distSq < bestDistSq) {
+        bestDistSq = distSq
+        activePrompt = entrance.prompt
+        activeEntrance = entrance
+      }
+    }
+
+    if (activePrompt !== this.currentPrompt) {
+      this.currentPrompt = activePrompt
+      this.onPrompt?.(activePrompt)
+    }
+
+    if (activeEntrance && this.inputManager.wasActionPressed('interact')) {
+      const event = activeEntrance.event
+      // Hide the prompt the moment the door starts moving.
+      if (this.currentPrompt !== null) {
+        this.currentPrompt = null
+        this.onPrompt?.(null)
+      }
+      activeEntrance.triggerOpen(() => this.onInteract?.(event))
+    }
   }
 
   /** Request pointer lock on the renderer canvas. */
