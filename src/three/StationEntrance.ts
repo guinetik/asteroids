@@ -16,37 +16,15 @@
  */
 import { Group, Vector3, type Object3D } from 'three'
 
-/** Cardinal side of a room a {@link StationEntrance} sits on. */
-export type EntranceSide = 'N' | 'S' | 'E' | 'W'
-
-/**
- * How wide the door opens when interacted with:
- * - `'crack'`: opens just a sliver before firing the event — for exits
- *   the player is *leaving* through (e.g. egress to space), where a
- *   full open is wasted animation since the room is about to unload.
- * - `'full'`: opens all the way before firing the event — for doors
- *   between rooms the player walks through.
- */
-export type EntranceOpenStyle = 'crack' | 'full'
-
-/** Data-only description of a single entrance on a room. */
-export interface EntranceSpec {
-  /** Which perimeter wall the entrance sits in. */
-  side: EntranceSide
-  /**
-   * 0-based wall-tile index along that side. For `N` / `S` the index runs
-   * along X (0..width-1); for `E` / `W` it runs along Z (0..depth-1).
-   */
-  index: number
-  /** Storey index this entrance lives on. Defaults to 0. */
-  storey?: number
-  /** Prompt text to show when the player is in range (e.g. `'F  Leave'`). */
-  prompt: string
-  /** Identifier passed to `onInteract` when the player triggers it. */
-  event: string
-  /** How wide the door opens before firing the event. Defaults to `'full'`. */
-  openStyle?: EntranceOpenStyle
-}
+// Pure-data layout types live in `src/lib/station/StationLayout.ts`; this
+// file owns only the runtime Three.js wrapper.
+export type {
+  EntranceOpenStyle,
+  EntranceSide,
+  EntranceSpec,
+  EntranceTarget,
+} from '@/lib/station/StationLayout'
+import type { EntranceOpenStyle } from '@/lib/station/StationLayout'
 
 /** Animation seconds the door takes to open fully. */
 const DOOR_OPEN_DURATION = 0.55

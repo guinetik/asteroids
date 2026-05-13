@@ -1,0 +1,108 @@
+{
+  "id": "yamada-titania",
+  "name": "Yamada Station",
+  "rooms": [
+    {
+      "id": "r-west",
+      "width": 3,
+      "depth": 3,
+      "height": 2,
+      "anchor": { "x": -5.08, "z": 8.205 },
+      "yaw": 0,
+      "entrances": [
+        {
+          "side": "S",
+          "index": 1,
+          "storey": 0,
+          "prompt": "F  Enter West Bay",
+          "event": "enter:r-west",
+          "openStyle": "full",
+          "target": { "kind": "corridor", "nodeId": "c-w-corner", "worldSide": "N" }
+        }
+      ]
+    },
+    {
+      "id": "r-east",
+      "width": 3,
+      "depth": 3,
+      "height": 2,
+      "anchor": { "x": 5.08, "z": 8.205 },
+      "yaw": 0,
+      "entrances": [
+        {
+          "side": "S",
+          "index": 1,
+          "storey": 0,
+          "prompt": "F  Enter East Bay",
+          "event": "enter:r-east",
+          "openStyle": "full",
+          "target": { "kind": "corridor", "nodeId": "c-e-corner", "worldSide": "N" }
+        }
+      ]
+    },
+    {
+      "id": "r-north",
+      "width": 3,
+      "depth": 3,
+      "height": 2,
+      "anchor": { "x": 8.425, "z": 5.08 },
+      "yaw": 0,
+      "entrances": [
+        {
+          "side": "W",
+          "index": 1,
+          "storey": 0,
+          "prompt": "F  Enter Bridge",
+          "event": "enter:r-north",
+          "openStyle": "full",
+          "target": { "kind": "corridor", "nodeId": "c-n-window", "worldSide": "E" }
+        }
+      ]
+    }
+  ],
+  "corridors": [
+    {
+      "id": "c-hub",
+      "kind": "cross",
+      "anchor": { "x": 0, "z": 0 },
+      "yaw": 0,
+      "ports": {
+        "S": { "kind": "exit", "prompt": "F  Leave", "event": "station:exit" },
+        "W": { "kind": "corridor", "nodeId": "c-w-corner", "worldSide": "E" },
+        "E": { "kind": "corridor", "nodeId": "c-e-corner", "worldSide": "W" },
+        "N": { "kind": "corridor", "nodeId": "c-n-window", "worldSide": "S" }
+      }
+    },
+    {
+      "id": "c-w-corner",
+      "kind": "corner",
+      "anchor": { "x": -5.08, "z": 0 },
+      "yaw": 0,
+      "ports": {
+        "E": { "kind": "corridor", "nodeId": "c-hub", "worldSide": "W" },
+        "N": { "kind": "room", "roomId": "r-west", "entranceIndex": 0 }
+      }
+    },
+    {
+      "id": "c-e-corner",
+      "kind": "corner",
+      "anchor": { "x": 5.08, "z": 0 },
+      "yaw": 3,
+      "ports": {
+        "W": { "kind": "corridor", "nodeId": "c-hub", "worldSide": "E" },
+        "N": { "kind": "room", "roomId": "r-east", "entranceIndex": 0 }
+      }
+    },
+    {
+      "id": "c-n-window",
+      "kind": "window",
+      "anchor": { "x": 0, "z": 5.08 },
+      "yaw": 0,
+      "ports": {
+        "S": { "kind": "corridor", "nodeId": "c-hub", "worldSide": "N" },
+        "E": { "kind": "room", "roomId": "r-north", "entranceIndex": 0 },
+        "W": { "kind": "sealed" }
+      }
+    }
+  ]
+}
