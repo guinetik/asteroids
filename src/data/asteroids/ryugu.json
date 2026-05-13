@@ -27,7 +27,7 @@
     "roughness": 0.85,
     "dustCoverage": 0.35,
     "modelPath": "/models/asteroids/ryugu.glb",
-    "modelScale": 1300,
+    "modelScale": 6000,
     "surfaceTextures": "/textures/asteroids/rocky",
     "surfaceTextureRepeat": 13,
     "surfaceModulatorStrength": 1.0,
