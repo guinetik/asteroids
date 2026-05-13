@@ -51,6 +51,13 @@ const DIR_LIGHT_HEIGHT = 10
 /** Color of the overhead directional fill light. */
 const DIR_LIGHT_COLOR = 0xffffff
 /**
+ * Player eye height inside the station (world units).
+ * Overrides the FPS default (4.5, tuned for asteroid-surface EVA) because
+ * the station's pressurised modules are habitat-scale: 5 m cylinder radius,
+ * 2.2 m doors. At 1.7 m the player walks under every doorway with clearance.
+ */
+const STATION_EYE_HEIGHT = 1.7
+/**
  * Tick offset placing per-frame logic and the hatch just before
  * {@link TICK_PRIORITY_RENDER}, after physics but before the camera lerps.
  */
@@ -99,6 +106,11 @@ export class StationViewController implements Tickable {
     }
 
     const config = buildFpsPlayerConfig()
+    // Station interior is pressurised-module scale (R=5m cylinders, 2.2m
+    // doors); the default eye height of 4.5 (tuned for asteroid-surface
+    // EVA suits) puts the player's head above every doorway. Override to
+    // a realistic human eye height for indoor habitat scenes.
+    config.camera = { ...config.camera, eyeHeight: STATION_EYE_HEIGHT }
 
     this.inputManager = new InputManager(FPS_BINDINGS)
     this.tickHandler = new TickHandler()
