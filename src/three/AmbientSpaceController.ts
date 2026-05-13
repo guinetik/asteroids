@@ -79,12 +79,11 @@ const CLOUD_OUTER_RADIUS = 45
 const CLOUD_SPEED = 0.006
 /**
  * World-space size of each cloud billboard plane.
- * At close range (~8 u) the cloud fills a large portion of the screen.
- * At first-visibility distance (~27 u) it appears as a small wisp.
+ * Large, low-density planes create a diffuse atmospheric haze instead of knots.
  */
-const CLOUD_MESH_SIZE = 9.0
+const CLOUD_MESH_SIZE = 16.0
 /** Peak opacity — reached only when the shuttle is within CLOUD_INNER_RADIUS. */
-const CLOUD_OPACITY = 0.9
+const CLOUD_OPACITY = 0.42
 
 /**
  * Per-cloud tint colors — six emission-nebula hues assigned round-robin.

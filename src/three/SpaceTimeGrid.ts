@@ -18,7 +18,7 @@ import spaceTimeGridVertexShader from '@/three/shaders/spaceTimeGrid.vert.glsl?r
 import spaceTimeGridFragmentShader from '@/three/shaders/spaceTimeGrid.frag.glsl?raw'
 
 const DEFAULT_GRID_SIZE = 2000
-const DEFAULT_GRID_RESOLUTION = 80
+const DEFAULT_GRID_RESOLUTION = 150
 const GRID_COLOR = 0x333366
 const GRID_OPACITY = 0.4
 

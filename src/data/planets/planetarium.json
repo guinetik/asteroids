@@ -847,7 +847,7 @@
       },
       "innerRadius": 30,
       "outerRadius": 50,
-      "maxParticles": 22000,
+      "maxParticles": 36000,
       "thickness": 0.2,
       "orbitalSpeed": 0.0008,
       "tumbleSpeed": 0.02,
