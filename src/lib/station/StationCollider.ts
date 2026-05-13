@@ -1,17 +1,21 @@
 /**
- * Axis-aligned floor + wall collision for the station-interior FPS view.
- * Floors are flat rectangles with a fixed Y; walls are thin AABBs that the
- * player capsule cannot pass through. Openings (archways) are represented
- * by their absence — the loader splits wall spans around openings before
- * passing the resulting AABB list in.
+ * Floor + lateral-bounds collision for the cylindrical station-interior
+ * FPS view. Every room is a half-cylinder whose floor footprint is the
+ * AABB `[centerX ± R/2 across, centerZ ± L/2 along]` (with axes swapped
+ * for `axis: 'x'` rooms). Doorways punch passage rectangles between
+ * adjacent room AABBs.
+ *
+ * The player is allowed in any point that lies inside (room ∪ doorways).
+ * Lateral movement clamps the destination back into that union, sliding
+ * along boundaries when the desired move would leave it.
  *
  * @author guinetik
  * @date 2026-05-12
  * @spec docs/superpowers/specs/2026-05-12-yamada-station-interior-design.md
  */
 
-/** Flat horizontal rectangle that the player stands on. */
-export interface StationFloor {
+/** A flat horizontal rectangle. Used for room floors and doorway passages. */
+export interface StationRect {
   /** Minimum X in world units. */
   minX: number
   /** Maximum X in world units. */
@@ -20,48 +24,55 @@ export interface StationFloor {
   minZ: number
   /** Maximum Z in world units. */
   maxZ: number
+}
+
+/** A room's walkable footprint (the half-cylinder's floor). */
+export interface StationFloor extends StationRect {
   /** Floor surface Y in world units. */
   y: number
 }
 
-/** Thin wall AABB the player capsule cannot penetrate. */
-export interface StationWallAabb {
-  /** Minimum X in world units. */
-  minX: number
-  /** Maximum X in world units. */
-  maxX: number
-  /** Minimum Z in world units. */
-  minZ: number
-  /** Maximum Z in world units. */
-  maxZ: number
-}
-
-/** Default floor Y when the player's (x, z) is outside every floor rect. */
+/** Default floor Y used when the player's (x, z) is outside every room. */
 const FLOOR_FALLBACK_Y = 0
 
+/** Numeric epsilon used for `inside` tests so a clamped point reads as inside. */
+const INSIDE_EPSILON = 1e-4
+
 /**
- * Pure collision math for the station interior. No Three.js dependencies.
- * Tested under Vitest.
+ * Number of equally-spaced samples (including the endpoint, excluding the
+ * start) checked along a desired move. Sampling guards against the
+ * pathological case where two adjacent room AABBs share an edge in
+ * collision space — without sampling, a single per-frame step could
+ * teleport across the shared edge outside any passage rectangle.
+ */
+const MOVE_SAMPLE_COUNT = 4
+
+/**
+ * Pure collision math for the cylindrical station interior. No Three.js
+ * dependencies. Tested under Vitest.
  */
 export class StationCollider {
   private readonly _floors: readonly StationFloor[]
-  private readonly _walls: readonly StationWallAabb[]
+  private readonly _passages: readonly StationRect[]
 
   /**
-   * Construct a collider over a fixed list of floors and wall AABBs.
+   * Construct a collider over a fixed list of room floors and doorway
+   * passage rectangles.
    *
-   * @param floors - Floor rectangles.
-   * @param walls - Wall AABBs with openings already removed.
+   * @param floors - Per-room walkable floor rectangles.
+   * @param passages - Per-doorway passage rectangles that bridge adjacent
+   *   floor rectangles. Each passage should overlap the boundary between
+   *   the two rooms it connects so movement is continuous.
    */
-  constructor(floors: readonly StationFloor[], walls: readonly StationWallAabb[]) {
+  constructor(floors: readonly StationFloor[], passages: readonly StationRect[]) {
     this._floors = floors
-    this._walls = walls
+    this._passages = passages
   }
 
   /**
-   * Floor surface Y at the given (x, z). Falls back to 0 when no floor rect
-   * contains the point — the player should not normally be there, but the
-   * fallback keeps physics finite.
+   * Floor surface Y at the given (x, z). Falls back to 0 when no floor
+   * rect contains the point — the player should not normally be there,
+   * but the fallback keeps physics finite.
    *
    * @param x - World X.
    * @param z - World Z.
@@ -77,9 +88,21 @@ export class StationCollider {
   }
 
   /**
-   * Resolve a desired lateral move so the capsule cannot enter a wall AABB.
-   * Each wall is checked once; the move is clamped per-axis so the player
-   * slides along walls instead of stopping dead.
+   * Resolve a desired lateral move so the player stays inside the union
+   * of (room floors ∪ doorway passages), shrunk by the player capsule
+   * radius. Tries axis-decomposed steps so the player slides along walls
+   * instead of stopping dead.
+   *
+   * Algorithm:
+   * 1. Try the full move; if its endpoint is inside the union, accept it.
+   * 2. Otherwise try X-only and Z-only sub-moves; accept whichever lands
+   *    inside the union.
+   * 3. Otherwise stay put.
+   *
+   * The union is shrunk per-rectangle: a point is inside `rect` if it sits
+   * at least `radius` away from every edge of `rect`. This keeps the
+   * player capsule clear of the (invisible) curved canopy walls.
+   * Doorway passages are NOT shrunk so the player can cross them freely.
    *
    * @param fromX - Current X.
    * @param fromZ - Current Z.
@@ -95,55 +118,61 @@ export class StationCollider {
     toZ: number,
     radius: number,
   ): { x: number; z: number } {
-    let x = toX
-    let z = toZ
+    if (this._isPathInside(fromX, fromZ, toX, toZ, radius)) return { x: toX, z: toZ }
+    // Try sliding along X only.
+    if (this._isPathInside(fromX, fromZ, toX, fromZ, radius)) return { x: toX, z: fromZ }
+    // Try sliding along Z only.
+    if (this._isPathInside(fromX, fromZ, fromX, toZ, radius)) return { x: fromX, z: toZ }
+    return { x: fromX, z: fromZ }
+  }
 
-    for (const w of this._walls) {
-      // X-axis resolve: only clamp if moving into the wall on X. The player
-      // must end up overlapping the wall in Z (expanded) for the wall to
-      // matter, and must not have already been overlapping the wall on X
-      // (otherwise this is parallel slide along it).
-      const fromOverlapsX = this._overlapsX(fromX, w, radius)
-      const fromOverlapsZ = this._overlapsZ(fromZ, w, radius)
-      // Sweep test on X: the motion crosses the wall's expanded X range when
-      // the start is outside on the near side and the end is at or past the
-      // near edge of the expanded wall.
-      const xSweepHits =
-        !fromOverlapsX &&
-        ((toX > fromX && fromX <= w.minX - radius && x > w.minX - radius) ||
-          (toX < fromX && fromX >= w.maxX + radius && x < w.maxX + radius))
-      if (fromOverlapsZ && xSweepHits) {
-        if (toX > fromX) {
-          x = Math.min(x, w.minX - radius)
-        } else if (toX < fromX) {
-          x = Math.max(x, w.maxX + radius)
-        }
-      }
-      // Z-axis resolve: only clamp if the new Z brings the player into the
-      // wall, and they were not already overlapping it on Z (i.e. moving
-      // along a wall is not blocked).
-      const xOverlapsAfter = this._overlapsX(x, w, radius)
-      const zSweepHits =
-        !fromOverlapsZ &&
-        ((toZ > fromZ && fromZ <= w.minZ - radius && z > w.minZ - radius) ||
-          (toZ < fromZ && fromZ >= w.maxZ + radius && z < w.maxZ + radius))
-      if (xOverlapsAfter && zSweepHits) {
-        if (toZ > fromZ) {
-          z = Math.min(z, w.minZ - radius)
-        } else if (toZ < fromZ) {
-          z = Math.max(z, w.maxZ + radius)
-        }
+  /**
+   * True iff every sampled point along the segment lies inside the union.
+   * The start point is assumed inside; this checks the path from the start
+   * to the end so the player cannot teleport across a shared edge between
+   * two adjacent room AABBs that happens to fall outside any passage.
+   */
+  private _isPathInside(
+    fromX: number,
+    fromZ: number,
+    toX: number,
+    toZ: number,
+    radius: number,
+  ): boolean {
+    for (let i = 1; i <= MOVE_SAMPLE_COUNT; i++) {
+      const t = i / MOVE_SAMPLE_COUNT
+      const x = fromX + (toX - fromX) * t
+      const z = fromZ + (toZ - fromZ) * t
+      if (!this._isInsideUnion(x, z, radius)) return false
+    }
+    return true
+  }
+
+  /**
+   * True iff `(x, z)` lies inside any room floor (shrunk by `radius`) or
+   * any doorway passage (not shrunk).
+   */
+  private _isInsideUnion(x: number, z: number, radius: number): boolean {
+    for (const f of this._floors) {
+      if (
+        x >= f.minX + radius - INSIDE_EPSILON &&
+        x <= f.maxX - radius + INSIDE_EPSILON &&
+        z >= f.minZ + radius - INSIDE_EPSILON &&
+        z <= f.maxZ - radius + INSIDE_EPSILON
+      ) {
+        return true
       }
     }
-
-    return { x, z }
-  }
-
-  private _overlapsX(x: number, w: StationWallAabb, radius: number): boolean {
-    return x > w.minX - radius && x < w.maxX + radius
-  }
-
-  private _overlapsZ(z: number, w: StationWallAabb, radius: number): boolean {
-    return z > w.minZ - radius && z < w.maxZ + radius
+    for (const p of this._passages) {
+      if (
+        x >= p.minX - INSIDE_EPSILON &&
+        x <= p.maxX + INSIDE_EPSILON &&
+        z >= p.minZ - INSIDE_EPSILON &&
+        z <= p.maxZ + INSIDE_EPSILON
+      ) {
+        return true
+      }
+    }
+    return false
   }
 }

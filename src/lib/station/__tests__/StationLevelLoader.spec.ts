@@ -6,31 +6,52 @@
  * @date 2026-05-12
  */
 import { describe, it, expect } from 'vitest'
-import { validateStationLevel, buildStationColliderGeometry } from '../StationLevelLoader'
+import {
+  validateStationLevel,
+  buildStationColliderGeometry,
+  roomFloorRect,
+  doorPassageRect,
+} from '../StationLevelLoader'
 import type { StationLevelJson } from '../types'
 
 const MINIMAL_LEVEL: StationLevelJson = {
   id: 'test',
-  spawn: { room: 'a', pos: [0, 0, 0], yaw: 0 },
-  exitHatch: { room: 'a', wall: '-z', centerY: 1.2 },
+  spawn: { room: 'foyer', pos: [0, 0, 0], yaw: 0 },
+  exitHatch: { room: 'foyer', wall: '-zCap', centerY: 1.6 },
   rooms: [
     {
-      id: 'a',
-      size: [10, 3, 8],
-      origin: [-5, 0, -4],
+      id: 'foyer',
+      axis: 'z',
+      radius: 5,
+      length: 14,
+      center: [0, 0, 0],
       material: 'm',
-      openings: [{ to: 'b', wall: '+z', offset: 0, width: 2 }],
+      doors: [
+        { to: 'margaret', wall: '-xCurve', width: 1.8, height: 2.2 },
+        { to: 'pig', wall: '+zCap', width: 1.8, height: 2.2 },
+      ],
     },
     {
-      id: 'b',
-      size: [10, 3, 8],
-      origin: [-5, 0, 4],
+      id: 'margaret',
+      axis: 'x',
+      radius: 5,
+      length: 10,
+      center: [-10, 0, 0],
       material: 'm',
-      openings: [{ to: 'a', wall: '-z', offset: 0, width: 2 }],
+      doors: [{ to: 'foyer', wall: '+xCap', width: 1.8, height: 2.2 }],
+    },
+    {
+      id: 'pig',
+      axis: 'z',
+      radius: 5,
+      length: 12,
+      center: [0, 0, 13],
+      material: 'm',
+      doors: [{ to: 'foyer', wall: '-zCap', width: 1.8, height: 2.2 }],
     },
   ],
-  materials: { m: { floor: '#000', wall: '#111', ceiling: '#222' } },
-  ambient: { color: '#fff', intensity: 0.3 },
+  materials: { m: { floor: '#ccc', cap: '#eee' } },
+  ambient: { color: '#fff', intensity: 0.7 },
 }
 
 describe('validateStationLevel', () => {
@@ -38,21 +59,45 @@ describe('validateStationLevel', () => {
     expect(() => validateStationLevel(MINIMAL_LEVEL)).not.toThrow()
   })
 
-  it('rejects an opening whose target room does not exist', () => {
+  it('rejects a door whose target room does not exist', () => {
     const bad: StationLevelJson = {
       ...MINIMAL_LEVEL,
       rooms: [
-        { ...MINIMAL_LEVEL.rooms[0]!, openings: [{ to: 'ghost', wall: '+z', offset: 0, width: 2 }] },
+        {
+          ...MINIMAL_LEVEL.rooms[0]!,
+          doors: [{ to: 'ghost', wall: '+zCap', width: 1.8, height: 2.2 }],
+        },
         MINIMAL_LEVEL.rooms[1]!,
+        MINIMAL_LEVEL.rooms[2]!,
       ],
     }
     expect(() => validateStationLevel(bad)).toThrow(/ghost/)
   })
 
-  it('rejects an opening that is not mirrored on the other side', () => {
+  it('rejects a door whose wall does not match the room axis', () => {
     const bad: StationLevelJson = {
       ...MINIMAL_LEVEL,
-      rooms: [MINIMAL_LEVEL.rooms[0]!, { ...MINIMAL_LEVEL.rooms[1]!, openings: [] }],
+      rooms: [
+        {
+          ...MINIMAL_LEVEL.rooms[0]!,
+          // axis 'z' room cannot expose a +xCap.
+          doors: [{ to: 'margaret', wall: '+xCap', width: 1.8, height: 2.2 }],
+        },
+        MINIMAL_LEVEL.rooms[1]!,
+        MINIMAL_LEVEL.rooms[2]!,
+      ],
+    }
+    expect(() => validateStationLevel(bad)).toThrow(/invalid for axis/i)
+  })
+
+  it('rejects a door that is not mirrored on the other side', () => {
+    const bad: StationLevelJson = {
+      ...MINIMAL_LEVEL,
+      rooms: [
+        MINIMAL_LEVEL.rooms[0]!,
+        { ...MINIMAL_LEVEL.rooms[1]!, doors: [] },
+        MINIMAL_LEVEL.rooms[2]!,
+      ],
     }
     expect(() => validateStationLevel(bad)).toThrow(/mirror/i)
   })
@@ -60,48 +105,73 @@ describe('validateStationLevel', () => {
   it('rejects a room whose material key is missing from the materials map', () => {
     const bad: StationLevelJson = {
       ...MINIMAL_LEVEL,
-      rooms: [{ ...MINIMAL_LEVEL.rooms[0]!, material: 'missing' }, MINIMAL_LEVEL.rooms[1]!],
+      rooms: [
+        { ...MINIMAL_LEVEL.rooms[0]!, material: 'missing' },
+        MINIMAL_LEVEL.rooms[1]!,
+        MINIMAL_LEVEL.rooms[2]!,
+      ],
     }
     expect(() => validateStationLevel(bad)).toThrow(/material/i)
   })
 
-  it('rejects a hatch whose room does not exist', () => {
+  it('rejects a hatch mounted on a curve wall', () => {
     const bad: StationLevelJson = {
       ...MINIMAL_LEVEL,
-      exitHatch: { room: 'ghost', wall: '-z', centerY: 1.2 },
+      exitHatch: { room: 'foyer', wall: '-xCurve', centerY: 1.6 },
     }
-    expect(() => validateStationLevel(bad)).toThrow(/ghost/)
+    expect(() => validateStationLevel(bad)).toThrow(/end cap/i)
+  })
+})
+
+describe('roomFloorRect', () => {
+  it('produces world-space floor for axis-z rooms', () => {
+    const r = roomFloorRect(MINIMAL_LEVEL.rooms[0]!)
+    expect(r.minX).toBe(-5)
+    expect(r.maxX).toBe(5)
+    expect(r.minZ).toBe(-7)
+    expect(r.maxZ).toBe(7)
+  })
+
+  it('swaps axes for axis-x rooms', () => {
+    const r = roomFloorRect(MINIMAL_LEVEL.rooms[1]!)
+    expect(r.minX).toBe(-15)
+    expect(r.maxX).toBe(-5)
+    expect(r.minZ).toBe(-5)
+    expect(r.maxZ).toBe(5)
+  })
+})
+
+describe('doorPassageRect', () => {
+  it('straddles a +xCap doorway between two rooms', () => {
+    const margaret = MINIMAL_LEVEL.rooms[1]!
+    const door = margaret.doors[0]!
+    const p = doorPassageRect(margaret, door)
+    // Centred on x=-5, z=0.
+    expect((p.minX + p.maxX) / 2).toBeCloseTo(-5)
+    expect((p.minZ + p.maxZ) / 2).toBeCloseTo(0)
+    expect(p.maxZ - p.minZ).toBeCloseTo(door.width)
+  })
+
+  it('straddles a -xCurve doorway on an axis-z room at the door width', () => {
+    const foyer = MINIMAL_LEVEL.rooms[0]!
+    const door = foyer.doors.find((d) => d.wall === '-xCurve')!
+    const p = doorPassageRect(foyer, door)
+    expect((p.minX + p.maxX) / 2).toBeCloseTo(-5)
+    expect(p.maxZ - p.minZ).toBeCloseTo(door.width)
   })
 })
 
 describe('buildStationColliderGeometry', () => {
-  it('emits one floor per room with absolute world coordinates', () => {
+  it('emits one floor per room in world coordinates', () => {
     const { floors } = buildStationColliderGeometry(MINIMAL_LEVEL)
-    expect(floors).toHaveLength(2)
-    const a = floors.find((f) => f.minX === -5 && f.minZ === -4)
-    expect(a).toBeDefined()
-    expect(a!.maxX).toBe(5)
-    expect(a!.maxZ).toBe(4)
-    expect(a!.y).toBe(0)
+    expect(floors).toHaveLength(3)
+    const foyer = floors.find((f) => f.minX === -5 && f.maxX === 5 && f.minZ === -7)
+    expect(foyer).toBeDefined()
   })
 
-  it('emits wall AABBs split around openings (no AABB spans the opening width)', () => {
-    const { walls } = buildStationColliderGeometry(MINIMAL_LEVEL)
-    // Room A has a 2m-wide opening at z=4 centred on x=0. The +z wall of A
-    // (z=4) should produce two segments: x∈[-5,-1] and x∈[1,5]. No segment
-    // covers x∈[-1,1] at z=4.
-    const aPlusZSegments = walls.filter((w) => w.minZ >= 4 - 0.2 && w.maxZ <= 4 + 0.2)
-    expect(aPlusZSegments.length).toBeGreaterThanOrEqual(2)
-    const spansOpening = aPlusZSegments.some((w) => w.minX < 0 && w.maxX > 0)
-    expect(spansOpening).toBe(false)
-  })
-
-  it('does not emit a wall segment where two rooms share an opening', () => {
-    const { walls } = buildStationColliderGeometry(MINIMAL_LEVEL)
-    // No wall AABB should sit at z=4 spanning the opening x∈[-1,1].
-    const blocking = walls.find(
-      (w) => w.minZ < 4 && w.maxZ > 4 && w.minX <= -1 && w.maxX >= 1,
-    )
-    expect(blocking).toBeUndefined()
+  it('emits one passage rectangle per declared door', () => {
+    const { passages } = buildStationColliderGeometry(MINIMAL_LEVEL)
+    // Foyer has 2 doors, Margaret 1, Pig 1 => 4 passages total.
+    expect(passages).toHaveLength(4)
   })
 })

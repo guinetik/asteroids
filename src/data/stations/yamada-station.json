@@ -1,46 +1,54 @@
 {
   "id": "yamada-titania",
-  "spawn": { "room": "foyer", "pos": [0, 0, -2], "yaw": 0 },
-  "exitHatch": { "room": "foyer", "wall": "-z", "centerY": 1.5 },
+  "spawn": { "room": "foyer", "pos": [0, 0, -5], "yaw": 0 },
+  "exitHatch": { "room": "foyer", "wall": "-zCap", "centerY": 1.6 },
   "rooms": [
     {
       "id": "foyer",
-      "size": [16, 4, 8],
-      "origin": [-8, 0, -4],
+      "axis": "z",
+      "radius": 5,
+      "length": 14,
+      "center": [0, 0, 0],
       "material": "yamada-foyer",
-      "openings": [
-        { "to": "margaret",  "wall": "+z", "offset": -5, "width": 2 },
-        { "to": "pig-ward",  "wall": "+z", "offset":  0, "width": 2 },
-        { "to": "listening", "wall": "+z", "offset":  5, "width": 2 }
+      "doors": [
+        { "to": "pig-ward",  "wall": "+zCap",   "width": 1.8, "height": 2.2 },
+        { "to": "margaret",  "wall": "-xCurve", "width": 1.8, "height": 2.2 },
+        { "to": "listening", "wall": "+xCurve", "width": 1.8, "height": 2.2 }
       ]
     },
     {
       "id": "margaret",
-      "size": [8, 4, 8],
-      "origin": [-11, 0, 4],
+      "axis": "x",
+      "radius": 5,
+      "length": 10,
+      "center": [-10, 0, 0],
       "material": "yamada-margaret",
-      "openings": [{ "to": "foyer", "wall": "-z", "offset": 2, "width": 2 }]
+      "doors": [{ "to": "foyer", "wall": "+xCap", "width": 1.8, "height": 2.2 }]
     },
     {
       "id": "pig-ward",
-      "size": [6, 4, 12],
-      "origin": [-3, 0, 4],
+      "axis": "z",
+      "radius": 5,
+      "length": 12,
+      "center": [0, 0, 13],
       "material": "yamada-pig",
-      "openings": [{ "to": "foyer", "wall": "-z", "offset": 0, "width": 2 }]
+      "doors": [{ "to": "foyer", "wall": "-zCap", "width": 1.8, "height": 2.2 }]
     },
     {
       "id": "listening",
-      "size": [8, 4, 8],
-      "origin": [3, 0, 4],
+      "axis": "x",
+      "radius": 5,
+      "length": 10,
+      "center": [10, 0, 0],
       "material": "yamada-listening",
-      "openings": [{ "to": "foyer", "wall": "-z", "offset": -2, "width": 2 }]
+      "doors": [{ "to": "foyer", "wall": "-xCap", "width": 1.8, "height": 2.2 }]
     }
   ],
   "materials": {
-    "yamada-foyer":     { "floor": "#cccccc", "wall": "#e8e8e8", "ceiling": "#f4f4f4" },
-    "yamada-margaret":  { "floor": "#cccccc", "wall": "#eaeae8", "ceiling": "#f4f4f4" },
-    "yamada-pig":       { "floor": "#c8c8c6", "wall": "#e2e2de", "ceiling": "#f0f0ee" },
-    "yamada-listening": { "floor": "#b8c2c8", "wall": "#d4dcdf", "ceiling": "#e8edef" }
+    "yamada-foyer":     { "floor": "#cccccc", "cap": "#eeeeee" },
+    "yamada-margaret":  { "floor": "#cccccc", "cap": "#eeeeee" },
+    "yamada-pig":       { "floor": "#c8c8c6", "cap": "#e8e8e8" },
+    "yamada-listening": { "floor": "#b8c2c8", "cap": "#dde2e5" }
   },
-  "ambient": { "color": "#ffdcb0", "intensity": 0.6 }
+  "ambient": { "color": "#ffffff", "intensity": 0.7 }
 }

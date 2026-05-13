@@ -23,6 +23,7 @@ import {
   TICK_PRIORITY_RENDER,
 } from '@/lib/tickPriorities'
 import { SceneManager } from '@/three/SceneManager'
+import { StarFieldController } from '@/three/StarFieldController'
 import { FpsCamera } from '@/three/FpsCamera'
 import { FpsPlayerController } from '@/three/FpsPlayerController'
 import { FpsAudioDirector } from '@/audio/FpsAudioDirector'
@@ -72,6 +73,7 @@ export class StationViewController implements Tickable {
   private playerController: FpsPlayerController | null = null
   private level: StationLevel | null = null
   private hatch: StationHatchController | null = null
+  private starfield: StarFieldController | null = null
   private readonly fpsAudio = new FpsAudioDirector()
   private readonly pointerLock = new FpsPointerLockSession()
   private router: Router | null = null
@@ -118,6 +120,10 @@ export class StationViewController implements Tickable {
     dir.position.set(0, DIR_LIGHT_HEIGHT, 0)
     this.sceneManager.addToScene(ambient)
     this.sceneManager.addToScene(dir)
+
+    // Starfield seen through the half-cylinder glass canopies.
+    this.starfield = new StarFieldController()
+    this.sceneManager.addToScene(this.starfield.points)
 
     // Camera + player
     this.fpsCamera = new FpsCamera(config.camera)
@@ -211,6 +217,7 @@ export class StationViewController implements Tickable {
   dispose(): void {
     DevConsole.unregister('StationView')
     this.gameLoop?.stop()
+    this.starfield?.dispose()
     this.hatch?.dispose()
     this.playerController?.dispose()
     this.fpsCamera?.dispose()
