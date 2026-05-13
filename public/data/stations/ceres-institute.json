@@ -46,7 +46,7 @@
       "id": "c-hub",
       "kind": "window",
       "anchor": { "x": 0, "z": 0 },
-      "yaw": 2,
+      "yaw": 0,
       "ports": {
         "S": { "kind": "exit", "prompt": "F  Leave", "event": "station:exit" },
         "W": { "kind": "corridor", "nodeId": "c-w-straight", "worldSide": "E" },

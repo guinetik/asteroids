@@ -78,9 +78,9 @@ describe('corridorWorldPorts', () => {
     expect(corridorWorldPorts(node).sort()).toEqual(['N', 'W'])
   })
 
-  it('rotates window native ports (N, W, E) by 180° to (S, E, W)', () => {
+  it('rotates window native ports (S, W, E) by 180° to (N, E, W)', () => {
     const node: CorridorNode = { id: 'c1', kind: 'window', anchor: { x: 0, z: 0 }, yaw: 2 }
-    expect(corridorWorldPorts(node).sort()).toEqual(['E', 'S', 'W'])
+    expect(corridorWorldPorts(node).sort()).toEqual(['E', 'N', 'W'])
   })
 })
 
@@ -114,9 +114,9 @@ describe('corridorPortWorldAnchor', () => {
       x: CORRIDOR_HALF_EXTENTS.window.x,
       z: 0,
     })
-    expect(corridorPortWorldAnchor(node, 'N')?.anchor).toEqual({
+    expect(corridorPortWorldAnchor(node, 'S')?.anchor).toEqual({
       x: 0,
-      z: CORRIDOR_HALF_EXTENTS.window.z,
+      z: -CORRIDOR_HALF_EXTENTS.window.z,
     })
   })
 })

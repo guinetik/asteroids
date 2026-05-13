@@ -145,13 +145,13 @@ export const CORRIDOR_HALF_EXTENTS: Readonly<Record<CorridorKind, Vec2>> = {
  * - `corner` opens on `S` + `W` — a 90° elbow whose inside angle faces
  *   the −X −Z quadrant. The curved exterior window wall is on the `N`
  *   face; the remaining solid wall is on `E`.
- * - `window` is a T whose long bar runs along X, opening on `N`, `W`,
- *   and `E`. The stem of the T closes off the `S` face.
+ * - `window` is a T whose long bar runs along X, opening on `S`, `W`,
+ *   and `E`. The stem of the T closes off the `N` face.
  */
 export const CORRIDOR_NATIVE_PORTS: Readonly<Record<CorridorKind, ReadonlyArray<EntranceSide>>> = {
   cross: ['N', 'E', 'S', 'W'],
   corner: ['S', 'W'],
-  window: ['N', 'W', 'E'],
+  window: ['S', 'W', 'E'],
   straight: ['N', 'S'],
 }
 
