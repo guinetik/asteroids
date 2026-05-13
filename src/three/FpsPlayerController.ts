@@ -269,6 +269,12 @@ export class FpsPlayerController implements Tickable {
   /** Tracks previous jump state for rising-edge sound trigger. */
   private _prevJumping = false
   /**
+   * Whether the player can jump in this scene. Indoor scenes (e.g.
+   * `/station` habitat-pressurised modules) disable jumping so the
+   * player cannot escape low-ceilinged geometry. Defaults to true.
+   */
+  jumpEnabled = true
+  /**
    * Seconds remaining during which the grounded-movement loop will preserve
    * momentum instead of overwriting `lateralVelocity` from input. Set by
    * {@link applyLateralImpulse} and decremented in {@link tick}. While > 0,
@@ -568,7 +574,7 @@ export class FpsPlayerController implements Tickable {
     }
 
     // --- Input-driven jump (hold to auto-hop) ---
-    const jumpHeld = this.inputManager.isActionActive('jump')
+    const jumpHeld = this.jumpEnabled && this.inputManager.isActionActive('jump')
     const canJump = jumpHeld && this.coyoteTimer > 0 && this.thrusterSystem.canFire('jump')
     if (canJump) {
       const jumpBoost = isSprinting ? SPRINT_JUMP_BOOST : 1

@@ -32,30 +32,96 @@ import { StationCollider, type StationFloor, type StationRect } from './StationC
 export const FLOOR_Y = 0
 /** Vertical thickness of the deck (world units). Top of the floor box sits at FLOOR_Y. */
 export const FLOOR_THICKNESS = 0.12
-/** Tint colour of the glass canopy. */
-const GLASS_COLOR = 0x88ccff
-/** Transparency of the glass canopy (0 = fully transparent, 1 = opaque). */
-const GLASS_OPACITY = 0.15
-/** Roughness of the glass canopy. */
-const GLASS_ROUGHNESS = 0.05
-/** Metalness of the glass canopy. */
-const GLASS_METALNESS = 0.1
-/** Colour of the metallic wireframe girders. */
-const GIRDER_COLOR = 0x888888
-/** How far inside the cylinder radius the girder rings sit. */
-const GIRDER_INSET = 0.05
 /** Number of radial segments on each canopy mesh. */
 const CYLINDER_RADIAL_SEGMENTS = 24
-/** Number of height steps used for the girder rings. */
-const GIRDER_SEGMENTS_HEIGHT = 6
-/** Number of radial steps per girder arc. */
-const GIRDER_SEGMENTS_RADIAL = 12
-/** Floor roughness for the standard material. */
+/** Floor roughness for the textured standard material. */
 const FLOOR_ROUGHNESS = 0.85
-/** End-cap roughness for the standard material. */
+/** End-cap roughness for the textured standard material. */
 const CAP_ROUGHNESS = 0.75
-/** End-cap metalness for the standard material. */
+/** End-cap metalness for the textured standard material. */
 const CAP_METALNESS = 0.15
+/** Wall (canopy) roughness. */
+const WALL_ROUGHNESS = 0.7
+/** Wall (canopy) metalness. */
+const WALL_METALNESS = 0.25
+/** Floor texture tile density (repeats per world unit). */
+const FLOOR_TEX_REPEATS_PER_UNIT = 0.5
+/** Wall texture tile density around the half-circumference (repeats per world unit of arc length). */
+const WALL_TEX_REPEATS_PER_UNIT_U = 0.18
+/** Wall texture tile density along the cylinder axis (repeats per world unit). */
+const WALL_TEX_REPEATS_PER_UNIT_V = 0.18
+/** End-cap texture tile density (repeats per world unit). */
+const CAP_TEX_REPEATS_PER_UNIT = 0.18
+/** Floor albedo URL — checker pattern shared with the habitat. */
+const FLOOR_COLOR_URL = '/textures/checkers/color.webp'
+/** Floor normal URL. */
+const FLOOR_NORMAL_URL = '/textures/checkers/normal.webp'
+/** Floor roughness URL. */
+const FLOOR_ROUGHNESS_URL = '/textures/checkers/roughness.webp'
+/** Wall/cap albedo URL — plates pattern shared with the habitat. */
+const PLATES_COLOR_URL = '/textures/plates/color.webp'
+/** Wall/cap normal URL. */
+const PLATES_NORMAL_URL = '/textures/plates/normal.webp'
+/** Wall/cap roughness URL. */
+const PLATES_ROUGHNESS_URL = '/textures/plates/roughness.webp'
+/** Wall/cap metalness URL. */
+const PLATES_METALNESS_URL = '/textures/plates/metalness.webp'
+/** Floor normal-map strength. */
+const FLOOR_NORMAL_SCALE = 0.3
+/** Wall/cap normal-map strength. */
+const PLATES_NORMAL_SCALE = 0.85
+/**
+ * Emissive intensity applied to walls and caps with the tint colour as the
+ * emissive colour. The plates texture is dark by default; lifting the
+ * emissive component pushes painted tones toward off-white the way the
+ * habitat interior does (see `HABITAT_PAINT_WALL_EMISSIVE_INTENSITY`).
+ */
+const PLATES_EMISSIVE_INTENSITY = 0.18
+/** Emissive lift for the deck so saturated palette tones don't read as washed-out grey. */
+const FLOOR_EMISSIVE_INTENSITY = 0.28
+
+// ---------------------------------------------------------------------------
+// Texture cache — load each map once and reuse across rooms.
+// ---------------------------------------------------------------------------
+
+const _textureLoader = new THREE.TextureLoader()
+const _textureCache = new Map<string, THREE.Texture>()
+
+/**
+ * Lazily load a texture map and cache it. Forces `RepeatWrapping` so the
+ * caller can set arbitrary `repeat` values on per-mesh clones.
+ *
+ * @param url - Public-relative texture URL.
+ * @returns Shared texture instance.
+ */
+function loadStationTexture(url: string): THREE.Texture {
+  let tex = _textureCache.get(url)
+  if (tex) return tex
+  tex = _textureLoader.load(url)
+  tex.wrapS = THREE.RepeatWrapping
+  tex.wrapT = THREE.RepeatWrapping
+  tex.colorSpace = url === FLOOR_COLOR_URL || url === PLATES_COLOR_URL ? THREE.SRGBColorSpace : THREE.LinearSRGBColorSpace
+  _textureCache.set(url, tex)
+  return tex
+}
+
+/**
+ * Clone a cached texture and apply a per-mesh UV repeat. Cloning keeps the
+ * shared GPU image but lets each mesh tile it at its own density.
+ *
+ * @param url - Texture URL.
+ * @param repeatU - Tiles across the U axis.
+ * @param repeatV - Tiles across the V axis.
+ * @returns Per-mesh texture clone with `repeat` set.
+ */
+function tiledTexture(url: string, repeatU: number, repeatV: number): THREE.Texture {
+  const tex = loadStationTexture(url).clone()
+  tex.needsUpdate = true
+  tex.wrapS = THREE.RepeatWrapping
+  tex.wrapT = THREE.RepeatWrapping
+  tex.repeat.set(repeatU, repeatV)
+  return tex
+}
 
 // ---------------------------------------------------------------------------
 // Geometry helpers — pure math, no Three.js types.
@@ -366,22 +432,24 @@ export function buildHabitatStyleRoom(
 ): THREE.Group {
   const group = new THREE.Group()
   group.name = `station-room:${room.id}`
-  group.add(buildCanopy(room))
+  group.add(buildCanopy(room, mat))
   group.add(buildFloor(room, mat))
   group.add(buildEndCap(room, true, mat))
   group.add(buildEndCap(room, false, mat))
-  group.add(buildGirders(room))
   return group
 }
 
 /**
- * Half-cylinder glass canopy. Open-ended, top semicircle only, rotated so
- * its axis maps to the room's chosen world axis.
+ * Half-cylinder solid wall/roof. Open-ended (no top/bottom caps), top
+ * semicircle only, rotated so its axis maps to the room's chosen world
+ * axis. Textured with the `plates` PBR set, tiled around the
+ * circumference and along the cylinder axis.
  *
  * @param room - Room definition.
- * @returns Canopy mesh positioned in world space.
+ * @param mat - Resolved material palette (provides wall tint).
+ * @returns Wall mesh positioned in world space.
  */
-function buildCanopy(room: StationRoomJson): THREE.Mesh {
+function buildCanopy(room: StationRoomJson, mat: StationMaterialJson): THREE.Mesh {
   const geo = new THREE.CylinderGeometry(
     room.radius,
     room.radius,
@@ -392,14 +460,25 @@ function buildCanopy(room: StationRoomJson): THREE.Mesh {
     Math.PI / 2,
     Math.PI,
   )
-  const matl = new THREE.MeshPhysicalMaterial({
-    color: GLASS_COLOR,
-    transparent: true,
-    opacity: GLASS_OPACITY,
-    roughness: GLASS_ROUGHNESS,
-    metalness: GLASS_METALNESS,
-    side: THREE.DoubleSide,
-    depthWrite: false,
+  const arcLen = Math.PI * room.radius
+  const repeatU = Math.max(1, Math.round(arcLen * WALL_TEX_REPEATS_PER_UNIT_U))
+  const repeatV = Math.max(1, Math.round(room.length * WALL_TEX_REPEATS_PER_UNIT_V))
+  const colorMap = tiledTexture(PLATES_COLOR_URL, repeatU, repeatV)
+  const normalMap = tiledTexture(PLATES_NORMAL_URL, repeatU, repeatV)
+  const roughnessMap = tiledTexture(PLATES_ROUGHNESS_URL, repeatU, repeatV)
+  const metalnessMap = tiledTexture(PLATES_METALNESS_URL, repeatU, repeatV)
+  const matl = new THREE.MeshStandardMaterial({
+    color: mat.cap,
+    map: colorMap,
+    normalMap,
+    normalScale: new THREE.Vector2(PLATES_NORMAL_SCALE, PLATES_NORMAL_SCALE),
+    roughnessMap,
+    metalnessMap,
+    roughness: WALL_ROUGHNESS,
+    metalness: WALL_METALNESS,
+    emissive: new THREE.Color(mat.cap),
+    emissiveIntensity: PLATES_EMISSIVE_INTENSITY,
+    side: THREE.BackSide,
   })
   const mesh = new THREE.Mesh(geo, matl)
   // Rotate so the cylinder's Y (its axis in local space) maps to world axis.
@@ -409,6 +488,7 @@ function buildCanopy(room: StationRoomJson): THREE.Mesh {
     mesh.rotation.z = Math.PI / 2
   }
   mesh.position.set(room.center[0], FLOOR_Y, room.center[2])
+  mesh.receiveShadow = true
   return mesh
 }
 
@@ -429,9 +509,25 @@ function buildFloor(room: StationRoomJson, mat: StationMaterialJson): THREE.Mesh
   } else {
     geo = new THREE.BoxGeometry(Math.max(room.length, MIN_BOX_DIM), FLOOR_THICKNESS, Math.max(width, MIN_BOX_DIM))
   }
+  const repeatX = Math.max(1, Math.round(width * FLOOR_TEX_REPEATS_PER_UNIT))
+  const repeatZ = Math.max(1, Math.round(room.length * FLOOR_TEX_REPEATS_PER_UNIT))
+  // For axis-X rooms the box is rotated 90° in world (length runs along X),
+  // but the floor's top face UVs come from BoxGeometry's +Y face which uses
+  // the box's local (x, z). Map our world repeats to that local layout.
+  const tilesU = room.axis === 'z' ? repeatX : repeatZ
+  const tilesV = room.axis === 'z' ? repeatZ : repeatX
+  const colorMap = tiledTexture(FLOOR_COLOR_URL, tilesU, tilesV)
+  const normalMap = tiledTexture(FLOOR_NORMAL_URL, tilesU, tilesV)
+  const roughnessMap = tiledTexture(FLOOR_ROUGHNESS_URL, tilesU, tilesV)
   const matl = new THREE.MeshStandardMaterial({
     color: mat.floor,
+    map: colorMap,
+    normalMap,
+    normalScale: new THREE.Vector2(FLOOR_NORMAL_SCALE, FLOOR_NORMAL_SCALE),
+    roughnessMap,
     roughness: FLOOR_ROUGHNESS,
+    emissive: new THREE.Color(mat.floor),
+    emissiveIntensity: FLOOR_EMISSIVE_INTENSITY,
     side: THREE.DoubleSide,
   })
   const mesh = new THREE.Mesh(geo, matl)
@@ -477,10 +573,22 @@ function buildEndCap(
   }
 
   const geo = new THREE.ShapeGeometry(shape, CYLINDER_RADIAL_SEGMENTS)
+  const repeatCap = Math.max(1, Math.round(r * 2 * CAP_TEX_REPEATS_PER_UNIT))
+  const colorMap = tiledTexture(PLATES_COLOR_URL, repeatCap, repeatCap)
+  const normalMap = tiledTexture(PLATES_NORMAL_URL, repeatCap, repeatCap)
+  const roughnessMap = tiledTexture(PLATES_ROUGHNESS_URL, repeatCap, repeatCap)
+  const metalnessMap = tiledTexture(PLATES_METALNESS_URL, repeatCap, repeatCap)
   const matl = new THREE.MeshStandardMaterial({
     color: mat.cap,
+    map: colorMap,
+    normalMap,
+    normalScale: new THREE.Vector2(PLATES_NORMAL_SCALE, PLATES_NORMAL_SCALE),
+    roughnessMap,
+    metalnessMap,
     roughness: CAP_ROUGHNESS,
     metalness: CAP_METALNESS,
+    emissive: new THREE.Color(mat.cap),
+    emissiveIntensity: PLATES_EMISSIVE_INTENSITY,
     side: THREE.DoubleSide,
   })
   const mesh = new THREE.Mesh(geo, matl)
@@ -505,61 +613,6 @@ function buildEndCap(
     }
   }
   return mesh
-}
-
-/**
- * Wireframe girder rings on the upper semicircle of the canopy. Mirrors
- * the habitat scene's {@link HabitatInteriorScene.buildGirders} math.
- *
- * @param room - Room definition.
- * @returns LineSegments mesh.
- */
-function buildGirders(room: StationRoomJson): THREE.LineSegments {
-  const verts: number[] = []
-  const r = room.radius - GIRDER_INSET
-  const halfLen = room.length / 2
-  const [cx, , cz] = room.center
-  const axisZ = room.axis === 'z'
-
-  // Horizontal half-circle arcs at each height step (top half only).
-  for (let h = 0; h <= GIRDER_SEGMENTS_HEIGHT; h++) {
-    const t = -halfLen + (h / GIRDER_SEGMENTS_HEIGHT) * room.length
-    for (let s = 0; s < GIRDER_SEGMENTS_RADIAL; s++) {
-      const a1 = (s / GIRDER_SEGMENTS_RADIAL) * Math.PI
-      const a2 = ((s + 1) / GIRDER_SEGMENTS_RADIAL) * Math.PI
-      // (perpendicular, vertical) plane coordinates.
-      const p1 = Math.cos(a1) * r
-      const v1 = FLOOR_Y + Math.sin(a1) * r
-      const p2 = Math.cos(a2) * r
-      const v2 = FLOOR_Y + Math.sin(a2) * r
-      if (axisZ) {
-        verts.push(cx + p1, v1, cz + t, cx + p2, v2, cz + t)
-      } else {
-        verts.push(cx + t, v1, cz + p1, cx + t, v2, cz + p2)
-      }
-    }
-  }
-
-  // Vertical bars along the axis at each radial step.
-  for (let s = 0; s <= GIRDER_SEGMENTS_RADIAL; s++) {
-    const a = (s / GIRDER_SEGMENTS_RADIAL) * Math.PI
-    const p = Math.cos(a) * r
-    const v = FLOOR_Y + Math.sin(a) * r
-    for (let h = 0; h < GIRDER_SEGMENTS_HEIGHT; h++) {
-      const t1 = -halfLen + (h / GIRDER_SEGMENTS_HEIGHT) * room.length
-      const t2 = -halfLen + ((h + 1) / GIRDER_SEGMENTS_HEIGHT) * room.length
-      if (axisZ) {
-        verts.push(cx + p, v, cz + t1, cx + p, v, cz + t2)
-      } else {
-        verts.push(cx + t1, v, cz + p, cx + t2, v, cz + p)
-      }
-    }
-  }
-
-  const geo = new THREE.BufferGeometry()
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3))
-  const matl = new THREE.LineBasicMaterial({ color: GIRDER_COLOR })
-  return new THREE.LineSegments(geo, matl)
 }
 
 // ---------------------------------------------------------------------------

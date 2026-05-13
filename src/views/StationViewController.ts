@@ -150,6 +150,9 @@ export class StationViewController implements Tickable {
       config,
       this.level.collider,
     )
+    // Indoor pressurised modules — disable jumping so the player cannot
+    // hop into the curved ceiling or out through the door arches.
+    this.playerController.jumpEnabled = false
     this.playerController.group.position.copy(this.level.spawnPos)
     this.sceneManager.addToScene(this.playerController.group)
     this.fpsCamera.setTarget(this.playerController.group)
