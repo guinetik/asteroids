@@ -273,8 +273,8 @@ export class CatAudioDirector {
     // Two happy-meow takes; flip a coin so back-to-back idle entries don't sound
     // like a stuck sample. Alert keeps a single cue — it's a "needs attention"
     // signal, varying it muddles the read.
-    let cue: 'sfx.meow.alert' | 'sfx.meow.happy' | 'sfx.cat.meow.variant' | null = null
-    if (needsUnmet) cue = 'sfx.meow.alert'
+    let cue: 'sfx.cat.meow.alert' | 'sfx.meow.happy' | 'sfx.cat.meow.variant' | null = null
+    if (needsUnmet) cue = 'sfx.cat.meow.alert'
     else if (state.love >= CAT_PURR_LOVE_THRESHOLD) {
       cue = Math.random() < 0.5 ? 'sfx.meow.happy' : 'sfx.cat.meow.variant'
     }

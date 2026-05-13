@@ -126,7 +126,7 @@ describe('audioManifest', () => {
       'sfx.litter.scoop',
       'sfx.litter.use',
       'sfx.meow.happy',
-      'sfx.meow.alert',
+      'sfx.cat.meow.alert',
       // music
       'music.menu',
       'music.levelCombat',

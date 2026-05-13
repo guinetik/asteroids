@@ -138,7 +138,7 @@ export const AUDIO_SOUND_IDS = [
   'sfx.litter.scoop',
   'sfx.litter.use',
   'sfx.meow.happy',
-  'sfx.meow.alert',
+  'sfx.cat.meow.alert',
   // Music
   'music.menu',
   'music.levelCombat',
@@ -1143,9 +1143,9 @@ const manifestById: ManifestById = {
     volume: 0.7,
     effect: 'none',
   },
-  'sfx.meow.alert': {
-    id: 'sfx.meow.alert',
-    src: '/sound/sfx.meow.alert.mp3',
+  'sfx.cat.meow.alert': {
+    id: 'sfx.cat.meow.alert',
+    src: '/sound/sfx.cat.meow.alert.mp3',
     category: 'sfx',
     load: 'lazy',
     playback: 'restart',
