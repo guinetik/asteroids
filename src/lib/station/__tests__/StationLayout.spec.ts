@@ -1,13 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import {
+  bboxOverlapsInterior,
   CORRIDOR_HALF_EXTENTS,
   type CorridorNode,
+  corridorBBox,
   corridorPortWorldAnchor,
   corridorWorldPorts,
   type EntranceSpec,
   nativePortAnchor,
   portsMate,
   resolveLayout,
+  roomBBox,
   roomEntranceWorldAnchor,
   ROOM_TILE_SIZE,
   type RoomSpec,
@@ -214,6 +217,54 @@ describe('roomEntranceWorldAnchor', () => {
   })
 })
 
+describe('bbox helpers', () => {
+  it('roomBBox returns the AABB around the room anchor', () => {
+    const room: RoomSpec = { id: 'r', width: 3, depth: 2, anchor: { x: 10, z: -5 } }
+    const halfW = (3 * ROOM_TILE_SIZE) / 2
+    const halfD = (2 * ROOM_TILE_SIZE) / 2
+    expect(roomBBox(room)).toEqual({
+      id: 'r',
+      minX: 10 - halfW,
+      maxX: 10 + halfW,
+      minZ: -5 - halfD,
+      maxZ: -5 + halfD,
+    })
+  })
+
+  it('roomBBox swaps X/Z when yaw is odd', () => {
+    const room: RoomSpec = { id: 'r', width: 3, depth: 2, anchor: { x: 0, z: 0 }, yaw: 1 }
+    const halfW = (3 * ROOM_TILE_SIZE) / 2
+    const halfD = (2 * ROOM_TILE_SIZE) / 2
+    // X half-extent comes from depth tiles after the 90° rotation.
+    expect(roomBBox(room).maxX - roomBBox(room).minX).toBeCloseTo(2 * halfD)
+    expect(roomBBox(room).maxZ - roomBBox(room).minZ).toBeCloseTo(2 * halfW)
+  })
+
+  it('corridorBBox sizes from the piece kind and swaps on odd yaw', () => {
+    const node: CorridorNode = { id: 'c', kind: 'window', anchor: { x: 0, z: 0 } }
+    const bbox = corridorBBox(node)
+    expect(bbox.maxX - bbox.minX).toBeCloseTo(2 * CORRIDOR_HALF_EXTENTS.window.x)
+    expect(bbox.maxZ - bbox.minZ).toBeCloseTo(2 * CORRIDOR_HALF_EXTENTS.window.z)
+
+    const rotated: CorridorNode = { ...node, yaw: 1 }
+    const rbbox = corridorBBox(rotated)
+    expect(rbbox.maxX - rbbox.minX).toBeCloseTo(2 * CORRIDOR_HALF_EXTENTS.window.z)
+    expect(rbbox.maxZ - rbbox.minZ).toBeCloseTo(2 * CORRIDOR_HALF_EXTENTS.window.x)
+  })
+
+  it('bboxOverlapsInterior accepts edge-only touching as non-overlap', () => {
+    const a = { id: 'a', minX: 0, maxX: 5, minZ: 0, maxZ: 5 }
+    const b = { id: 'b', minX: 5, maxX: 10, minZ: 0, maxZ: 5 }
+    expect(bboxOverlapsInterior(a, b)).toBe(false)
+  })
+
+  it('bboxOverlapsInterior detects positive-area interior overlap', () => {
+    const a = { id: 'a', minX: 0, maxX: 5, minZ: 0, maxZ: 5 }
+    const b = { id: 'b', minX: 4, maxX: 10, minZ: 4, maxZ: 10 }
+    expect(bboxOverlapsInterior(a, b)).toBe(true)
+  })
+})
+
 describe('validateLayout', () => {
   it('rejects a room entrance whose index is out of range', () => {
     const layout: StationLayout = {
@@ -322,6 +373,18 @@ describe('validateLayout', () => {
       ],
     }
     expect(() => validateLayout(layout)).toThrow(/reciprocal mismatch/)
+  })
+
+  it('rejects two pieces whose bounding boxes overlap in volume', () => {
+    // Two rooms placed on top of each other.
+    const layout: StationLayout = {
+      rooms: [
+        { id: 'r1', width: 3, depth: 3, anchor: { x: 0, z: 0 } },
+        { id: 'r2', width: 3, depth: 3, anchor: { x: 1, z: 1 } },
+      ],
+      corridors: [],
+    }
+    expect(() => validateLayout(layout)).toThrow(/overlapping bounding boxes/)
   })
 
   it('rejects a corridor↔corridor edge whose anchors do not line up', () => {

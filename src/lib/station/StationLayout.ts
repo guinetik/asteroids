@@ -307,6 +307,89 @@ export function roomEntranceWorldAnchor(
 
 /** Maximum positional drift (world units) allowed when mating two ports. */
 const PORT_MATE_EPSILON = 1e-3
+/**
+ * Tolerance for piece-vs-piece bbox overlap. Two pieces that share a
+ * port edge will have axis-aligned bboxes that touch along a line; we
+ * accept anything tighter than this as "sharing an edge" rather than
+ * "overlapping in volume".
+ */
+const BBOX_OVERLAP_EPSILON = 1e-3
+
+/** Axis-aligned XZ-plane bounding box of a placed piece. */
+export interface PieceBBox {
+  /** Stable identifier used for error messages. */
+  id: string
+  /** Inclusive min X. */
+  minX: number
+  /** Inclusive max X. */
+  maxX: number
+  /** Inclusive min Z. */
+  minZ: number
+  /** Inclusive max Z. */
+  maxZ: number
+}
+
+/**
+ * World-space bbox of a placed room. Yaw 0/2 keeps the X/Z axes; yaw
+ * 1/3 swaps them (the room is rectangular in tile pitch).
+ *
+ * @param room - Room placement.
+ * @returns Axis-aligned bbox in world XZ.
+ */
+export function roomBBox(room: RoomSpec): PieceBBox {
+  const tile = ROOM_TILE_SIZE
+  const halfW = (room.width * tile) / 2
+  const halfD = (room.depth * tile) / 2
+  const yaw = room.yaw ?? 0
+  const swapped = yaw === 1 || yaw === 3
+  const hx = swapped ? halfD : halfW
+  const hz = swapped ? halfW : halfD
+  return {
+    id: room.id,
+    minX: room.anchor.x - hx,
+    maxX: room.anchor.x + hx,
+    minZ: room.anchor.z - hz,
+    maxZ: room.anchor.z + hz,
+  }
+}
+
+/**
+ * World-space bbox of a placed corridor piece. Yaw 0/2 keeps the X/Z
+ * axes; yaw 1/3 swaps them (the window piece is rectangular).
+ *
+ * @param node - Corridor placement.
+ * @returns Axis-aligned bbox in world XZ.
+ */
+export function corridorBBox(node: CorridorNode): PieceBBox {
+  const half = CORRIDOR_HALF_EXTENTS[node.kind]
+  const yaw = node.yaw ?? 0
+  const swapped = yaw === 1 || yaw === 3
+  const hx = swapped ? half.z : half.x
+  const hz = swapped ? half.x : half.z
+  return {
+    id: node.id,
+    minX: node.anchor.x - hx,
+    maxX: node.anchor.x + hx,
+    minZ: node.anchor.z - hz,
+    maxZ: node.anchor.z + hz,
+  }
+}
+
+/**
+ * Two bboxes overlap in volume when their X *and* Z ranges both share
+ * an interval wider than {@link BBOX_OVERLAP_EPSILON}. Pieces that
+ * merely share a port edge land at exactly one axis touching, which
+ * this function rejects (interior overlap only).
+ *
+ * @param a - First bbox.
+ * @param b - Second bbox.
+ * @returns `true` if the bboxes have positive-area interior overlap.
+ */
+export function bboxOverlapsInterior(a: PieceBBox, b: PieceBBox): boolean {
+  const xOverlap = Math.min(a.maxX, b.maxX) - Math.max(a.minX, b.minX)
+  const zOverlap = Math.min(a.maxZ, b.maxZ) - Math.max(a.minZ, b.minZ)
+  return xOverlap > BBOX_OVERLAP_EPSILON && zOverlap > BBOX_OVERLAP_EPSILON
+}
 
 /**
  * Validate that two world-space anchors mate cleanly. Ports mate when
@@ -511,7 +594,23 @@ export function validateLayout(layout: StationLayout): void {
     }
   }
 
-  // 6: geometric mating — declared anchors must produce port anchors
+  // 6: no-overlap — every pair of pieces (rooms + corridors) must have
+  // axis-aligned bboxes that at worst share an edge.
+  const bboxes: PieceBBox[] = [
+    ...layout.rooms.map(roomBBox),
+    ...layout.corridors.map(corridorBBox),
+  ]
+  for (let i = 0; i < bboxes.length; i++) {
+    for (let j = i + 1; j < bboxes.length; j++) {
+      if (bboxOverlapsInterior(bboxes[i]!, bboxes[j]!)) {
+        throw new Error(
+          `Pieces ${bboxes[i]!.id} and ${bboxes[j]!.id} have overlapping bounding boxes — they would render on top of each other`,
+        )
+      }
+    }
+  }
+
+  // 7: geometric mating — declared anchors must produce port anchors
   // that actually meet in world space and face opposite directions.
   for (const corridor of layout.corridors) {
     for (const [side, target] of Object.entries(corridor.ports) as Array<

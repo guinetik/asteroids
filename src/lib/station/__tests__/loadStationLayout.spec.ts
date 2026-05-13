@@ -17,9 +17,9 @@ describe('Yamada station layout', () => {
       'c-hub',
       'c-n-window',
       'c-w-corner',
-      'r-east',
-      'r-north',
-      'r-west',
+      'r-bridge',
+      'r-east-bay',
+      'r-west-bay',
     ])
     const kinds = new Set(plan.map((p) => p.kind))
     expect(kinds).toEqual(new Set(['room', 'cross', 'corner', 'window']))

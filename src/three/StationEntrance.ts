@@ -32,6 +32,22 @@ const DOOR_OPEN_DURATION = 0.55
 const DOOR_ANGLE_FULL = Math.PI / 2
 /** Hinge rotation (radians) for a `'crack'` open — door barely cracks. */
 const DOOR_ANGLE_CRACK = 0.18
+/** Seconds the door stays held open before auto-closing behind the player. */
+const DOOR_HOLD_DURATION = 0.4
+/** Seconds the door takes to swing back closed. */
+const DOOR_CLOSE_DURATION = 0.45
+
+/**
+ * Animation phase for the entrance door:
+ *
+ * - `idle`: closed, waiting for interaction.
+ * - `opening`: hinge sweeping from closed → open angle.
+ * - `open`: held at the open angle while the player walks through.
+ * - `closing`: hinge sweeping back to closed.
+ * - `done`: fully closed again; the entrance has been "used" and the
+ *   controller no longer surfaces a prompt for it.
+ */
+type DoorPhase = 'idle' | 'opening' | 'open' | 'closing' | 'done'
 
 /**
  * Runtime instance of an entrance: the assembled scene group + cached
@@ -41,8 +57,6 @@ const DOOR_ANGLE_CRACK = 0.18
 export class StationEntrance {
   /** Root group containing the entrance frame + fitted door. */
   readonly group: Group
-  /** World-space position used for the proximity check. */
-  readonly anchor: Vector3
   /** Prompt string the controller forwards to the HUD. */
   readonly prompt: string
   /** Event id dispatched when the player interacts with this entrance. */
@@ -53,20 +67,30 @@ export class StationEntrance {
   private readonly hinge: Object3D
   private readonly hingeClosedAngle: number
   private readonly openAngle: number
-  /** 0..1 progress through the open animation. */
-  private openProgress = 0
-  /** True once {@link triggerOpen} fires and the animation begins. */
-  private opening = false
-  /** True once the animation reaches 1.0 — re-entry guards. */
-  private completed = false
-  /** Fired exactly once when {@link openProgress} hits 1.0. */
+  /** Current animation phase. */
+  private phase: DoorPhase = 'idle'
+  /** Elapsed seconds within the current phase. */
+  private phaseT = 0
+  /** Reused scratch for {@link anchor}. */
+  private readonly _anchorScratch = new Vector3()
+
+  /**
+   * Current world-space position of the entrance, recomputed each read
+   * from the group's world matrix. Lets a single entrance be placed
+   * under any parent transform (e.g. the room's world wrapper) without
+   * the controller needing to know about the chain.
+   */
+  get anchor(): Vector3 {
+    this.group.updateWorldMatrix(true, false)
+    return this.group.getWorldPosition(this._anchorScratch)
+  }
+  /** Fired exactly once when the open animation reaches its target. */
   private onComplete: (() => void) | null = null
 
   /**
-   * Build an entrance instance from its assembled group + anchor + door.
+   * Build an entrance instance from its assembled group + door.
    *
    * @param group - Three.js group containing the entrance frame + door.
-   * @param anchor - World position the controller measures distance from.
    * @param prompt - Prompt text shown when in range.
    * @param event - Event id dispatched on interact.
    * @param hinge - Hinge group whose `rotation.y` swings the door open.
@@ -74,14 +98,12 @@ export class StationEntrance {
    */
   constructor(
     group: Group,
-    anchor: Vector3,
     prompt: string,
     event: string,
     hinge: Object3D,
     openStyle: EntranceOpenStyle = 'full',
   ) {
     this.group = group
-    this.anchor = anchor.clone()
     this.prompt = prompt
     this.event = event
     this.openStyle = openStyle
@@ -90,44 +112,67 @@ export class StationEntrance {
     this.openAngle = openStyle === 'crack' ? DOOR_ANGLE_CRACK : DOOR_ANGLE_FULL
   }
 
-  /** True if the door is currently animating open. */
+  /** True while the door is mid-animation (opening, held open, or closing). */
   get isOpening(): boolean {
-    return this.opening && !this.completed
+    return this.phase === 'opening' || this.phase === 'open' || this.phase === 'closing'
   }
 
-  /** True once the open animation has finished (latched). */
+  /** True once the entrance has been used (closed, won't surface a prompt again). */
   get isOpened(): boolean {
-    return this.completed
+    return this.phase !== 'idle'
   }
 
   /**
-   * Begin the open animation. Idempotent — subsequent calls before
-   * completion are ignored. The callback fires exactly once when the
-   * animation reaches 1.0.
+   * Begin the open animation. Idempotent — subsequent calls before the
+   * entrance returns to `idle` are ignored. `onComplete` fires exactly
+   * once, the moment the door reaches its open angle.
    *
    * @param onComplete - Invoked when the door is fully (or crack-) open.
    */
   triggerOpen(onComplete: () => void): void {
-    if (this.opening) return
-    this.opening = true
+    if (this.phase !== 'idle') return
+    this.phase = 'opening'
+    this.phaseT = 0
     this.onComplete = onComplete
   }
 
   /**
-   * Advance the open animation. No-op when the door is closed or already
-   * finished.
+   * Advance the open → hold → close animation. No-op while `idle` or
+   * `done`.
    *
    * @param dt - Frame delta in seconds.
    */
   tick(dt: number): void {
-    if (!this.opening || this.completed) return
-    this.openProgress = Math.min(1, this.openProgress + dt / DOOR_OPEN_DURATION)
-    this.hinge.rotation.y = this.hingeClosedAngle + this.openAngle * this.openProgress
-    if (this.openProgress >= 1) {
-      this.completed = true
-      const cb = this.onComplete
-      this.onComplete = null
-      cb?.()
+    if (this.phase === 'idle' || this.phase === 'done') return
+    this.phaseT += dt
+    switch (this.phase) {
+      case 'opening': {
+        const t = Math.min(1, this.phaseT / DOOR_OPEN_DURATION)
+        this.hinge.rotation.y = this.hingeClosedAngle + this.openAngle * t
+        if (t >= 1) {
+          this.phase = 'open'
+          this.phaseT = 0
+          const cb = this.onComplete
+          this.onComplete = null
+          cb?.()
+        }
+        break
+      }
+      case 'open': {
+        if (this.phaseT >= DOOR_HOLD_DURATION) {
+          this.phase = 'closing'
+          this.phaseT = 0
+        }
+        break
+      }
+      case 'closing': {
+        const t = Math.min(1, this.phaseT / DOOR_CLOSE_DURATION)
+        this.hinge.rotation.y = this.hingeClosedAngle + this.openAngle * (1 - t)
+        if (t >= 1) {
+          this.phase = 'done'
+        }
+        break
+      }
     }
   }
 }

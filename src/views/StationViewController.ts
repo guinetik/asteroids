@@ -1,9 +1,9 @@
 /**
  * Bridges Vue lifecycle to the station-interior FPS scene.
  *
- * Renders a parametric room assembled from the modular hallway pack:
- * a `ROOM_WIDTH × ROOM_DEPTH` grid of floor + ceiling tiles surrounded
- * by perimeter walls.
+ * Loads the authored Yamada layout from `src/data/stations/yamada.json`,
+ * builds the full station (rooms + corridors) via {@link buildStation},
+ * and drives the entrance proximity prompts + interact callbacks.
  *
  * @author guinetik
  * @date 2026-05-13
@@ -30,37 +30,26 @@ import { FpsAudioDirector } from '@/audio/FpsAudioDirector'
 import { FpsPointerLockSession } from '@/lib/fps/FpsPointerLockSession'
 import { buildFpsPlayerConfig } from '@/lib/fps/buildFpsPlayerConfig'
 import { StationCollider } from '@/lib/station/StationCollider'
-import { buildStationRoom, type StationRoom } from '@/three/StationRoomBuilder'
-import type { EntranceSpec, StationEntrance } from '@/three/StationEntrance'
+import { buildStation, type BuiltStation } from '@/three/StationBuilder'
+import type { StationEntrance } from '@/three/StationEntrance'
+import { loadStationLayout } from '@/lib/station/loadStationLayout'
+import yamadaLayoutRaw from '@/data/stations/yamada.json'
 
 // ---------------------------------------------------------------------------
 // Room layout constants.
 // ---------------------------------------------------------------------------
 
-/** Number of wall pieces along the room's X axis. */
-const ROOM_WIDTH = 4
-/** Number of wall pieces along the room's Z axis. */
-const ROOM_DEPTH = 3
-/** Number of wall pieces stacked vertically. */
-const ROOM_HEIGHT = 2
 /** Floor surface Y, used by the player collider. Matches the visible
- * top of the raised floor tiles in {@link buildStationRoom}. */
+ * top of the raised floor tiles in the room builder. */
 const FLOOR_Y = 0.25
 /** Spawn yaw facing +Z. */
 const SPAWN_YAW = 0
 /** Maximum distance for an entrance to show its interact prompt. */
 const ENTRANCE_INTERACT_DISTANCE = 2.5
-/** Single hard-coded entrance on the south wall — exit back to `/`. */
-const ROOM_ENTRANCES: ReadonlyArray<EntranceSpec> = [
-  {
-    side: 'S',
-    index: 1,
-    storey: 0,
-    prompt: 'F  Leave',
-    event: 'station:exit',
-    openStyle: 'crack',
-  },
-]
+/** Padding (world units) around the bounding box of every piece used
+ * for the temporary unified collider — gives the player a little room
+ * around the outermost floor edges. */
+const COLLIDER_BOUNDS_PADDING = 1
 
 // ---------------------------------------------------------------------------
 // Lighting constants.
@@ -104,7 +93,7 @@ export class StationViewController implements Tickable {
   private sceneManager: SceneManager | null = null
   private fpsCamera: FpsCamera | null = null
   private playerController: FpsPlayerController | null = null
-  private room: StationRoom | null = null
+  private station: BuiltStation | null = null
   private spawnPos: Vector3 = new Vector3()
   private starfield: StarFieldController | null = null
   private readonly fpsAudio = new FpsAudioDirector()
@@ -143,15 +132,12 @@ export class StationViewController implements Tickable {
     this.sceneManager = new SceneManager()
     this.sceneManager.mount(container)
 
-    // Parametric room.
-    this.room = await buildStationRoom({
-      width: ROOM_WIDTH,
-      depth: ROOM_DEPTH,
-      height: ROOM_HEIGHT,
-      entrances: ROOM_ENTRANCES.map((e) => ({ ...e })),
-    })
-    this.sceneManager.addToScene(this.room.group)
+    // Whole station from the authored Yamada layout.
+    const layout = loadStationLayout(yamadaLayoutRaw)
+    this.station = await buildStation(layout)
+    this.sceneManager.addToScene(this.station.group)
 
+    // Spawn at the hub corridor's origin (Yamada places it at world XZ = 0).
     this.spawnPos.set(0, FLOOR_Y, 0)
 
     // Lighting.
@@ -165,14 +151,28 @@ export class StationViewController implements Tickable {
     this.starfield = new StarFieldController()
     this.sceneManager.addToScene(this.starfield.points)
 
-    // Collider — single rect covering the room's interior floor.
+    // Temporary collider: one big rect covering the bounding box of
+    // every piece. Lets the player walk through every room + corridor
+    // freely; walls are still rendered but don't physically block yet.
+    // A future pass will replace this with per-piece rects + per-edge
+    // passage rects between connected pieces.
+    let minX = Infinity
+    let maxX = -Infinity
+    let minZ = Infinity
+    let maxZ = -Infinity
+    for (const f of this.station.floors) {
+      if (f.minX < minX) minX = f.minX
+      if (f.maxX > maxX) maxX = f.maxX
+      if (f.minZ < minZ) minZ = f.minZ
+      if (f.maxZ > maxZ) maxZ = f.maxZ
+    }
     const collider = new StationCollider(
       [
         {
-          minX: -this.room.halfWidth,
-          maxX: this.room.halfWidth,
-          minZ: -this.room.halfDepth,
-          maxZ: this.room.halfDepth,
+          minX: minX - COLLIDER_BOUNDS_PADDING,
+          maxX: maxX + COLLIDER_BOUNDS_PADDING,
+          minZ: minZ - COLLIDER_BOUNDS_PADDING,
+          maxZ: maxZ + COLLIDER_BOUNDS_PADDING,
           y: FLOOR_Y,
         },
       ],
@@ -242,16 +242,16 @@ export class StationViewController implements Tickable {
    * @param dt - Frame delta in seconds.
    */
   private updateEntrancePrompt(dt: number): void {
-    if (!this.room || !this.playerController || !this.inputManager) return
+    if (!this.station || !this.playerController || !this.inputManager) return
 
-    for (const entrance of this.room.entrances) entrance.tick(dt)
+    for (const entrance of this.station.entrances) entrance.tick(dt)
 
     const pos = this.playerController.group.position
     let activePrompt: string | null = null
     let activeEntrance: StationEntrance | null = null
     let bestDistSq = ENTRANCE_INTERACT_DISTANCE * ENTRANCE_INTERACT_DISTANCE
 
-    for (const entrance of this.room.entrances) {
+    for (const entrance of this.station.entrances) {
       if (entrance.isOpening || entrance.isOpened) continue
       this._proximityScratch.copy(entrance.anchor)
       this._proximityScratch.y = pos.y

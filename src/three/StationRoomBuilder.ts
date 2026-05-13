@@ -17,7 +17,7 @@
  * @author guinetik
  * @date 2026-05-13
  */
-import { Group, Vector3 } from 'three'
+import { Group } from 'three'
 import { loadGLB } from '@/three/loadGLB'
 import { StationEntrance, type EntranceSpec } from '@/three/StationEntrance'
 
@@ -281,14 +281,7 @@ export async function buildStationRoom(layout: StationRoomLayout): Promise<Stati
         slot.add(hinge)
         group.add(slot)
         entrances.push(
-          new StationEntrance(
-            slot,
-            new Vector3(x + pushX, wallY + ENTRANCE_RAISE, z + pushZ),
-            spec.prompt,
-            spec.event,
-            hinge,
-            spec.openStyle ?? 'full',
-          ),
+          new StationEntrance(slot, spec.prompt, spec.event, hinge, spec.openStyle ?? 'full'),
         )
         return
       }
