@@ -1,0 +1,38 @@
+[
+  {
+    "title": "The Habitat Update",
+    "date": "May 13, 2026",
+    "backgroundImage": "/thumbnails/cat-tower.webp",
+    "description": "A new walkable shuttle habitat gives you a real home between contracts.",
+    "changes": [
+      "Walk around your glass habitat interior.",
+      "Care for a second ship passenger with food, litter, and status meters.",
+      "Decorate your habitat with posters from your achievements.",
+      "Buy furniture and cozy cabin props at Fantasia's new cosmetics shop."
+    ]
+  },
+  {
+    "title": "Pimp My Ride Update",
+    "date": "May 05, 2026",
+    "backgroundImage": "/fantasia.webp",
+    "description": "Fantasia opens the Pimp My Ride store with new ways to style your shuttle.",
+    "changes": [
+      "Visit Fantasia's new cosmetics shop.",
+      "Buy shuttle paint jobs, thruster trails, and title flair.",
+      "Preview looks before you commit your credits.",
+      "Carry your style into the cockpit, cabin, and contracts."
+    ]
+  },
+  {
+    "title": "Launch Update",
+    "date": "May 01, 2026",
+    "backgroundImage": "/og-image.png",
+    "description": "Asteroid Lander launches with a full solar-system orrery and physics-driven asteroid missions.",
+    "changes": [
+      "Navigate a full planetary orrery with gravity-driven flight.",
+      "Land on procedural asteroids and survive the approach.",
+      "Perform asteroid science with scans, samples, and discoveries.",
+      "Uncover contracts, story threads, and hidden lore across the belt."
+    ]
+  }
+]
