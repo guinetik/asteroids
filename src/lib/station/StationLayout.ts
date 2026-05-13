@@ -447,6 +447,20 @@ export type PortTarget =
   /** Terminator: closed-off port rendered as a plain wall cap. */
   | { kind: 'sealed' }
 
+/**
+ * Optional exterior sun the station view places outside the station mesh.
+ * Position is in world coordinates so authors can park the sun behind a
+ * specific window. The mesh is the same star renderer used elsewhere in the
+ * game (see `createSunMesh`) — `scale` is a uniform multiplier on the
+ * natural sun radius (Sol's `displayRadius * SIZE_SCALE` ≈ 20 scene units).
+ */
+export interface ExteriorSunSpec {
+  /** World-space position `[x, y, z]` of the sun's mesh centre. */
+  pos: [number, number, number]
+  /** Uniform scale applied to the sun mesh. Tune to taste. */
+  scale: number
+}
+
 /** Full station layout — rooms plus a corridor graph with port targets. */
 export interface StationLayout {
   /** Rooms placed in world coordinates. */
@@ -456,6 +470,8 @@ export interface StationLayout {
    * keyed by the *world-facing* side after the corridor's yaw is applied.
    */
   corridors: Array<CorridorNode & { ports: Partial<Record<EntranceSide, PortTarget>> }>
+  /** Optional exterior sun (rendered in scene, no interior lighting effect). */
+  exteriorSun?: ExteriorSunSpec
 }
 
 /** Final concrete instruction the Three.js builder consumes for a piece. */

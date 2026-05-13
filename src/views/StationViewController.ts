@@ -33,7 +33,9 @@ import { StationCollider, type StationRect } from '@/lib/station/StationCollider
 import { buildStation, type BuiltStation } from '@/three/StationBuilder'
 import type { StationEntrance } from '@/three/StationEntrance'
 import { loadStationLayout } from '@/lib/station/loadStationLayout'
-import type { StationLayout } from '@/lib/station/StationLayout'
+import type { ExteriorSunSpec, StationLayout } from '@/lib/station/StationLayout'
+import { createSunMesh, type SunMeshResult } from '@/three/meshes/createSunMesh'
+import { SUN } from '@/lib/planets/catalog'
 
 /**
  * URL prefix where station-interior layouts are served as static JSON.
@@ -133,6 +135,9 @@ export class StationViewController implements Tickable {
   private stationCollider: StationCollider | null = null
   private spawnPos: Vector3 = new Vector3()
   private starfield: StarFieldController | null = null
+  private exteriorSun: SunMeshResult | null = null
+  /** Sim time accumulated for the exterior sun's shader uniforms. */
+  private exteriorSunTime = 0
   private readonly fpsAudio = new FpsAudioDirector()
   private readonly pointerLock = new FpsPointerLockSession()
   private router: Router | null = null
@@ -200,6 +205,11 @@ export class StationViewController implements Tickable {
     })
     this.sceneManager.addToScene(this.starfield.points)
 
+    // Optional exterior sun parked behind a station window.
+    if (layout.exteriorSun) {
+      this.mountExteriorSun(layout.exteriorSun)
+    }
+
     const collider = new StationCollider(this.station.floors, this.station.passages)
     this.stationCollider = collider
     this.updateDoorBlockers()
@@ -247,6 +257,7 @@ export class StationViewController implements Tickable {
     if (!this.playerController) return
 
     this.updateEntrancePrompt(dt)
+    this.tickExteriorSun(dt)
 
     this.fpsAudio.update(dt, {
       grounded: this.playerController.grounded,
@@ -307,6 +318,26 @@ export class StationViewController implements Tickable {
   }
 
   /**
+   * Build and add the exterior sun mesh at the layout-specified position.
+   * The sun's point light is muted because interior lighting is already
+   * driven by ambient + directional; we only want the visual disk so the
+   * player can see it through the station's windows.
+   *
+   * @param spec - Authored exterior-sun position + scale.
+   */
+  private mountExteriorSun(spec: ExteriorSunSpec): void {
+    if (!this.sceneManager) return
+    const result = createSunMesh(SUN)
+    result.group.position.set(spec.pos[0], spec.pos[1], spec.pos[2])
+    result.group.scale.setScalar(spec.scale)
+    // Habitat pattern: keep the sun's own point light off so we do not
+    // double-up on the interior lighting rig.
+    result.light.intensity = 0
+    this.sceneManager.addToScene(result.group)
+    this.exteriorSun = result
+  }
+
+  /**
    * Fetch the station layout JSON for the given id from `public/data/stations/`
    * and validate it via {@link loadStationLayout}.
    *
@@ -324,6 +355,22 @@ export class StationViewController implements Tickable {
     }
     const raw: unknown = await res.json()
     return loadStationLayout(raw)
+  }
+
+  /**
+   * Advance the exterior sun's shader uniforms by one frame. No-op when no
+   * sun was mounted. Both the star and corona shaders share `uTime`.
+   *
+   * @param dt - Frame delta in seconds.
+   */
+  private tickExteriorSun(dt: number): void {
+    const sun = this.exteriorSun
+    if (!sun) return
+    this.exteriorSunTime += dt
+    const uTime = sun.uniforms.uTime
+    if (uTime) uTime.value = this.exteriorSunTime
+    const coronaUTime = sun.coronaUniforms.uTime
+    if (coronaUTime) coronaUTime.value = this.exteriorSunTime
   }
 
   /** Refresh door collision blockers from the current entrance animation states. */
@@ -356,6 +403,7 @@ export class StationViewController implements Tickable {
     DevConsole.unregister('StationView')
     this.gameLoop?.stop()
     this.starfield?.dispose()
+    this.disposeExteriorSun()
     this.playerController?.dispose()
     this.fpsCamera?.dispose()
     this.pointerLock.releaseLock()
@@ -363,5 +411,20 @@ export class StationViewController implements Tickable {
     this.sceneManager?.dispose()
     this.inputManager?.dispose()
     this.fpsAudio.dispose()
+  }
+
+  /** Detach and free GPU resources owned by the exterior sun, if any. */
+  private disposeExteriorSun(): void {
+    const sun = this.exteriorSun
+    if (!sun) return
+    this.sceneManager?.removeFromScene(sun.group)
+    sun.mesh.geometry.dispose()
+    const mat = sun.mesh.material
+    if (Array.isArray(mat)) {
+      for (const m of mat) m.dispose()
+    } else {
+      mat.dispose()
+    }
+    this.exteriorSun = null
   }
 }

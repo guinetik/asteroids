@@ -1,6 +1,10 @@
 {
   "id": "ceres-institute",
   "name": "Ceres Institute for Eternal Biology",
+  "exteriorSun": {
+    "pos": [0, 5, 200],
+    "scale": 0.5
+  },
   "rooms": [
     {
       "id": "r-west",
