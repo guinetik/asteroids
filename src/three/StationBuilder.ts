@@ -69,6 +69,13 @@ const STATION_FLOOR_Y = 0.25
  * marker seams aligned without changing graph validation anchors.
  */
 const CORNER_VISUAL_ALIGNMENT_OFFSET = 0.21
+/**
+ * Local-space nudge for the T corridor asset. Its central floor-panel
+ * markers sit slightly behind the logical port centerline along the stem;
+ * shifting the clone keeps the visible seams aligned without changing
+ * layout math.
+ */
+const WINDOW_VISUAL_ALIGNMENT_OFFSET = 0.21
 /** Entrance piece URL — reused for corridor exit caps. */
 const ENTRANCE_URL = '/models/station/pieces/entrance.glb'
 /** Door piece URL — reused for corridor exit caps. */
@@ -155,6 +162,9 @@ async function placeCorridor(node: CorridorNode): Promise<Group> {
     floor.position.x = -CORNER_VISUAL_ALIGNMENT_OFFSET
     floor.position.z = -CORNER_VISUAL_ALIGNMENT_OFFSET
   }
+  if (node.kind === 'window') {
+    floor.position.z = -WINDOW_VISUAL_ALIGNMENT_OFFSET
+  }
   group.add(floor)
 
   const roof = roofSrc.clone(true)
@@ -166,6 +176,9 @@ async function placeCorridor(node: CorridorNode): Promise<Group> {
   if (node.kind === 'corner') {
     roof.position.x = -CORNER_VISUAL_ALIGNMENT_OFFSET
     roof.position.z = -CORNER_VISUAL_ALIGNMENT_OFFSET
+  }
+  if (node.kind === 'window') {
+    roof.position.z = -WINDOW_VISUAL_ALIGNMENT_OFFSET
   }
   group.add(roof)
 

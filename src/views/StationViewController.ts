@@ -11,7 +11,7 @@
  */
 import type { Router } from 'vue-router'
 import type { Tickable } from '@/lib/Tickable'
-import { AmbientLight, Color, DirectionalLight, Vector3 } from 'three'
+import { AmbientLight, Color, DirectionalLight, MathUtils, Vector3 } from 'three'
 import { DevConsole } from '@/lib/devConsole'
 import { GameLoop } from '@/lib/GameLoop'
 import { TickHandler } from '@/lib/TickHandler'
@@ -78,8 +78,16 @@ const DIR_LIGHT_COLOR = 0xffffff
  * Human-scale for indoor habitat scenes.
  */
 const STATION_EYE_HEIGHT = 1.7
+/** Maximum up/down pitch while auto-looking at station interactions. */
+const STATION_PITCH_CLAMP = Math.PI / 3
 /** Indoor movement scale applied to the FPS suit config for station interiors. */
 const STATION_MOVEMENT_SPEED_SCALE = 0.35
+/** Lerp factor per second for turning the camera toward an interacted station door. */
+const DOOR_CAMERA_TURN_RATE = 6
+/** Seconds the door-look sequence owns camera yaw/pitch after F is pressed. */
+const DOOR_CAMERA_TURN_DURATION_S = 0.55
+/** Vertical offset from the door anchor used as the look-at point. */
+const DOOR_LOOK_TARGET_Y_OFFSET = STATION_EYE_HEIGHT
 
 // ---------------------------------------------------------------------------
 // Tick priority offsets.
@@ -149,8 +157,14 @@ export class StationViewController implements Tickable {
   onInteract: ((event: string) => void) | null = null
   /** Scratch vector reused for the per-frame entrance proximity check. */
   private readonly _proximityScratch = new Vector3()
+  /** World-space look-at target for the active door interaction camera turn. */
+  private readonly _doorLookTarget = new Vector3()
   /** Cached prompt text so we only fire `onPrompt` when it changes. */
   private currentPrompt: string | null = null
+  /** True while the camera is smoothly turning toward the interacted door. */
+  private doorLookSequenceActive = false
+  /** Seconds elapsed in the current door-look sequence. */
+  private doorLookSequenceTime = 0
 
   /**
    * Mount the scene into the given container.
@@ -257,6 +271,7 @@ export class StationViewController implements Tickable {
     if (!this.playerController) return
 
     this.updateEntrancePrompt(dt)
+    this.tickDoorLookSequence(dt)
     this.tickExteriorSun(dt)
 
     this.fpsAudio.update(dt, {
@@ -312,8 +327,60 @@ export class StationViewController implements Tickable {
         this.currentPrompt = null
         this.onPrompt?.(null)
       }
+      this.startDoorLookSequence(activeEntrance)
       activeEntrance.triggerOpen(pos, () => this.onInteract?.(event))
       this.updateDoorBlockers()
+    }
+  }
+
+  /**
+   * Start a short camera turn toward the door the player just interacted with.
+   *
+   * @param entrance - Door/entrance instance selected by proximity.
+   */
+  private startDoorLookSequence(entrance: StationEntrance): void {
+    this._doorLookTarget.copy(entrance.anchor)
+    this._doorLookTarget.y = FLOOR_Y + DOOR_LOOK_TARGET_Y_OFFSET
+    this.doorLookSequenceActive = true
+    this.doorLookSequenceTime = 0
+  }
+
+  /**
+   * Advance the door-look camera turn.
+   *
+   * @param dt - Frame delta in seconds.
+   */
+  private tickDoorLookSequence(dt: number): void {
+    if (!this.doorLookSequenceActive || !this.fpsCamera) return
+    this.doorLookSequenceTime += dt
+
+    const cam = this.fpsCamera.camera
+    const dx = this._doorLookTarget.x - cam.position.x
+    const dy = this._doorLookTarget.y - cam.position.y
+    const dz = this._doorLookTarget.z - cam.position.z
+    const horiz = Math.hypot(dx, dz)
+    if (horiz > 1e-5) {
+      const desiredYaw = Math.atan2(-dx, -dz)
+      const desiredPitch = MathUtils.clamp(
+        Math.atan2(dy, horiz),
+        -STATION_PITCH_CLAMP,
+        STATION_PITCH_CLAMP,
+      )
+      const k = Math.min(1, DOOR_CAMERA_TURN_RATE * dt)
+      let yawErr = desiredYaw - this.fpsCamera.yaw
+      while (yawErr > Math.PI) yawErr -= Math.PI * 2
+      while (yawErr < -Math.PI) yawErr += Math.PI * 2
+      this.fpsCamera.yaw += yawErr * k
+      this.fpsCamera.pitch += (desiredPitch - this.fpsCamera.pitch) * k
+      this.fpsCamera.pitch = MathUtils.clamp(
+        this.fpsCamera.pitch,
+        -STATION_PITCH_CLAMP,
+        STATION_PITCH_CLAMP,
+      )
+    }
+
+    if (this.doorLookSequenceTime >= DOOR_CAMERA_TURN_DURATION_S) {
+      this.doorLookSequenceActive = false
     }
   }
 

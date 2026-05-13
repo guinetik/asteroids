@@ -34,13 +34,13 @@ const DOOR_ANGLE_FULL = Math.PI / 2
 /** Hinge rotation (radians) for a `'crack'` open — door barely cracks. */
 const DOOR_ANGLE_CRACK = 0.18
 /** Seconds the door stays held open before auto-closing behind the player. */
-const DOOR_HOLD_DURATION = 0.1
+const DOOR_HOLD_DURATION = 0.65
 /** Seconds the door takes to swing back closed. */
-const DOOR_CLOSE_DURATION = 0.45
+const DOOR_CLOSE_DURATION = 0.65
 /** World units the player can back away on the original side before auto-close. */
 const DOOR_SAME_SIDE_HOLD_DISTANCE = 3.2
 /** World units past the doorway center required before closing after crossing. */
-const DOOR_CROSS_CLOSE_DISTANCE = 1.05
+const DOOR_CROSS_CLOSE_DISTANCE = 2.1
 /** Fallback side used if the player is exactly centered in the doorway. */
 const DOOR_DEFAULT_PLAYER_SIDE = 1
 /** Local half-width of the closed panel blocker along the doorway. */
