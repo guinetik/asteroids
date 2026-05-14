@@ -1,0 +1,136 @@
+# Sprite sheets: 128×128, 2×2 grid (4 icons). Order per sheet: TL, TR, BL, BR.
+# Use `id` for data; crop output basename = icon stem (.png). When only `id` is listed, icon matches id.
+
+001
+1) fuel-cell — Lander Fuel Cell
+2) shuttle-fuel-cell — Shuttle Fuel Cell
+3) viroid-psychosphere — Viroid Psychosphere
+4) grid-coupling-module — Gravity Surfing Module
+
+002
+1) ceres-institute-canister (icon: ceres-canister) — Sealed Ampoule Case
+2) ceres-mineral-results-crate (icon: ceres-mineral-crate) — Sealed Sample Crate · Mineral Survey
+3) ceres-dan-results-crate (icon: ceres-dan-crate) — Sealed Sample Crate · DAN
+4) yamada-organ-case — Yamada Organ Case
+
+003
+1) luxury-foods — Luxury Foods
+2) medicine — Medicine
+3) entertainment-media — Entertainment Media
+4) textiles — Textiles
+
+004
+1) heat-resistant-alloys — Heat-Resistant Alloys
+2) solar-panels — Solar Panels
+3) radiation-shielding — Radiation Shielding
+4) thermal-regulators — Thermal Regulators
+
+005
+1) acid-resistant-coatings — Acid-Resistant Coatings
+2) pressure-vessels — Pressure Vessels
+3) sulfuric-compounds — Sulfuric Compounds
+4) atmospheric-filters — Atmospheric Filters
+
+006
+1) construction-prefabs — Construction Prefabs
+2) iron-composites — Iron Composites
+3) terraforming-enzymes — Terraforming Enzymes
+4) drill-bits — Drill Bits
+
+007
+1) purified-water — Purified Water
+2) ice-cores — Ice Cores
+3) hydroponics-kits — Hydroponics Kits
+4) filtration-membranes — Filtration Membranes
+
+008
+1) helium-3-cells — Helium-3 Cells
+2) magnetic-coils — Magnetic Coils
+3) atmospheric-samples — Atmospheric Samples
+4) plasma-conduits — Plasma Conduits
+
+009
+1) cryogenic-coolants — Cryogenic Coolants
+2) superconductors — Superconductors
+3) exotic-isotopes — Exotic Isotopes
+4) frost-compounds — Frost Compounds
+
+010
+1) navigation-beacons — Navigation Beacons
+2) dark-matter-sensors — Dark-Matter Sensors
+3) deep-space-probes — Deep-Space Probes
+4) signal-amplifiers — Signal Amplifiers
+
+011
+1) ancient-artifacts — Ancient Artifacts
+2) void-crystals — Void Crystals
+3) dark-ice-specimens — Dark-Ice Specimens
+4) kuiper-relics — Kuiper Relics
+
+012
+1) sun-forged-glass — Sun-Forged Glass
+2) dense-gas-canisters — Dense-Gas Canisters
+3) biocultures — Biocultures
+4) cat-food — Cat Food
+
+013
+1) red-soil-ceramics — Red-Soil Ceramics
+2) brine-concentrates — Brine Concentrates
+3) storm-glass — Storm-Glass
+4) cryo-silicates — Cryo-Silicates
+
+014
+1) null-temp-alloys — Null-Temp Alloys
+2) void-wave-emitters — Void-Wave Emitters
+3) shadow-minerals — Shadow Minerals
+4) keycard — Keycard (planned; not in items.json / trade-goods yet)
+
+015
+1) olivine — Olivine
+2) magnetite — Magnetite
+3) iron-sulfides — Iron Sulfides
+4) carbonates — Carbonates
+
+016
+1) organic-compounds — Organic Compounds
+2) hydrated-silicates — Hydrated Silicates
+3) pyroxene — Pyroxene
+4) plagioclase-feldspar — Plagioclase Feldspar
+
+017
+1) iron-nickel-alloy — Iron-Nickel Alloy
+2) water-ice — Water Ice
+3) troilite — Troilite
+4) enstatite — Enstatite
+
+018
+1) carbon-dioxide-ice — Carbon Dioxide Ice
+2) ammonia-hydrate — Ammonia Hydrate
+3) silicate-dust — Silicate Dust
+4) sodium-chloride — Sodium Chloride
+
+019
+1) basaltic-lava — Basaltic Lava
+2) sulfur-deposits — Sulfur Deposits
+3) iron-oxide — Iron Oxide
+4) carbonaceous-chondrite — Carbonaceous Chondrite
+
+020
+1) organic-macromolecules — Organic Macromolecules
+2) volcanic-glass — Volcanic Glass
+3) hydrogel — Hydrogel (planned; tentative id)
+4) silicone-block — Silicone Block (planned; tentative id)
+
+021
+# Saturn batch (first four): absent from 003–020; only cryo-silicates was placed on 013.
+1) ring-ice-crystals — Ring-Ice Crystals
+2) exotic-gems — Exotic Gems
+3) resonance-instruments — Resonance Instruments
+4) prismatic-dust — Prismatic Dust
+
+022
+# Services
+1) Shuttle Refuel
+2) Shuttle Repair
+3) Lander Repair
+4) Bribe to Restock
