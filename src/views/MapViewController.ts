@@ -4063,6 +4063,7 @@ export class MapViewController implements Tickable {
           quantity,
         })
       }
+      uiAudio.notifyCreditsAwarded()
     }
   }
 

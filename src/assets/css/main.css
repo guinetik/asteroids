@@ -1704,30 +1704,22 @@ body,
 
 .upgrade-shop-program__row {
   @apply grid gap-x-3 gap-y-2 rounded-lg border border-white/8 bg-white/[0.03] p-3;
-  grid-template-columns: 2.5rem minmax(0, 1fr);
+  grid-template-columns: 6rem minmax(0, 1fr);
 }
 
 .upgrade-shop-program__row-icon {
-  @apply flex h-10 w-10 shrink-0 items-center justify-center rounded-md border font-mono text-sm font-semibold;
+  @apply relative h-24 w-24 shrink-0 overflow-hidden rounded-md;
   grid-column: 1;
-  grid-row: 1 / span 2;
+  grid-row: 1 / span 3;
   align-self: start;
 }
 
-.upgrade-shop-program__row-icon--shuttle {
-  @apply border-cyan-500/40 bg-cyan-500/10 text-cyan-200;
+.upgrade-shop-program__row-icon-border {
+  @apply absolute inset-0 h-full w-full object-cover;
 }
 
-.upgrade-shop-program__row-icon--lander {
-  @apply border-amber-500/35 bg-amber-500/10 text-amber-200;
-}
-
-.upgrade-shop-program__row-icon--multitool {
-  @apply border-emerald-500/35 bg-emerald-500/10 text-emerald-200;
-}
-
-.upgrade-shop-program__row-icon--suit {
-  @apply border-fuchsia-500/35 bg-fuchsia-500/10 text-fuchsia-200;
+.upgrade-shop-program__row-icon-img {
+  @apply absolute inset-0 h-full w-full object-contain p-1;
 }
 
 .upgrade-shop-program__meta {
@@ -1831,7 +1823,7 @@ body,
 
 @media (min-width: 1024px) {
   .upgrade-shop-program__row {
-    grid-template-columns: 2.5rem minmax(0, 1fr) auto;
+    grid-template-columns: 6rem minmax(0, 1fr) auto;
   }
 
   .upgrade-shop-program__levels-wrap {

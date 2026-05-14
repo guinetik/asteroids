@@ -12,6 +12,7 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import type { PlayerProfile } from '@/lib/player/types'
+import { uiAudio } from '@/audio/UiAudioDirector'
 import {
   createProfile,
   loadProfile,
@@ -45,6 +46,7 @@ export const usePlayerStore = defineStore('player', () => {
     if (!profile.value) return
     profile.value = addCreditsToProfile(profile.value, amount)
     saveProfile(profile.value)
+    uiAudio.notifyCreditsAwarded()
   }
 
   /** Spend credits. Returns false if insufficient balance. */

@@ -8,7 +8,10 @@ import {
   type UpgradeId,
 } from '@/lib/upgrades'
 import { formatUpgradeStatValue, statValueAtDisplayLevel } from '@/lib/upgrades/upgradeUiFormat'
+import { getInventoryCategoryBorderUrl } from '@/lib/inventory/itemCategoryBorder'
 import ShuttleProgramCover from '@/components/ShuttleProgramCover.vue'
+
+const UPGRADE_BORDER_URL = getInventoryCategoryBorderUrl('equipment')
 
 const props = defineProps<{
   /** Current credit balance (same source as map HUD). */
@@ -79,12 +82,8 @@ function tryBuy(upgradeId: UpgradeId, slotLevel: number): void {
   emit('purchase-upgrade', upgradeId)
 }
 
-function rowIconLetter(def: NumericUpgradeDefinition): string {
-  return def.label.trim().charAt(0).toUpperCase()
-}
-
-function rowIconModifier(category: UpgradeCategory): string {
-  return `upgrade-shop-program__row-icon--${category}`
+function upgradeIconUrl(id: UpgradeId): string {
+  return `/items/${id}.webp`
 }
 </script>
 
@@ -190,12 +189,19 @@ function rowIconModifier(category: UpgradeCategory): string {
           </div>
           <ul class="upgrade-shop-program__list" role="list">
             <li v-for="row in block.upgrades" :key="row.def.id" class="upgrade-shop-program__row">
-              <div
-                class="upgrade-shop-program__row-icon"
-                :class="rowIconModifier(row.def.category)"
-                aria-hidden="true"
-              >
-                {{ rowIconLetter(row.def) }}
+              <div class="upgrade-shop-program__row-icon" aria-hidden="true">
+                <img
+                  class="upgrade-shop-program__row-icon-border"
+                  :src="UPGRADE_BORDER_URL"
+                  alt=""
+                  decoding="async"
+                />
+                <img
+                  class="upgrade-shop-program__row-icon-img"
+                  :src="upgradeIconUrl(row.id)"
+                  alt=""
+                  decoding="async"
+                />
               </div>
               <div class="upgrade-shop-program__meta">
                 <span class="upgrade-shop-program__name">{{ row.def.label }}</span>

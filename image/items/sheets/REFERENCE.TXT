@@ -134,3 +134,51 @@
 2) Shuttle Repair
 3) Lander Repair
 4) Bribe to Restock
+
+023
+1) shuttleThrusterEfficiency 
+2) shuttleThrusterCharge 
+3) shuttleThrusterSpeed 
+4) shuttleSystemsEfficiency 
+
+024
+1) shuttleHull 
+2) shuttleHeatResistance 
+3) shuttleFreezeResistance 
+4) shuttleRadiationResistance 
+
+025
+1) shuttleCargoBay 
+2) shuttleFuelCapacity 
+3) shuttleScienceStation 
+4) shuttleSlingshotSpeed
+
+026
+1) gravitySurfing 
+2) orbitalSurfing 
+3) landerThrusterEfficiency 
+4) landerThrusterCharge 
+
+027
+1) landerThrusterSpeed 
+2) landerHull 
+3) landerFuelCapacity 
+4) multitoolEfficiency 
+
+028
+1) multitoolDamage 
+2) multitoolRtgCapacity 
+3) multitoolRtgCharge 
+4) multitoolScience 
+
+029
+1) suitArmor 
+2) suitStaminaCapacity 
+3) suitStaminaEfficiency 
+4) suitO2Capacity 
+
+030
+1) turretMiningUnlock 
+2) turretMiningYield 
+3) turretMiningEfficiency 
+4) multitoolEfficiency

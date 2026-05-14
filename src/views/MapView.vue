@@ -1221,7 +1221,6 @@ onMounted(async () => {
           showMissionNotification(
             `Contract step complete — +${payload.creditsReward.toLocaleString()} CR`,
           )
-          uiAudio.notifyCreditsAwarded()
         }
       })
     })
