@@ -18,7 +18,7 @@ export interface TradeGoodDefinition {
   label: string
   /** Flavor text hinting at who wants this good. */
   description: string
-  /** Filename in public/images/items/, e.g. "heat-resistant-alloys.png". */
+  /** Filename in public/items/, e.g. "heat-resistant-alloys.webp". */
   icon: string
   /** Weight in kg per unit. */
   weightPerUnit: number
@@ -54,6 +54,8 @@ export interface TradeGoodSlot {
   stock: number
   /** Credits per unit at this planet (discounted from catalog base at the source). */
   price: number
+  /** Icon filename in public/items/, e.g. "heat-resistant-alloys.webp". */
+  icon: string
   /** True when this slot is imported from another planet. */
   isImported?: boolean
   /** Origin planet for imported slots. */

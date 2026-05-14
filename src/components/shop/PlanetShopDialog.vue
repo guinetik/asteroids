@@ -216,6 +216,14 @@ function onKeydown(e: KeyboardEvent): void {
                         alt=""
                         decoding="async"
                       />
+                      <img
+                        class="planet-shop-item__category-icon"
+                        src="/items/shuttle-refuel.webp"
+                        :width="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
+                        :height="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
+                        alt=""
+                        decoding="async"
+                      />
                     </div>
                     <div class="planet-shop-item__info">
                       <span class="planet-shop-item__name">Refuel</span>
@@ -243,6 +251,14 @@ function onKeydown(e: KeyboardEvent): void {
                       <img
                         class="planet-shop-item__category-border"
                         :src="shopServiceCategoryBorderUrl"
+                        :width="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
+                        :height="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
+                        alt=""
+                        decoding="async"
+                      />
+                      <img
+                        class="planet-shop-item__category-icon"
+                        src="/items/shuttle-repair.webp"
                         :width="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
                         :height="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
                         alt=""
@@ -276,6 +292,14 @@ function onKeydown(e: KeyboardEvent): void {
                       <img
                         class="planet-shop-item__category-border"
                         :src="shopServiceCategoryBorderUrl"
+                        :width="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
+                        :height="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
+                        alt=""
+                        decoding="async"
+                      />
+                      <img
+                        class="planet-shop-item__category-icon"
+                        src="/items/lander-repair.webp"
                         :width="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
                         :height="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
                         alt=""
@@ -329,6 +353,14 @@ function onKeydown(e: KeyboardEvent): void {
                         alt=""
                         decoding="async"
                       />
+                      <img
+                        class="planet-shop-item__category-icon"
+                        src="/items/shuttle-fuel-cell.webp"
+                        :width="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
+                        :height="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
+                        alt=""
+                        decoding="async"
+                      />
                     </div>
                     <div class="planet-shop-item__info">
                       <span class="planet-shop-item__name">Shuttle Fuel Cell</span>
@@ -357,6 +389,14 @@ function onKeydown(e: KeyboardEvent): void {
                       <img
                         class="planet-shop-item__category-border"
                         :src="shopFuelCategoryBorderUrl"
+                        :width="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
+                        :height="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
+                        alt=""
+                        decoding="async"
+                      />
+                      <img
+                        class="planet-shop-item__category-icon"
+                        src="/items/fuel-cell.webp"
                         :width="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
                         :height="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
                         alt=""
@@ -421,6 +461,15 @@ function onKeydown(e: KeyboardEvent): void {
                           alt=""
                           decoding="async"
                         />
+                        <img
+                          v-if="slot.icon"
+                          class="planet-shop-item__category-icon"
+                          :src="`/items/${slot.icon}`"
+                          :width="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
+                          :height="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
+                          alt=""
+                          decoding="async"
+                        />
                       </div>
                       <div class="planet-shop-item__info">
                         <span class="planet-shop-item__name">{{ slotLabel(slot) }}</span>
@@ -455,6 +504,15 @@ function onKeydown(e: KeyboardEvent): void {
                         <img
                           class="planet-shop-item__category-border"
                           :src="shopTradeCategoryBorderUrl"
+                          :width="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
+                          :height="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
+                          alt=""
+                          decoding="async"
+                        />
+                        <img
+                          v-if="slot.icon"
+                          class="planet-shop-item__category-icon"
+                          :src="`/items/${slot.icon}`"
                           :width="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
                           :height="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
                           alt=""
@@ -503,6 +561,15 @@ function onKeydown(e: KeyboardEvent): void {
                           alt=""
                           decoding="async"
                         />
+                        <img
+                          v-if="slot.icon"
+                          class="planet-shop-item__category-icon"
+                          :src="`/items/${slot.icon}`"
+                          :width="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
+                          :height="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
+                          alt=""
+                          decoding="async"
+                        />
                       </div>
                       <div class="planet-shop-item__info">
                         <span class="planet-shop-item__name">{{ slotLabel(slot) }}</span>
@@ -533,6 +600,14 @@ function onKeydown(e: KeyboardEvent): void {
                       <img
                         class="planet-shop-item__category-border"
                         :src="shopBribeCategoryBorderUrl"
+                        :width="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
+                        :height="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
+                        alt=""
+                        decoding="async"
+                      />
+                      <img
+                        class="planet-shop-item__category-icon"
+                        src="/items/bribe-to-restock.webp"
                         :width="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
                         :height="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
                         alt=""

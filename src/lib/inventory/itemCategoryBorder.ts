@@ -1,5 +1,5 @@
 /**
- * Published inventory-slot frame raster per {@link ItemCategory}, served from `/images/items/`.
+ * Published inventory-slot frame raster per {@link ItemCategory}, served from `/items/`.
  *
  * @author guinetik
  * @date 2026-05-13
@@ -15,7 +15,7 @@ import type { ItemCategory } from './types'
  */
 export const FALLBACK_ITEM_CATEGORY_BORDER: ItemCategory = 'equipment'
 
-/** File base (no extension) under `public/images/items/` from the border build script. */
+/** File base (no extension) under `public/items/` from the border build script. */
 const ITEM_CATEGORY_TO_BORDER_BASENAME: Record<ItemCategory, string> = {
   mineral: 'border_yellow',
   consumable: 'border_green',
@@ -28,7 +28,7 @@ const ITEM_CATEGORY_TO_BORDER_BASENAME: Record<ItemCategory, string> = {
  * Validates and normalizes a raw category string to {@link ItemCategory}.
  *
  * @param raw - Possibly invalid category (`undefined` when catalog lookup fails).
- * @returns A valid {@link ItemCategory} suitable for `/images/items/border_*.webp` lookups.
+ * @returns A valid {@link ItemCategory} suitable for `/items/border_*.webp` lookups.
  */
 export function coerceInventoryItemCategory(raw: string | undefined): ItemCategory {
   if (
@@ -47,9 +47,9 @@ export function coerceInventoryItemCategory(raw: string | undefined): ItemCatego
  * URL path segment for Vue `<img :src>` and CSS `background-image` (leading slash, no hash).
  *
  * @param category - Item classification from catalog.
- * @returns Absolute site path `/images/items/border_*.webp`.
+ * @returns Absolute site path `/items/border_*.webp`.
  */
 export function getInventoryCategoryBorderUrl(category: ItemCategory): string {
   const base = ITEM_CATEGORY_TO_BORDER_BASENAME[category]
-  return `/images/items/${base}.webp`
+  return `/items/${base}.webp`
 }

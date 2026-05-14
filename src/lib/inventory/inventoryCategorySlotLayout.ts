@@ -10,8 +10,8 @@
 /**
  * Edge length of the square slot in CSS pixels (16px browser default).
  *
- * Matches Tailwind `h-12` / `w-12` (`3rem`) when the root font size is untouched.
+ * Matches Tailwind `h-20` / `w-20` (`5rem`) when the root font size is untouched.
  *
- * Keep `.inventory-panel` grid first column aligned to this (`3rem`) so rows do not clip.
+ * Keep `.inventory-panel` grid first column aligned to this (`5rem`) so rows do not clip.
  */
-export const INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS = 48
+export const INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS = 80

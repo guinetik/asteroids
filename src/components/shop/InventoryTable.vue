@@ -25,6 +25,7 @@ interface DisplayRow {
   label: string
   category: ItemCategory
   categoryBorderUrl: string
+  iconUrl: string
   quantity: number
   weightKg: number
   pips: number
@@ -48,6 +49,7 @@ const rows = computed<DisplayRow[]>(() => {
       label: def?.label ?? stack.itemId,
       category,
       categoryBorderUrl: getInventoryCategoryBorderUrl(category),
+      iconUrl: def?.icon ? `/items/${def.icon}` : '',
       quantity: stack.quantity,
       weightKg: stack.totalWeightKg,
       pips,
@@ -98,6 +100,15 @@ function handleUse(itemId: string) {
             <img
               class="inventory-table__category-border"
               :src="row.categoryBorderUrl"
+              :width="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
+              :height="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
+              alt=""
+              decoding="async"
+            />
+            <img
+              v-if="row.iconUrl"
+              class="inventory-table__category-icon"
+              :src="row.iconUrl"
               :width="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
               :height="INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS"
               alt=""

@@ -143,6 +143,7 @@ function buildSlot(tg: TradeGoodDefinition, isImported: boolean): TradeGoodSlot 
     itemId: tg.id,
     stock,
     price,
+    icon: tg.icon,
     ...(isImported ? { isImported: true, originPlanetId: tg.producedBy } : {}),
   }
 }

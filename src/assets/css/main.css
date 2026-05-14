@@ -2801,11 +2801,15 @@ body,
 
 .inventory-table__category-slot {
   /* Keep in sync with `INVENTORY_CATEGORY_SLOT_EDGE_CSS_PIXELS` (inventoryCategorySlotLayout). */
-  @apply relative flex h-12 w-12 shrink-0 overflow-hidden rounded;
+  @apply relative h-20 w-20 shrink-0 overflow-hidden rounded;
 }
 
 .inventory-table__category-border {
-  @apply block h-full w-full object-cover;
+  @apply absolute inset-0 h-full w-full object-cover;
+}
+
+.inventory-table__category-icon {
+  @apply absolute inset-0 h-full w-full object-contain p-2;
 }
 
 .inventory-table__info {
@@ -3028,11 +3032,15 @@ body,
 
 .planet-shop-item__category-slot {
   /* Matches shuttle/cargo inventory category slot sizing. */
-  @apply relative flex h-12 w-12 shrink-0 overflow-hidden rounded;
+  @apply relative h-20 w-20 shrink-0 overflow-hidden rounded;
 }
 
 .planet-shop-item__category-border {
-  @apply block h-full w-full object-cover;
+  @apply absolute inset-0 h-full w-full object-cover;
+}
+
+.planet-shop-item__category-icon {
+  @apply absolute inset-0 h-full w-full object-contain p-2;
 }
 
 .planet-shop-item__info {

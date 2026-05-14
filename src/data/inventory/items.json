@@ -4,7 +4,7 @@
     "category": "mineral",
     "label": "Olivine",
     "description": "Green silicate mineral common in stony asteroids. Valuable for industrial silicate production.",
-    "icon": "olivine.png",
+    "icon": "olivine.webp",
     "weightPerUnit": 1,
     "maxStack": 500,
     "sellable": true
@@ -14,7 +14,7 @@
     "category": "mineral",
     "label": "Magnetite",
     "description": "Iron oxide with strong magnetic properties. Used in electronics and radiation shielding.",
-    "icon": "magnetite.png",
+    "icon": "magnetite.webp",
     "weightPerUnit": 1,
     "maxStack": 500,
     "sellable": true
@@ -24,7 +24,7 @@
     "category": "mineral",
     "label": "Iron Sulfides",
     "description": "Metallic sulfide ore. Feedstock for sulfuric acid production and steel alloys.",
-    "icon": "iron-sulfides.png",
+    "icon": "iron-sulfides.webp",
     "weightPerUnit": 1,
     "maxStack": 500,
     "sellable": true
@@ -34,7 +34,7 @@
     "category": "mineral",
     "label": "Carbonates",
     "description": "Calcium carbonate deposits. Essential for cement production in off-world construction.",
-    "icon": "carbonates.png",
+    "icon": "carbonates.webp",
     "weightPerUnit": 1,
     "maxStack": 500,
     "sellable": true
@@ -44,7 +44,7 @@
     "category": "mineral",
     "label": "Organic Compounds",
     "description": "Complex carbon chains preserved in carbonaceous rock. High scientific and pharmaceutical value.",
-    "icon": "organic-compounds.png",
+    "icon": "organic-compounds.webp",
     "weightPerUnit": 1,
     "maxStack": 500,
     "sellable": true
@@ -54,7 +54,7 @@
     "category": "mineral",
     "label": "Hydrated Silicates",
     "description": "Water-bearing silicate minerals. Can be processed to extract potable water in deep space.",
-    "icon": "hydrated-silicates.png",
+    "icon": "hydrated-silicates.webp",
     "weightPerUnit": 1,
     "maxStack": 500,
     "sellable": true
@@ -64,7 +64,7 @@
     "category": "mineral",
     "label": "Pyroxene",
     "description": "Dark silicate mineral rich in iron and magnesium. Used in refractory ceramics.",
-    "icon": "pyroxene.png",
+    "icon": "pyroxene.webp",
     "weightPerUnit": 1,
     "maxStack": 500,
     "sellable": true
@@ -74,7 +74,7 @@
     "category": "mineral",
     "label": "Plagioclase Feldspar",
     "description": "Light-colored silicate found in rocky asteroids. Aluminum feedstock for alloy production.",
-    "icon": "plagioclase-feldspar.png",
+    "icon": "plagioclase-feldspar.webp",
     "weightPerUnit": 1,
     "maxStack": 500,
     "sellable": true
@@ -84,7 +84,7 @@
     "category": "mineral",
     "label": "Iron-Nickel Alloy",
     "description": "Native metal from the core of a differentiated body. The most valuable mining commodity in the belt.",
-    "icon": "iron-nickel-alloy.png",
+    "icon": "iron-nickel-alloy.webp",
     "weightPerUnit": 1,
     "maxStack": 500,
     "sellable": true
@@ -94,7 +94,7 @@
     "category": "mineral",
     "label": "Water Ice",
     "description": "Frozen water extracted from icy bodies. Critical life support resource in deep space operations.",
-    "icon": "water-ice.png",
+    "icon": "water-ice.webp",
     "weightPerUnit": 1,
     "maxStack": 500,
     "sellable": true
@@ -104,7 +104,7 @@
     "category": "mineral",
     "label": "Troilite",
     "description": "Iron-sulfide mineral common in differentiated planetary cores. Feedstock for sulfuric acid production.",
-    "icon": "troilite.png",
+    "icon": "troilite.webp",
     "weightPerUnit": 1,
     "maxStack": 500,
     "sellable": true
@@ -114,7 +114,7 @@
     "category": "mineral",
     "label": "Enstatite",
     "description": "Magnesium-rich silicate found in chondrites and metallic asteroids. Used in refractory ceramics.",
-    "icon": "enstatite.png",
+    "icon": "enstatite.webp",
     "weightPerUnit": 1,
     "maxStack": 500,
     "sellable": true
@@ -124,7 +124,7 @@
     "category": "mineral",
     "label": "Carbon Dioxide Ice",
     "description": "Solid CO2 sublimating off cometary bodies. Used as propellant feedstock and life-support buffer.",
-    "icon": "carbon-dioxide-ice.png",
+    "icon": "carbon-dioxide-ice.webp",
     "weightPerUnit": 1,
     "maxStack": 500,
     "sellable": true
@@ -134,7 +134,7 @@
     "category": "mineral",
     "label": "Ammonia Hydrate",
     "description": "Frozen ammonia-water mixture from outer-system icy bodies. Industrial nitrogen feedstock.",
-    "icon": "ammonia-hydrate.png",
+    "icon": "ammonia-hydrate.webp",
     "weightPerUnit": 1,
     "maxStack": 500,
     "sellable": true
@@ -144,7 +144,7 @@
     "category": "mineral",
     "label": "Silicate Dust",
     "description": "Loose regolith of fragmented silicates. Bulk feedstock for sintered habitat construction blocks.",
-    "icon": "silicate-dust.png",
+    "icon": "silicate-dust.webp",
     "weightPerUnit": 1,
     "maxStack": 500,
     "sellable": true
@@ -154,7 +154,7 @@
     "category": "mineral",
     "label": "Sodium Chloride",
     "description": "Salt deposits leached from briny ice. Essential life-support consumable and chemical feedstock.",
-    "icon": "sodium-chloride.png",
+    "icon": "sodium-chloride.webp",
     "weightPerUnit": 1,
     "maxStack": 500,
     "sellable": true
@@ -164,7 +164,7 @@
     "category": "mineral",
     "label": "Basaltic Lava",
     "description": "Cooled volcanic glass from active silicate-iron bodies. Heat-resistant feedstock for hull plating.",
-    "icon": "basaltic-lava.png",
+    "icon": "basaltic-lava.webp",
     "weightPerUnit": 1,
     "maxStack": 500,
     "sellable": true
@@ -174,7 +174,7 @@
     "category": "mineral",
     "label": "Sulfur Deposits",
     "description": "Native sulfur condensed around volcanic vents. Industrial chemistry and propellant additive.",
-    "icon": "sulfur-deposits.png",
+    "icon": "sulfur-deposits.webp",
     "weightPerUnit": 1,
     "maxStack": 500,
     "sellable": true
@@ -184,7 +184,7 @@
     "category": "mineral",
     "label": "Iron Oxide",
     "description": "Rust-rich ore from oxidized surfaces. Standard steel feedstock for orbital foundries.",
-    "icon": "iron-oxide.png",
+    "icon": "iron-oxide.webp",
     "weightPerUnit": 1,
     "maxStack": 500,
     "sellable": true
@@ -194,7 +194,7 @@
     "category": "mineral",
     "label": "Carbonaceous Chondrite",
     "description": "Primordial carbon-rich matrix from the earliest Solar System. Rare scientific commodity and carbon feedstock for organic synthesis.",
-    "icon": "carbonaceous-chondrite.png",
+    "icon": "carbonaceous-chondrite.webp",
     "weightPerUnit": 1,
     "maxStack": 500,
     "sellable": true
@@ -204,7 +204,7 @@
     "category": "mineral",
     "label": "Organic Macromolecules",
     "description": "Complex prebiotic carbon chains preserved in D-type asteroid regolith. Extreme scientific and pharmaceutical value.",
-    "icon": "organic-macromolecules.png",
+    "icon": "organic-macromolecules.webp",
     "weightPerUnit": 1,
     "maxStack": 500,
     "sellable": true
@@ -214,7 +214,7 @@
     "category": "mineral",
     "label": "Volcanic Glass",
     "description": "Vitrified silicate fragments quenched by rapid cooling. Sharp-edged stock for cutting tools.",
-    "icon": "volcanic-glass.png",
+    "icon": "volcanic-glass.webp",
     "weightPerUnit": 1,
     "maxStack": 500,
     "sellable": true
@@ -224,7 +224,7 @@
     "category": "consumable",
     "label": "Lander Fuel Cell",
     "description": "Hydrogen fuel cell for the lander's neutron thrusters. Each cell provides one full burn cycle.",
-    "icon": "fuel-cell.png",
+    "icon": "fuel-cell.webp",
     "weightPerUnit": 5,
     "maxStack": 20,
     "sellable": false
@@ -234,7 +234,7 @@
     "category": "consumable",
     "label": "Shuttle Fuel Cell",
     "description": "Compact fusion cell for the shuttle's main drive. Restores half the fuel tank when consumed.",
-    "icon": "shuttle-fuel-cell.png",
+    "icon": "shuttle-fuel-cell.webp",
     "weightPerUnit": 4,
     "maxStack": 20,
     "sellable": false
@@ -244,7 +244,7 @@
     "category": "consumable",
     "label": "Gravity Surfing Module",
     "description": "USC-issued shuttle hardware. Once installed from inventory, the Space Fabric overlay lights up on the tactical map (M) and the shuttle can ride the spacetime grid lines — approach a line and press Q to lock on, WASD to pick the rail, Q again to drop free. Fast travel that costs you nothing but a moment of motion sickness.",
-    "icon": "grid-coupling-module.png",
+    "icon": "grid-coupling-module.webp",
     "weightPerUnit": 12,
     "maxStack": 1,
     "sellable": false
@@ -254,7 +254,7 @@
     "category": "consumable",
     "label": "Viroid Psychosphere",
     "description": "Residue siphoned from a downed viroid by the Cinderline-modified sidearm. The Anvil pigment room renders these into encaustum.",
-    "icon": "viroid-psychosphere.png",
+    "icon": "viroid-psychosphere.webp",
     "weightPerUnit": 0.01,
     "maxStack": 99,
     "sellable": false
@@ -264,7 +264,7 @@
     "category": "consumable",
     "label": "Sealed Ampoule Case",
     "description": "Biostable case from the Ceres Institute. Outer shell sealed; do not handle inner cassettes without equipment you do not have.",
-    "icon": "ceres-canister.png",
+    "icon": "ceres-canister.webp",
     "weightPerUnit": 1,
     "maxStack": 1,
     "sellable": false
@@ -274,7 +274,7 @@
     "category": "consumable",
     "label": "Sealed Sample Crate · Mineral Survey",
     "description": "Hand-readable crate of substrate cores and DAN-cross-referenced mineral readings, sealed for return to the Institute.",
-    "icon": "ceres-mineral-crate.png",
+    "icon": "ceres-mineral-crate.webp",
     "weightPerUnit": 1,
     "maxStack": 1,
     "sellable": false
@@ -284,7 +284,7 @@
     "category": "consumable",
     "label": "Sealed Sample Crate · DAN",
     "description": "Particle capture cassettes and field-stamped DAN albedo logs, sealed for return to the Institute.",
-    "icon": "ceres-dan-crate.png",
+    "icon": "ceres-dan-crate.webp",
     "weightPerUnit": 1,
     "maxStack": 1,
     "sellable": false
@@ -294,7 +294,7 @@
     "category": "mission-material",
     "label": "Yamada Organ Case",
     "description": "Refrigerated medical case from a Yamada Farms patient-pig cylinder. Contains a freshly-harvested organ. Temperature-and-time sensitive.",
-    "icon": "yamada-organ-case.png",
+    "icon": "yamada-organ-case.webp",
     "weightPerUnit": 2,
     "maxStack": 1,
     "sellable": false
