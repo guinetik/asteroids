@@ -79,6 +79,13 @@ export interface EntranceSpec {
   storey?: number
   /** Prompt text to show when the player is in range (e.g. `'F  Leave'`). */
   prompt: string
+  /**
+   * Optional prompt shown when the player approaches the door from the
+   * opposite side of {@link prompt}. Lets a single doorway read as
+   * "Enter Terminal" from the corridor and "Return to Hub" from inside.
+   * Falls back to {@link prompt} when omitted.
+   */
+  returnPrompt?: string
   /** Identifier passed to `onInteract` when the player triggers it. */
   event: string
   /** How wide the door opens before firing the event. Defaults to `'full'`. */
@@ -88,6 +95,89 @@ export interface EntranceSpec {
    * (the existing south-side `station:exit` pattern).
    */
   target?: EntranceTarget
+  /**
+   * When `true`, the door is locked: the controller surfaces
+   * {@link lockedPrompt} instead of {@link prompt} and the open animation
+   * is suppressed on interact. Unlocking is the controller's job (e.g. a
+   * keycard pickup flips the entrance out of its locked state).
+   */
+  locked?: boolean
+  /**
+   * Prompt shown to the player while the entrance is locked. Defaults to
+   * a generic `'LOCKED'` string when omitted.
+   */
+  lockedPrompt?: string
+}
+
+/**
+ * A prop to spawn inside a room. Position is room-local XZ (not world).
+ * The room's own yaw is applied to the prop transform, so authored props
+ * stay in the same in-room slot regardless of how the room is rotated.
+ */
+export interface RoomPropSpec {
+  /**
+   * Prop kind. Resolves via the runtime prop registry in
+   * `src/three/stationProps.ts`. Unknown kinds throw at build time.
+   */
+  kind: string
+  /**
+   * Room-local XZ offset from the room centre. Defaults to `[0, 0]`.
+   * Ignored when {@link placement} is `'random'`.
+   */
+  pos?: [number, number]
+  /** Yaw in 90° steps applied to the prop. Defaults to 0. */
+  yaw?: YawTurns
+  /** Uniform scale applied to the prop. Defaults to 1. */
+  scale?: number
+  /**
+   * Placement strategy. `'fixed'` (default) uses {@link pos} verbatim.
+   * `'random'` picks a tile centre inside the room at build time,
+   * excluding tiles adjacent to any entrance.
+   */
+  placement?: 'fixed' | 'random'
+  /**
+   * Optional F-prompt interaction. When present, the controller shows
+   * {@link interact.prompt} while the player is within interact range
+   * and dispatches {@link interact.event} through the standard
+   * `onInteract` callback on press.
+   */
+  interact?: {
+    /** Prompt text shown to the player (e.g. `'F  Use Terminal'`). */
+    prompt: string
+    /** Event id dispatched to {@link onInteract} on press. */
+    event: string
+  }
+  /**
+   * Optional loot payload — used by chest props. The builder rolls a
+   * concrete quantity in `[qtyMin, qtyMax]` at station-load time and
+   * attaches it to the prop's interactor so the UI can preview the
+   * reward before the player presses F.
+   */
+  loot?: {
+    /** Inventory item id (must exist in the inventory catalog). */
+    itemId: string
+    /** Minimum random quantity, inclusive. */
+    qtyMin: number
+    /** Maximum random quantity, inclusive. */
+    qtyMax: number
+  }
+}
+
+/**
+ * Authored reward slot for a room (e.g. a vault). The builder rolls
+ * each entry into a concrete prop (chest + loot) at station-load time
+ * and places it at a random in-room tile.
+ *
+ * The discriminant `type` is open for future reward kinds (upgrades,
+ * cosmetics, arcade ROMs); only `'tradeable'` is implemented today.
+ */
+export type RewardSpec = {
+  /** Pull from the catalog's `trade-good` category — shop-grade goods. */
+  type: 'tradeable'
+  /** Inclusive lower bound on the rolled quantity. */
+  qtyMin: number
+  /** Inclusive upper bound on the rolled quantity. */
+  qtyMax: number
 }
 
 /** A room placed in the world. */
@@ -106,6 +196,15 @@ export interface RoomSpec {
   yaw?: YawTurns
   /** Entrance specs on the room's perimeter. */
   entrances?: EntranceSpec[]
+  /** Props to spawn inside the room. Local-space transforms. */
+  props?: RoomPropSpec[]
+  /**
+   * Reward slots — the builder rolls one chest per entry, picks a random
+   * tile inside the room, and rolls the prize from the matching catalog
+   * pool. JSON authors only choose how many rewards exist, not where
+   * they spawn or what's inside.
+   */
+  rewards?: RewardSpec[]
 }
 
 /** XZ plane vector — anchors, port positions, etc. */

@@ -30,7 +30,8 @@ import { FpsAudioDirector } from '@/audio/FpsAudioDirector'
 import { FpsPointerLockSession } from '@/lib/fps/FpsPointerLockSession'
 import { buildFpsPlayerConfig } from '@/lib/fps/buildFpsPlayerConfig'
 import { StationCollider, type StationRect } from '@/lib/station/StationCollider'
-import { buildStation, type BuiltStation } from '@/three/StationBuilder'
+import { buildStation, type BuiltStation, type PropInteractor } from '@/three/StationBuilder'
+import type { PropInteractorMeta, PropStatus } from '@/three/stationProps'
 import type { StationEntrance } from '@/three/StationEntrance'
 import { loadStationLayout } from '@/lib/station/loadStationLayout'
 import type { ExteriorSunSpec, StationLayout } from '@/lib/station/StationLayout'
@@ -153,6 +154,12 @@ export class StationViewController implements Tickable {
   onPointerLockChange: ((locked: boolean) => void) | null = null
   /** Prompt callback driven by entrance proximity. `null` clears the HUD. */
   onPrompt: ((prompt: string | null) => void) | null = null
+  /**
+   * Fires when the closest in-range prop interactor changes. The UI uses
+   * this to render previews (e.g. "DRILLBITS x 20" above the F prompt
+   * when looking at a chest) without having to poll.
+   */
+  onActiveInteractorMeta: ((meta: PropInteractorMeta | null) => void) | null = null
   /** Interact callback fired when the player presses F near an entrance. */
   onInteract: ((event: string) => void) | null = null
   /** Scratch vector reused for the per-frame entrance proximity check. */
@@ -161,6 +168,7 @@ export class StationViewController implements Tickable {
   private readonly _doorLookTarget = new Vector3()
   /** Cached prompt text so we only fire `onPrompt` when it changes. */
   private currentPrompt: string | null = null
+  private currentInteractorMeta: PropInteractorMeta | null = null
   /** True while the camera is smoothly turning toward the interacted door. */
   private doorLookSequenceActive = false
   /** Seconds elapsed in the current door-look sequence. */
@@ -297,10 +305,12 @@ export class StationViewController implements Tickable {
 
     const pos = this.playerController.group.position
     for (const entrance of this.station.entrances) entrance.tick(dt, pos)
+    for (const prop of this.station.props) prop.tick?.(dt)
     this.updateDoorBlockers()
 
     let activePrompt: string | null = null
     let activeEntrance: StationEntrance | null = null
+    let activeInteractor: PropInteractor | null = null
     let bestDistSq = ENTRANCE_INTERACT_DISTANCE * ENTRANCE_INTERACT_DISTANCE
 
     for (const entrance of this.station.entrances) {
@@ -310,8 +320,22 @@ export class StationViewController implements Tickable {
       const distSq = this._proximityScratch.distanceToSquared(pos)
       if (distSq < bestDistSq) {
         bestDistSq = distSq
-        activePrompt = entrance.prompt
+        activePrompt = entrance.promptFor(pos)
         activeEntrance = entrance
+        activeInteractor = null
+      }
+    }
+
+    for (const interactor of this.station.interactors) {
+      if (interactor.disabled) continue
+      this._proximityScratch.copy(interactor.anchor)
+      this._proximityScratch.y = pos.y
+      const distSq = this._proximityScratch.distanceToSquared(pos)
+      if (distSq < bestDistSq) {
+        bestDistSq = distSq
+        activePrompt = interactor.prompt
+        activeEntrance = null
+        activeInteractor = interactor
       }
     }
 
@@ -320,26 +344,127 @@ export class StationViewController implements Tickable {
       this.onPrompt?.(activePrompt)
     }
 
-    if (activeEntrance && this.inputManager.wasActionPressed('interact')) {
-      const event = activeEntrance.event
-      // Hide the prompt the moment the door starts moving.
-      if (this.currentPrompt !== null) {
-        this.currentPrompt = null
-        this.onPrompt?.(null)
+    const nextMeta = activeInteractor?.meta ?? null
+    if (nextMeta !== this.currentInteractorMeta) {
+      this.currentInteractorMeta = nextMeta
+      this.onActiveInteractorMeta?.(nextMeta)
+    }
+
+    if (this.inputManager.wasActionPressed('interact')) {
+      if (activeInteractor) {
+        // Hide prompt + briefly look at the interactable so the player
+        // sees the screen colour change land.
+        if (this.currentPrompt !== null) {
+          this.currentPrompt = null
+          this.onPrompt?.(null)
+        }
+        this.startDoorLookSequence(activeInteractor.anchor)
+        this.onInteract?.(activeInteractor.event)
+      } else if (activeEntrance) {
+        if (activeEntrance.locked) {
+          // Locked: surface the event so future systems (keycard checks,
+          // SFX, etc.) can react, but skip the door-look + open animation.
+          this.onInteract?.(activeEntrance.event)
+        } else {
+          const event = activeEntrance.event
+          // Hide the prompt the moment the door starts moving.
+          if (this.currentPrompt !== null) {
+            this.currentPrompt = null
+            this.onPrompt?.(null)
+          }
+          this.startDoorLookSequence(activeEntrance.anchor)
+          activeEntrance.triggerOpen(pos, () => this.onInteract?.(event))
+          this.updateDoorBlockers()
+        }
       }
-      this.startDoorLookSequence(activeEntrance)
-      activeEntrance.triggerOpen(pos, () => this.onInteract?.(event))
-      this.updateDoorBlockers()
     }
   }
 
   /**
-   * Start a short camera turn toward the door the player just interacted with.
+   * Mark a prop interactor as consumed and update its prop's visual
+   * status. Used by the UI layer to one-shot terminals after they
+   * dispense a keycard, fire a minigame, etc. No-op if no interactor
+   * with the given event id exists.
    *
-   * @param entrance - Door/entrance instance selected by proximity.
+   * @param event - Event id used to find the interactor.
+   * @param status - Visual status to apply to the prop. Defaults to
+   *   `'success'` (green screen on a terminal).
    */
-  private startDoorLookSequence(entrance: StationEntrance): void {
-    this._doorLookTarget.copy(entrance.anchor)
+  /**
+   * Find a prop interactor by event id. Used by the UI to read loot
+   * metadata, inspect the disabled state, etc.
+   *
+   * @param event - Event id to look up.
+   * @returns The matching interactor, or `null` if none.
+   */
+  findInteractorByEvent(event: string): PropInteractor | null {
+    if (!this.station) return null
+    for (const interactor of this.station.interactors) {
+      if (interactor.event === event) return interactor
+    }
+    return null
+  }
+
+  consumeInteractor(event: string, status: PropStatus = 'success'): void {
+    if (!this.station) return
+    for (const interactor of this.station.interactors) {
+      if (interactor.event !== event || interactor.disabled) continue
+      interactor.disabled = true
+      interactor.prop.setStatus?.(status)
+    }
+  }
+
+  /**
+   * Find the entrance owning the given event id. Used by the UI layer
+   * to toggle locked state or swap prompts when an inventory condition
+   * changes (e.g. the player picks up a keycard).
+   *
+   * @param event - Entrance event id to match.
+   * @returns The matching entrance, or `null` if none found.
+   */
+  findEntrance(event: string): StationEntrance | null {
+    if (!this.station) return null
+    for (const entrance of this.station.entrances) {
+      if (entrance.event === event) return entrance
+    }
+    return null
+  }
+
+  /**
+   * Unlock a previously locked entrance and immediately play the open
+   * animation. The interact event still fires through `onInteract` once
+   * the door reaches its open angle, so the caller's existing event
+   * handler runs for the "post-unlock" path as well as the normal one.
+   *
+   * No-op when the entrance is not found, not locked, or mid-animation.
+   *
+   * @param event - Entrance event id to unlock.
+   * @returns `true` if the entrance was unlocked + opened this call.
+   */
+  unlockAndOpenEntrance(event: string): boolean {
+    if (!this.playerController) return false
+    const entrance = this.findEntrance(event)
+    if (!entrance || !entrance.locked) return false
+    entrance.locked = false
+    const pos = this.playerController.group.position
+    this.startDoorLookSequence(entrance.anchor)
+    entrance.triggerOpen(pos, () => this.onInteract?.(event))
+    this.updateDoorBlockers()
+    if (this.currentPrompt !== null) {
+      this.currentPrompt = null
+      this.onPrompt?.(null)
+    }
+    return true
+  }
+
+  /**
+   * Start a short camera turn toward the world-space anchor of whatever
+   * the player just interacted with (door entrance or prop).
+   *
+   * @param anchor - World-space XYZ of the interaction target.
+   */
+  private startDoorLookSequence(anchor: Vector3): void {
+    this._doorLookTarget.copy(anchor)
     this._doorLookTarget.y = FLOOR_Y + DOOR_LOOK_TARGET_Y_OFFSET
     this.doorLookSequenceActive = true
     this.doorLookSequenceTime = 0
@@ -443,7 +568,7 @@ export class StationViewController implements Tickable {
   /** Refresh door collision blockers from the current entrance animation states. */
   private updateDoorBlockers(): void {
     if (!this.station || !this.stationCollider) return
-    const blockers: StationRect[] = []
+    const blockers: StationRect[] = [...this.station.propBlockers]
     for (const entrance of this.station.entrances) {
       if (!entrance.isPassable) blockers.push(entrance.getBlockerRect())
     }
@@ -471,6 +596,9 @@ export class StationViewController implements Tickable {
     this.gameLoop?.stop()
     this.starfield?.dispose()
     this.disposeExteriorSun()
+    if (this.station) {
+      for (const prop of this.station.props) prop.dispose()
+    }
     this.playerController?.dispose()
     this.fpsCamera?.dispose()
     this.pointerLock.releaseLock()

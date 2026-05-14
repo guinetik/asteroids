@@ -12,7 +12,7 @@
  * @author guinetik
  * @date 2026-05-13
  */
-import { Group, Mesh, type Material } from 'three'
+import { Group, Mesh, Vector3, type Material } from 'three'
 import { loadGLB } from '@/three/loadGLB'
 import { buildStationRoom, type StationRoom } from '@/three/StationRoomBuilder'
 import { StationEntrance } from '@/three/StationEntrance'
@@ -25,12 +25,22 @@ import type {
 } from '@/lib/station/StationLayout'
 import {
   CORRIDOR_HALF_EXTENTS,
+  ROOM_TILE_SIZE,
   ROOM_WALL_OUTER_FACE_OFFSET,
   corridorPortWorldAnchor,
   rotateVec2,
 } from '@/lib/station/StationLayout'
+import type { EntranceSpec, RoomSpec } from '@/lib/station/StationLayout'
 import { roomEntranceWorldAnchor, type PortTarget } from '@/lib/station/StationLayout'
 import type { StationFloor, StationRect } from '@/lib/station/StationCollider'
+import {
+  createStationProp,
+  defaultPropScale,
+  rollReward,
+  type PropInteractorMeta,
+  type StationPropInstance,
+} from '@/three/stationProps'
+import type { RoomPropSpec } from '@/lib/station/StationLayout'
 
 /** Per-piece GLB urls. */
 const CORRIDOR_URL: Readonly<Record<CorridorKind, string>> = {
@@ -120,6 +130,27 @@ const GLASS_OPACITY = 0.18
  * Result of {@link buildStation}: scene group, runtime entrances, and
  * the collider rectangles that make every piece's footprint walkable.
  */
+/**
+ * A prop's F-prompt interaction point. The controller iterates these
+ * each frame and surfaces the closest in-range prompt; pressing the
+ * interact key dispatches the event through the standard `onInteract`
+ * callback (same channel entrances already use).
+ */
+export interface PropInteractor {
+  /** World-space XZ centre used for proximity tests. Y is the floor Y. */
+  anchor: Vector3
+  /** HUD prompt shown while the player is in range. */
+  prompt: string
+  /** Event id dispatched to the controller's `onInteract` callback. */
+  event: string
+  /** Back-reference to the prop instance so consumers can flip status / colour. */
+  prop: StationPropInstance
+  /** When true, the controller skips this interactor (consumed / one-shot). */
+  disabled: boolean
+  /** Optional metadata the UI can preview (e.g. chest loot payload). */
+  meta: PropInteractorMeta | null
+}
+
 export interface BuiltStation {
   /** Root group containing every room + corridor piece. */
   group: Group
@@ -129,6 +160,16 @@ export interface BuiltStation {
   floors: StationFloor[]
   /** Walkable seam rectangles between connected room / corridor pieces. */
   passages: StationRect[]
+  /** In-room props (terminals, etc.) the controller ticks + disposes. */
+  props: StationPropInstance[]
+  /**
+   * World-space lateral blockers contributed by props that declared a
+   * `localFootprint`. Static for a given station load (props don't move),
+   * so the controller can union them with door blockers each frame.
+   */
+  propBlockers: StationRect[]
+  /** F-prompt interaction points declared by props. */
+  interactors: PropInteractor[]
 }
 
 /**
@@ -404,11 +445,131 @@ function patchGlassTransparency(group: Group): void {
  * @param layout - Validated station layout.
  * @returns Scene group + entrances + collider rects.
  */
+/**
+ * Tile index of an entrance along its wall, projected onto the
+ * `(col, row)` grid the room is built on. Wall `'N'`/`'S'` entrances
+ * sit at a known `col` and at the room's north/south extreme `row`;
+ * `'E'`/`'W'` entrances at a known `row` and east/west extreme `col`.
+ *
+ * @param room - Room placement.
+ * @param entrance - One of the room's entrances.
+ * @returns The `(col, row)` tile pair the entrance opens into.
+ */
+function entranceInnerTile(
+  room: RoomSpec,
+  entrance: EntranceSpec,
+): { col: number; row: number } {
+  switch (entrance.side) {
+    case 'N':
+      return { col: entrance.index, row: room.depth - 1 }
+    case 'S':
+      return { col: entrance.index, row: 0 }
+    case 'E':
+      return { col: room.width - 1, row: entrance.index }
+    case 'W':
+      return { col: 0, row: entrance.index }
+  }
+}
+
+/**
+ * Fraction of the maximum entrance distance below which a tile is
+ * considered "too close to a door" for random prop placement. With the
+ * default `0.5`, tiles in the entrance-half of the room are filtered
+ * out and the picker only draws from the far half.
+ */
+const RANDOM_PLACEMENT_MIN_DOOR_DISTANCE_FRACTION = 0.5
+
+/**
+ * Pick a uniformly random tile centre inside a room, biased toward the
+ * far end relative to its entrances. Tiles directly inside an entrance
+ * and any tiles already picked this session are excluded.
+ *
+ * Returns local XZ in the room's pre-yaw frame so the existing prop
+ * transform pipeline still applies room.yaw on top.
+ *
+ * @param room - Room to sample from.
+ * @param used - Mutable set of `"col:row"` keys already claimed; this
+ *   call adds its pick to the set.
+ * @returns Local-frame `[x, z]` tile centre, or `null` if every tile is
+ *   blocked (defensive — only happens for pathological tiny rooms).
+ */
+function pickRandomInnerTile(
+  room: RoomSpec,
+  used: Set<string>,
+): [number, number] | null {
+  const entranceTiles = (room.entrances ?? []).map((e) => entranceInnerTile(room, e))
+  const blocked = new Set(entranceTiles.map((t) => `${t.col}:${t.row}`))
+  const candidates: Array<{ col: number; row: number; dist: number; key: string }> = []
+  for (let col = 0; col < room.width; col++) {
+    for (let row = 0; row < room.depth; row++) {
+      const key = `${col}:${row}`
+      if (blocked.has(key) || used.has(key)) continue
+      let nearest = Infinity
+      for (const t of entranceTiles) {
+        const d = Math.abs(col - t.col) + Math.abs(row - t.row)
+        if (d < nearest) nearest = d
+      }
+      candidates.push({ col, row, dist: nearest, key })
+    }
+  }
+  if (candidates.length === 0) return null
+  const maxDist = candidates.reduce((acc, c) => Math.max(acc, c.dist), 0)
+  const threshold = Math.ceil(maxDist * RANDOM_PLACEMENT_MIN_DOOR_DISTANCE_FRACTION)
+  const farTiles = candidates.filter((c) => c.dist >= threshold)
+  const pool = farTiles.length > 0 ? farTiles : candidates
+  const pick = pool[Math.floor(Math.random() * pool.length)]!
+  used.add(pick.key)
+  const x = (pick.col - (room.width - 1) / 2) * ROOM_TILE_SIZE
+  const z = (pick.row - (room.depth - 1) / 2) * ROOM_TILE_SIZE
+  return [x, z]
+}
+
+/**
+ * Synthesize chest {@link RoomPropSpec}s from a room's authored
+ * `rewards`. Each entry rolls its own item + quantity, picks a random
+ * tile (distinct from already-occupied tiles, the entrance, and tiles
+ * used by previous rewards), and assigns a stable `chest:open:<roomId>-<n>`
+ * event id so the UI layer can target it.
+ *
+ * @param room - Room owning the reward slots.
+ * @param used - Mutable tile-claim set, shared with authored props.
+ * @returns The synthesised prop specs (one per resolved reward).
+ */
+function synthesizeRewardChests(
+  room: RoomSpec,
+  used: Set<string>,
+): RoomPropSpec[] {
+  if (!room.rewards || room.rewards.length === 0) return []
+  const out: RoomPropSpec[] = []
+  const pickedItemIds = new Set<string>()
+  for (let i = 0; i < room.rewards.length; i++) {
+    const reward = room.rewards[i]!
+    const roll = rollReward(reward, pickedItemIds)
+    if (!roll) continue
+    pickedItemIds.add(roll.itemId)
+    const pos = pickRandomInnerTile(room, used)
+    if (!pos) continue
+    out.push({
+      kind: 'chest',
+      pos,
+      loot: { itemId: roll.itemId, qtyMin: roll.quantity, qtyMax: roll.quantity },
+      interact: {
+        prompt: 'F  Open Chest',
+        event: `chest:open:${room.id}-${i + 1}`,
+      },
+    })
+  }
+  return out
+}
+
 export async function buildStation(layout: StationLayout): Promise<BuiltStation> {
   const group = new Group()
   group.name = 'Station'
   const entrances: StationEntrance[] = []
   const floors: StationFloor[] = []
+  const props: StationPropInstance[] = []
+  const propBlockers: StationRect[] = []
+  const interactors: PropInteractor[] = []
   const passages = buildPassages(layout)
 
   // Rooms — reuse the existing parametric builder, then wrap in a
@@ -437,6 +598,65 @@ export async function buildStation(layout: StationLayout): Promise<BuiltStation>
       maxZ: room.anchor.z + result.halfDepth,
       y: STATION_FLOOR_Y,
     })
+
+    // Shared tile-claim ledger so authored random-placement props and
+    // reward-synthesized chests never land on the same tile.
+    const claimedTiles = new Set<string>()
+    const propSpecs: RoomPropSpec[] = [
+      ...(room.props ?? []),
+      ...synthesizeRewardChests(room, claimedTiles),
+    ]
+    for (const propSpec of propSpecs) {
+      const prop = createStationProp(propSpec.kind)
+      const resolvedPos =
+        propSpec.placement === 'random' ? pickRandomInnerTile(room, claimedTiles) : null
+      const [localX, localZ] = resolvedPos ?? propSpec.pos ?? [0, 0]
+      const scale = propSpec.scale ?? defaultPropScale(propSpec.kind)
+      const propYaw = (propSpec.yaw ?? 0) as YawTurns
+      prop.group.position.set(localX, STATION_FLOOR_Y, localZ)
+      prop.group.rotation.y = (propYaw * Math.PI) / 2
+      prop.group.scale.setScalar(scale)
+      wrapper.add(prop.group)
+      props.push(prop)
+
+      // Generic prop collider: fold room.yaw + propSpec.yaw into the
+      // local footprint, scale it, and emit a world-space blocker rect.
+      // Static for the lifetime of the station — props don't move.
+      const roomYaw = (room.yaw ?? 0) as YawTurns
+      const worldCenter = rotateVec2({ x: localX, z: localZ }, roomYaw)
+      const worldX = room.anchor.x + worldCenter.x
+      const worldZ = room.anchor.z + worldCenter.z
+      const footprint = prop.localFootprint
+      if (footprint) {
+        const combinedYaw = ((roomYaw + propYaw) % 4) as YawTurns
+        const isPerpendicular = combinedYaw === 1 || combinedYaw === 3
+        const halfX = (isPerpendicular ? footprint.halfZ : footprint.halfX) * scale
+        const halfZ = (isPerpendicular ? footprint.halfX : footprint.halfZ) * scale
+        propBlockers.push({
+          minX: worldX - halfX,
+          maxX: worldX + halfX,
+          minZ: worldZ - halfZ,
+          maxZ: worldZ + halfZ,
+        })
+      }
+
+      if (propSpec.interact) {
+        let meta: PropInteractorMeta | null = null
+        if (propSpec.loot) {
+          const span = Math.max(0, propSpec.loot.qtyMax - propSpec.loot.qtyMin)
+          const quantity = propSpec.loot.qtyMin + Math.floor(Math.random() * (span + 1))
+          meta = { kind: 'loot', itemId: propSpec.loot.itemId, quantity }
+        }
+        interactors.push({
+          anchor: new Vector3(worldX, STATION_FLOOR_Y, worldZ),
+          prompt: propSpec.interact.prompt,
+          event: propSpec.interact.event,
+          prop,
+          disabled: false,
+          meta,
+        })
+      }
+    }
   }
 
   // Pre-load entrance + door GLBs once if any corridor declares an
@@ -473,5 +693,5 @@ export async function buildStation(layout: StationLayout): Promise<BuiltStation>
   }
 
   patchGlassTransparency(group)
-  return { group, entrances, floors, passages }
+  return { group, entrances, floors, passages, props, propBlockers, interactors }
 }

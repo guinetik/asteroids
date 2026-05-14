@@ -304,7 +304,16 @@ export async function buildStationRoom(layout: StationRoomLayout): Promise<Stati
         slot.add(hinge)
         group.add(slot)
         entrances.push(
-          new StationEntrance(slot, spec.prompt, spec.event, hinge, spec.openStyle ?? 'full'),
+          new StationEntrance(
+            slot,
+            spec.prompt,
+            spec.event,
+            hinge,
+            spec.openStyle ?? 'full',
+            spec.locked ?? false,
+            spec.lockedPrompt,
+            spec.returnPrompt ?? null,
+          ),
         )
         return
       }

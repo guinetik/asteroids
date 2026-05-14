@@ -13,7 +13,11 @@
 import type { LocationQuery } from 'vue-router'
 
 /** Set of station-interior level ids the router will let the player enter. */
-const KNOWN_STATION_IDS: ReadonlySet<string> = new Set(['yamada-titania', 'ceres-institute'])
+const KNOWN_STATION_IDS: ReadonlySet<string> = new Set([
+  'yamada-titania',
+  'ceres-institute',
+  'microwave-test',
+])
 
 /**
  * Pull the first scalar value for a given query key. Returns the empty

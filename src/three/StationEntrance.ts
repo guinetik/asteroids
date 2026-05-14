@@ -69,15 +69,31 @@ type DoorPhase = 'idle' | 'opening' | 'open' | 'closing' | 'done'
  * world-space anchor used for proximity tests + a simple open animation
  * driven by {@link tick}.
  */
+/** Fallback prompt for a locked entrance whose spec did not provide one. */
+const DEFAULT_LOCKED_PROMPT = 'LOCKED'
+
 export class StationEntrance {
   /** Root group containing the entrance frame + fitted door. */
   readonly group: Group
-  /** Prompt string the controller forwards to the HUD. */
+  /** Prompt string the controller forwards to the HUD when unlocked. */
   readonly prompt: string
+  /**
+   * Optional prompt shown when the player is on the side of the doorway
+   * opposite the one {@link prompt} is written for. Falls back to
+   * {@link prompt} when `null`.
+   */
+  readonly returnPrompt: string | null
   /** Event id dispatched when the player interacts with this entrance. */
   readonly event: string
   /** How far the door opens before firing the event. */
   readonly openStyle: EntranceOpenStyle
+  /** Prompt shown while {@link locked} is `true`. Mutable so a controller
+   *  can swap it (e.g. from `'KEYCARD REQUIRED'` to `'UNLOCK F'` once the
+   *  player picks the key up). */
+  lockedPrompt: string
+
+  /** Whether interactions with this entrance are currently blocked. */
+  locked: boolean
 
   private readonly hinge: Object3D
   private readonly hingeClosedAngle: number
@@ -118,6 +134,9 @@ export class StationEntrance {
    * @param event - Event id dispatched on interact.
    * @param hinge - Hinge group whose `rotation.y` swings the door open.
    * @param openStyle - `'crack'` or `'full'`. Defaults to `'full'`.
+   * @param locked - When `true`, the entrance starts locked and `triggerOpen` no-ops.
+   * @param lockedPrompt - Prompt shown while locked. Defaults to `'LOCKED'`.
+   * @param returnPrompt - Prompt shown when approached from the opposite side.
    */
   constructor(
     group: Group,
@@ -125,14 +144,36 @@ export class StationEntrance {
     event: string,
     hinge: Object3D,
     openStyle: EntranceOpenStyle = 'full',
+    locked = false,
+    lockedPrompt: string = DEFAULT_LOCKED_PROMPT,
+    returnPrompt: string | null = null,
   ) {
     this.group = group
     this.prompt = prompt
+    this.returnPrompt = returnPrompt
     this.event = event
     this.openStyle = openStyle
+    this.locked = locked
+    this.lockedPrompt = lockedPrompt
     this.hinge = hinge
     this.hingeClosedAngle = hinge.rotation.y
     this.openAngle = openStyle === 'crack' ? DOOR_ANGLE_CRACK : DOOR_ANGLE_FULL
+  }
+
+  /**
+   * Resolve the prompt to show based on the player's approach side and
+   * the entrance's current lock state. Locked entrances always show
+   * {@link lockedPrompt}. Otherwise: when the player is on the local
+   * +Z side, returns {@link prompt}; on local −Z, returns
+   * {@link returnPrompt} (falling back to {@link prompt}).
+   *
+   * @param playerPosition - Current world-space player position.
+   * @returns The HUD prompt string for this entrance.
+   */
+  promptFor(playerPosition: Vector3): string {
+    if (this.locked) return this.lockedPrompt
+    if (!this.returnPrompt) return this.prompt
+    return this.playerSide(playerPosition) >= 0 ? this.prompt : this.returnPrompt
   }
 
   /** True while the door is mid-animation (opening, held open, or closing). */
@@ -187,7 +228,7 @@ export class StationEntrance {
    * @param onComplete - Invoked when the door is fully (or crack-) open.
    */
   triggerOpen(playerPosition: Vector3, onComplete: () => void): void {
-    if (this.phase !== 'idle') return
+    if (this.phase !== 'idle' || this.locked) return
     this.openingPlayerSide = this.playerSide(playerPosition)
     this.openDirection = this.openingPlayerSide >= 0 ? 1 : -1
     this.phase = 'opening'

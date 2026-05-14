@@ -1,0 +1,201 @@
+{
+  "id": "microwave-test",
+  "name": "Microwave Minigame Test Station",
+  "exteriorSun": {
+    "pos": [200, 5, 14.048],
+    "scale": 0.5
+  },
+  "rooms": [
+    {
+      "id": "r-hub",
+      "width": 1,
+      "depth": 3,
+      "height": 2,
+      "anchor": { "x": 0, "z": 14.048 },
+      "yaw": 0,
+      "entrances": [
+        {
+          "side": "S",
+          "index": 0,
+          "storey": 0,
+          "prompt": "F  Enter Hub",
+          "returnPrompt": "F  Toward Exit",
+          "event": "enter:r-hub:south",
+          "openStyle": "full",
+          "target": { "kind": "corridor", "nodeId": "c-entrance-top", "worldSide": "N" }
+        },
+        {
+          "side": "N",
+          "index": 0,
+          "storey": 0,
+          "prompt": "F  Enter Hub",
+          "returnPrompt": "F  Toward Vault",
+          "event": "enter:r-hub:north",
+          "openStyle": "full",
+          "target": { "kind": "corridor", "nodeId": "c-vault", "worldSide": "S" }
+        },
+        {
+          "side": "E",
+          "index": 1,
+          "storey": 0,
+          "prompt": "F  Enter Hub",
+          "returnPrompt": "F  Toward Microwave Room",
+          "event": "enter:r-hub:east",
+          "openStyle": "full",
+          "target": { "kind": "corridor", "nodeId": "c-microwave", "worldSide": "W" }
+        },
+        {
+          "side": "W",
+          "index": 1,
+          "storey": 0,
+          "prompt": "F  Enter Hub",
+          "returnPrompt": "F  Toward Terminal Room",
+          "event": "enter:r-hub:west",
+          "openStyle": "full",
+          "target": { "kind": "corridor", "nodeId": "c-terminal", "worldSide": "E" }
+        }
+      ]
+    },
+    {
+      "id": "r-terminal",
+      "width": 2,
+      "depth": 3,
+      "height": 2,
+      "anchor": { "x": -13.397, "z": 14.048 },
+      "yaw": 0,
+      "entrances": [
+        {
+          "side": "E",
+          "index": 1,
+          "storey": 0,
+          "prompt": "F  Enter Terminal Room",
+          "returnPrompt": "F  Return to Hub",
+          "event": "enter:r-terminal",
+          "openStyle": "full",
+          "target": { "kind": "corridor", "nodeId": "c-terminal", "worldSide": "W" }
+        }
+      ],
+      "props": [
+        {
+          "kind": "terminal",
+          "pos": [-1.925, 0],
+          "yaw": 1,
+          "interact": {
+            "prompt": "F  Use Terminal",
+            "event": "terminal:use:r-terminal"
+          }
+        }
+      ]
+    },
+    {
+      "id": "r-microwave",
+      "width": 5,
+      "depth": 3,
+      "height": 2,
+      "anchor": { "x": 19.172, "z": 14.048 },
+      "yaw": 0,
+      "entrances": [
+        {
+          "side": "W",
+          "index": 1,
+          "storey": 0,
+          "prompt": "F  Enter Microwave Room",
+          "returnPrompt": "F  Return to Hub",
+          "event": "enter:r-microwave",
+          "openStyle": "full",
+          "target": { "kind": "corridor", "nodeId": "c-microwave", "worldSide": "E" }
+        }
+      ],
+      "props": [
+        {
+          "kind": "terminal",
+          "placement": "random",
+          "yaw": 3,
+          "interact": {
+            "prompt": "F  Obtain Vault Keycard",
+            "event": "terminal:use:r-microwave"
+          }
+        }
+      ]
+    },
+    {
+      "id": "r-vault",
+      "width": 3,
+      "depth": 2,
+      "height": 2,
+      "anchor": { "x": 0, "z": 31.295 },
+      "yaw": 0,
+      "entrances": [
+        {
+          "side": "S",
+          "index": 1,
+          "storey": 0,
+          "prompt": "F  Open Vault",
+          "returnPrompt": "F  Return to Hub",
+          "event": "enter:r-vault",
+          "openStyle": "full",
+          "locked": true,
+          "lockedPrompt": "VAULT LOCKED  ·  KEYCARD REQUIRED",
+          "target": { "kind": "corridor", "nodeId": "c-vault", "worldSide": "N" }
+        }
+      ],
+      "rewards": [
+        { "type": "tradeable", "qtyMin": 25, "qtyMax": 50 },
+        { "type": "tradeable", "qtyMin": 25, "qtyMax": 50 },
+        { "type": "tradeable", "qtyMin": 25, "qtyMax": 50 }
+      ]
+    }
+  ],
+  "corridors": [
+    {
+      "id": "c-entrance-bot",
+      "kind": "straight",
+      "anchor": { "x": 0, "z": 0 },
+      "yaw": 0,
+      "ports": {
+        "S": { "kind": "exit", "prompt": "F  Leave Station", "event": "station:exit" },
+        "N": { "kind": "corridor", "nodeId": "c-entrance-top", "worldSide": "S" }
+      }
+    },
+    {
+      "id": "c-entrance-top",
+      "kind": "straight",
+      "anchor": { "x": 0, "z": 4.462 },
+      "yaw": 0,
+      "ports": {
+        "S": { "kind": "corridor", "nodeId": "c-entrance-bot", "worldSide": "N" },
+        "N": { "kind": "room", "roomId": "r-hub", "entranceIndex": 0 }
+      }
+    },
+    {
+      "id": "c-vault",
+      "kind": "straight",
+      "anchor": { "x": 0, "z": 23.634 },
+      "yaw": 0,
+      "ports": {
+        "S": { "kind": "room", "roomId": "r-hub", "entranceIndex": 1 },
+        "N": { "kind": "room", "roomId": "r-vault", "entranceIndex": 0 }
+      }
+    },
+    {
+      "id": "c-terminal",
+      "kind": "straight",
+      "anchor": { "x": -5.736, "z": 14.048 },
+      "yaw": 1,
+      "ports": {
+        "E": { "kind": "room", "roomId": "r-hub", "entranceIndex": 3 },
+        "W": { "kind": "room", "roomId": "r-terminal", "entranceIndex": 0 }
+      }
+    },
+    {
+      "id": "c-microwave",
+      "kind": "straight",
+      "anchor": { "x": 5.736, "z": 14.048 },
+      "yaw": 1,
+      "ports": {
+        "W": { "kind": "room", "roomId": "r-hub", "entranceIndex": 2 },
+        "E": { "kind": "room", "roomId": "r-microwave", "entranceIndex": 0 }
+      }
+    }
+  ]
+}

@@ -19,13 +19,13 @@ export const TERMINAL_BODY_HEIGHT = 16.0
 const TERMINAL_DEPTH = 1.5
 
 /** Pedestal width in world units on the X axis. */
-const TERMINAL_BASE_WIDTH = 7.5
+export const TERMINAL_BASE_WIDTH = 7.5
 
 /** Pedestal height in world units on the Y axis. */
 const TERMINAL_BASE_HEIGHT = 0.68
 
 /** Pedestal depth in world units on the Z axis. */
-const TERMINAL_BASE_DEPTH = 2.7
+export const TERMINAL_BASE_DEPTH = 2.7
 
 /** How far the terminal extends below its placement Y to survive uneven terrain. */
 const TERMINAL_BURIED_DEPTH = 4
