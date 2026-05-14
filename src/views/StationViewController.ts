@@ -86,6 +86,11 @@ const STATION_PITCH_CLAMP = Math.PI / 3
 /** Indoor movement scale applied to the FPS suit config for station interiors. */
 const STATION_MOVEMENT_SPEED_SCALE = 0.175
 
+/** Seconds between walking footsteps inside the station. */
+const STATION_WALK_FOOTSTEP_INTERVAL = 0.65
+/** Seconds between sprinting footsteps inside the station. */
+const STATION_SPRINT_FOOTSTEP_INTERVAL = 0.46
+
 /**
  * Per-second passive O2 drain inside a derelict station. The base FPS
  * config tunes this for outdoor EVA (0.2/s → ~8 min run). Derelicts are
@@ -333,6 +338,10 @@ export class StationViewController implements Tickable {
       },
     })
 
+    this.fpsAudio.setFootstepIntervals(
+      STATION_WALK_FOOTSTEP_INTERVAL,
+      STATION_SPRINT_FOOTSTEP_INTERVAL,
+    )
     this.fpsAudio.start()
     this.gameLoop = new GameLoop(this.tickHandler)
     this.gameLoop.start()

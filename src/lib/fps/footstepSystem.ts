@@ -139,16 +139,14 @@ export class FootstepSystem {
 
     this.sprinting = isSprinting
 
-    // Fire the first step immediately on the rising edge so the player hears
-    // it as soon as they start moving instead of after a full interval delay.
-    // The cooldown inside `_tryPlayStep` prevents this from spamming when
-    // `isMoving` flickers across consecutive frames.
+    // First frame of a new movement burst: seed the timer + cadence and
+    // let the player take a beat before the first step fires. Hearing
+    // a step the instant a key registers reads as a stutter — the foot
+    // hasn't landed yet. The timer below accumulates from this frame.
     if (!this.wasMoving) {
       this.wasMoving = true
       this.stepTimer = 0
       this.nextInterval = this.jitteredInterval()
-      this._tryPlayStep()
-      return
     }
 
     this.stepTimer += dt
