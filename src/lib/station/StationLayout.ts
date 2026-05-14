@@ -205,6 +205,13 @@ export interface RoomSpec {
    * they spawn or what's inside.
    */
   rewards?: RewardSpec[]
+  /**
+   * Hazardous floor type, when set. The controller polls the player's
+   * footprint against the room's floor each tick and applies damage
+   * while standing in it. Today only `'lava'` is implemented — fast,
+   * deadly tick damage paired with the grunt SFX + red vignette.
+   */
+  hazard?: 'lava'
 }
 
 /** XZ plane vector — anchors, port positions, etc. */

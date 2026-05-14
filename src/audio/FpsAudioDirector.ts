@@ -154,6 +154,19 @@ export class FpsAudioDirector {
   }
 
   /**
+   * Override the footstep cadence for the active scene. Useful when the
+   * view scales the player's move speed (cramped interiors take longer
+   * strides per second) and the default surface intervals run too fast.
+   * Pass `null` for either value to revert to the surface default.
+   *
+   * @param walk - Seconds between walking steps, or `null` to clear.
+   * @param sprint - Seconds between sprinting steps, or `null` to clear.
+   */
+  setFootstepIntervals(walk: number | null, sprint: number | null): void {
+    this.footsteps.setIntervals(walk, sprint)
+  }
+
+  /**
    * Begin FPS audio output. Starts the resting breath loop and resets all
    * edge-detect state so subsequent updates produce clean transitions.
    *

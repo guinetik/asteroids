@@ -170,6 +170,16 @@ export interface BuiltStation {
   propBlockers: StationRect[]
   /** F-prompt interaction points declared by props. */
   interactors: PropInteractor[]
+  /** Hazardous floor regions sampled per-tick for damage application. */
+  hazards: StationHazard[]
+}
+
+/** A hazardous floor rectangle the controller polls each tick. */
+export interface StationHazard {
+  /** Hazard kind. Currently only `'lava'`. */
+  kind: 'lava'
+  /** World-space XZ rectangle the player must avoid. */
+  rect: StationRect
 }
 
 /**
@@ -570,6 +580,7 @@ export async function buildStation(layout: StationLayout): Promise<BuiltStation>
   const props: StationPropInstance[] = []
   const propBlockers: StationRect[] = []
   const interactors: PropInteractor[] = []
+  const hazards: StationHazard[] = []
   const passages = buildPassages(layout)
 
   // Rooms — reuse the existing parametric builder, then wrap in a
@@ -591,13 +602,25 @@ export async function buildStation(layout: StationLayout): Promise<BuiltStation>
     entrances.push(...result.entrances)
     roomResults.push({ result, anchor: room.anchor })
 
-    floors.push({
+    const floorRect: StationFloor = {
       minX: room.anchor.x - result.halfWidth,
       maxX: room.anchor.x + result.halfWidth,
       minZ: room.anchor.z - result.halfDepth,
       maxZ: room.anchor.z + result.halfDepth,
       y: STATION_FLOOR_Y,
-    })
+    }
+    floors.push(floorRect)
+    if (room.hazard === 'lava') {
+      hazards.push({
+        kind: 'lava',
+        rect: {
+          minX: floorRect.minX,
+          maxX: floorRect.maxX,
+          minZ: floorRect.minZ,
+          maxZ: floorRect.maxZ,
+        },
+      })
+    }
 
     // Shared tile-claim ledger so authored random-placement props and
     // reward-synthesized chests never land on the same tile.
@@ -693,5 +716,5 @@ export async function buildStation(layout: StationLayout): Promise<BuiltStation>
   }
 
   patchGlassTransparency(group)
-  return { group, entrances, floors, passages, props, propBlockers, interactors }
+  return { group, entrances, floors, passages, props, propBlockers, interactors, hazards }
 }

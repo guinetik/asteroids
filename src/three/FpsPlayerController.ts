@@ -534,6 +534,16 @@ export class FpsPlayerController implements Tickable {
    * @param dt - Delta time in seconds
    */
   tick(dt: number): void {
+    // Dead players ignore all input + physics — the death-presentation
+    // state owned by the view controller drives the camera/fade. Movement
+    // gating used to leak through (player could still walk during the
+    // YOU DIED beat); freezing the tick here makes the corpse behaviour
+    // consistent across /level and /station.
+    if (this._dead) {
+      this.lateralVelocity.x = 0
+      this.lateralVelocity.z = 0
+      return
+    }
     const mv = this.config.movement
 
     // Sprint lockout — once the bar empties, ignore Shift until BOTH the bar

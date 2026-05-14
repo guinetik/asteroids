@@ -31,6 +31,7 @@ import { FpsPointerLockSession } from '@/lib/fps/FpsPointerLockSession'
 import { buildFpsPlayerConfig } from '@/lib/fps/buildFpsPlayerConfig'
 import { StationCollider, type StationRect } from '@/lib/station/StationCollider'
 import { buildStation, type BuiltStation, type PropInteractor } from '@/three/StationBuilder'
+import { computeDeathPresentationState, stepDamageFlash } from '@/lib/fps/fpsPresentation'
 import type { PropInteractorMeta, PropStatus } from '@/three/stationProps'
 import type { FpsTelemetry } from '@/lib/ui/fpsHudTypes'
 import type { StationEntrance } from '@/three/StationEntrance'
@@ -83,13 +84,41 @@ const STATION_EYE_HEIGHT = 1.7
 /** Maximum up/down pitch while auto-looking at station interactions. */
 const STATION_PITCH_CLAMP = Math.PI / 3
 /** Indoor movement scale applied to the FPS suit config for station interiors. */
-const STATION_MOVEMENT_SPEED_SCALE = 0.35
+const STATION_MOVEMENT_SPEED_SCALE = 0.175
+
+/**
+ * Per-second passive O2 drain inside a derelict station. The base FPS
+ * config tunes this for outdoor EVA (0.2/s → ~8 min run). Derelicts are
+ * meant to feel like a hostile leak — bump it so the player can watch
+ * the bar fall and feel pressure to leave / find a regen point.
+ */
+const STATION_O2_DRAIN_PER_SECOND = 1.5
 /** Lerp factor per second for turning the camera toward an interacted station door. */
 const DOOR_CAMERA_TURN_RATE = 6
 /** Seconds the door-look sequence owns camera yaw/pitch after F is pressed. */
 const DOOR_CAMERA_TURN_DURATION_S = 0.55
 /** Vertical offset from the door anchor used as the look-at point. */
 const DOOR_LOOK_TARGET_Y_OFFSET = STATION_EYE_HEIGHT
+
+/**
+ * HP per second drained by lava-floor tiles. Tuned high so the player
+ * dies within a fraction of a second of stepping in — "absurd damage"
+ * is the point: stations are dangerous and the player learns to read
+ * the floor before walking onto it.
+ */
+const LAVA_DAMAGE_PER_SECOND = 75
+
+/** Seconds the red damage vignette stays at full opacity before decaying. */
+const DAMAGE_FLASH_DURATION = 0.3
+
+/** Speed the camera tilts down (rad/s) during the death animation. */
+const DEATH_PITCH_SPEED = 1.2
+/** Final camera pitch when the death animation settles (~80° down). */
+const DEATH_PITCH_TARGET = -1.4
+/** Seconds for the death black-fade to reach full opacity. */
+const DEATH_FADE_DURATION = 2.0
+/** Seconds after death before the YOU DIED + REWIND overlay appears. */
+const DEATH_MESSAGE_DELAY = 1.5
 
 // ---------------------------------------------------------------------------
 // Tick priority offsets.
@@ -148,7 +177,13 @@ export class StationViewController implements Tickable {
   private exteriorSun: SunMeshResult | null = null
   /** Sim time accumulated for the exterior sun's shader uniforms. */
   private exteriorSunTime = 0
-  private readonly fpsAudio = new FpsAudioDirector()
+  /**
+   * Audio director constructed with the `'habitat'` footstep surface so
+   * step recipes + cadence match the `/habitat` scene's hard-floor feel.
+   * `FpsAudioDirector` already owns its own `FootstepSystem` and ticks
+   * it from `update(dt, state)`; rolling our own here would double-fire.
+   */
+  private readonly fpsAudio = new FpsAudioDirector('habitat')
   private readonly pointerLock = new FpsPointerLockSession()
   private router: Router | null = null
   /** Called when pointer lock state changes. */
@@ -165,6 +200,14 @@ export class StationViewController implements Tickable {
   onActiveInteractorMeta: ((meta: PropInteractorMeta | null) => void) | null = null
   /** Interact callback fired when the player presses F near an entrance. */
   onInteract: ((event: string) => void) | null = null
+  /** Per-tick red-vignette opacity for the damage HUD. */
+  onDamageFlash: ((opacity: number) => void) | null = null
+  /** Fired once when the player's HP reaches zero. */
+  onPlayerDeath: (() => void) | null = null
+  /** Black death-fade opacity per tick (0 → 1 over `DEATH_FADE_DURATION`). */
+  onDeathFade: ((opacity: number) => void) | null = null
+  /** Toggles the YOU DIED message + REWIND overlay after the message delay. */
+  onDeathMessage: ((visible: boolean) => void) | null = null
   /** Scratch vector reused for the per-frame entrance proximity check. */
   private readonly _proximityScratch = new Vector3()
   /** World-space look-at target for the active door interaction camera turn. */
@@ -172,6 +215,20 @@ export class StationViewController implements Tickable {
   /** Cached prompt text so we only fire `onPrompt` when it changes. */
   private currentPrompt: string | null = null
   private currentInteractorMeta: PropInteractorMeta | null = null
+  /** Seconds the red vignette has left before decaying back to zero. */
+  private damageFlashTimer = 0
+  /** Seconds since the player's HP hit zero; drives the death animation. */
+  private deathStateTime = 0
+  /** Player X last frame — used to compute realised speed for the audio dir. */
+  private lastFootstepX = 0
+  /** Player Z last frame. */
+  private lastFootstepZ = 0
+  /** True once `lastFootstep{X,Z}` have been seeded (skip the first frame's huge delta). */
+  private footstepBaselineCaptured = false
+  /** Player HP from the previous tick — detects damage between frames. */
+  private lastHp: number | null = null
+  /** True once `onDeathMessage(true)` has fired (so we don't refire each tick). */
+  private deathMessageShown = false
   /** True while the camera is smoothly turning toward the interacted door. */
   private doorLookSequenceActive = false
   /** Seconds elapsed in the current door-look sequence. */
@@ -195,6 +252,7 @@ export class StationViewController implements Tickable {
       maxSpeed: config.movement.maxSpeed * STATION_MOVEMENT_SPEED_SCALE,
       maxSprintSpeed: config.movement.maxSprintSpeed * STATION_MOVEMENT_SPEED_SCALE,
     }
+    config.o2 = { ...config.o2, baseDrainRate: STATION_O2_DRAIN_PER_SECOND }
 
     // Merge FPS movement (WASD + jump + sprint + tools) with habitat's
     // F-key interact binding so the entrance prompt can fire.
@@ -249,6 +307,13 @@ export class StationViewController implements Tickable {
       collider,
     )
     this.playerController.jumpEnabled = false
+    this.playerController.onDeath = () => {
+      this.deathStateTime = 0
+      this.deathMessageShown = false
+      // Silence breathing + active loops on death — corpses don't pant.
+      this.fpsAudio.stop()
+      this.onPlayerDeath?.()
+    }
     this.playerController.group.position.copy(this.spawnPos)
     this.sceneManager.addToScene(this.playerController.group)
     this.fpsCamera.setTarget(this.playerController.group)
@@ -284,12 +349,33 @@ export class StationViewController implements Tickable {
     this.updateEntrancePrompt(dt)
     this.tickDoorLookSequence(dt)
     this.tickExteriorSun(dt)
+    this.tickHazards(dt)
+    this.tickPassiveDamage(dt)
+    this.tickDamageFlash(dt)
+    this.tickDeathPresentation(dt)
     this.emitFpsTelemetry()
+
+    // Realised speed = actual displacement / dt. Using this instead of
+    // `playerController.speed` (commanded velocity) means walking into a
+    // wall produces zero displacement → falls below the audio director's
+    // MIN_MOVE_SPEED threshold → no phantom footsteps. Same gating
+    // problem exists in `/habitat`; views consuming FpsPlayerController
+    // should prefer realised speed for any movement-driven SFX.
+    const pos = this.playerController.group.position
+    let realisedSpeed = 0
+    if (this.footstepBaselineCaptured && dt > 0) {
+      const dx = pos.x - this.lastFootstepX
+      const dz = pos.z - this.lastFootstepZ
+      realisedSpeed = Math.sqrt(dx * dx + dz * dz) / dt
+    }
+    this.lastFootstepX = pos.x
+    this.lastFootstepZ = pos.z
+    this.footstepBaselineCaptured = true
 
     this.fpsAudio.update(dt, {
       grounded: this.playerController.grounded,
       sprinting: this.playerController.isSprinting,
-      speed: this.playerController.speed,
+      speed: realisedSpeed,
       hovering: false,
       o2Level: this.playerController.o2Level,
       o2Capacity: this.playerController.o2Capacity,
@@ -596,6 +682,100 @@ export class StationViewController implements Tickable {
       headingRad: this.fpsCamera.yaw,
       objectives: [],
     })
+  }
+
+  /**
+   * Apply lava-floor tick damage when the player's footprint sits inside
+   * any hazard rect. Fires the grunt SFX (rate-limited at the manifest
+   * level), kicks the damage-flash timer, and forwards the death event
+   * via `onPlayerDeath`. No-op when the player is dead or off-station.
+   */
+  private tickHazards(dt: number): void {
+    if (!this.station || !this.playerController) return
+    if (this.playerController.isDead) return
+    const pos = this.playerController.group.position
+    for (const hazard of this.station.hazards) {
+      const r = hazard.rect
+      if (pos.x < r.minX || pos.x > r.maxX || pos.z < r.minZ || pos.z > r.maxZ) continue
+      this.playerController.takeDamage(LAVA_DAMAGE_PER_SECOND * dt)
+      this.fpsAudio.notifyHazardDamage()
+      this.damageFlashTimer = DAMAGE_FLASH_DURATION
+      break
+    }
+  }
+
+  /**
+   * Detect damage applied to the player from sources outside the
+   * controller's own logic (currently: hypoxia damage when O2 hits 0,
+   * triggered by `FpsPlayerController.tick`). Fires the same grunt SFX
+   * + red vignette the lava path uses, so the player gets unmissable
+   * feedback that the suit is killing them.
+   */
+  private tickPassiveDamage(_dt: number): void {
+    if (!this.playerController) return
+    const hp = this.playerController.hp
+    if (this.lastHp !== null && hp < this.lastHp - 1e-3) {
+      // Already covered by the lava path's own SFX/flash when applicable
+      // — but it's idempotent enough that a redundant call is fine.
+      this.fpsAudio.notifyHazardDamage()
+      this.damageFlashTimer = DAMAGE_FLASH_DURATION
+    }
+    this.lastHp = hp
+  }
+
+  /** Decay the red-vignette overlay each frame and broadcast its opacity. */
+  private tickDamageFlash(dt: number): void {
+    const flash = stepDamageFlash(this.damageFlashTimer, dt, DAMAGE_FLASH_DURATION)
+    this.damageFlashTimer = flash.timer
+    this.onDamageFlash?.(flash.opacity)
+  }
+
+  /**
+   * Drive the death cinematic — camera pitches down, screen fades to
+   * black, the YOU DIED message appears after a delay. No-op while the
+   * player is alive.
+   */
+  private tickDeathPresentation(dt: number): void {
+    if (!this.playerController || !this.fpsCamera || !this.playerController.isDead) return
+    this.deathStateTime += dt
+    const state = computeDeathPresentationState(
+      this.fpsCamera.pitch,
+      dt,
+      this.deathStateTime,
+      DEATH_PITCH_SPEED,
+      DEATH_PITCH_TARGET,
+      DEATH_FADE_DURATION,
+      DEATH_MESSAGE_DELAY,
+    )
+    this.fpsCamera.pitch = state.pitch
+    this.onDeathFade?.(state.fadeOpacity)
+    if (state.showMessage && !this.deathMessageShown) {
+      this.deathMessageShown = true
+      this.onDeathMessage?.(true)
+    }
+  }
+
+  /**
+   * Reset the player after a death: refill HP / O2 / stamina, teleport
+   * back to the station spawn at world origin, and clear the damage
+   * flash so the next visit starts clean. The inventory rollback is
+   * owned by the Vue layer (it holds the snapshot taken at mount).
+   */
+  restart(): void {
+    if (!this.playerController) return
+    this.playerController.replenish()
+    this.playerController.group.position.copy(this.spawnPos)
+    if (this.fpsCamera) this.fpsCamera.pitch = 0
+    this.damageFlashTimer = 0
+    this.deathStateTime = 0
+    this.deathMessageShown = false
+    this.footstepBaselineCaptured = false
+    this.lastHp = null
+    // Bring breathing + footstep loops back online for the new run.
+    this.fpsAudio.start()
+    this.onDamageFlash?.(0)
+    this.onDeathFade?.(0)
+    this.onDeathMessage?.(false)
   }
 
   /** Refresh door collision blockers from the current entrance animation states. */

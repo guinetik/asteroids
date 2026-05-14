@@ -3,9 +3,12 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import KeyPrompt from '@/components/KeyPrompt.vue'
 import FpsHud from '@/components/FpsHud.vue'
+import DamageFeedback from '@/components/DamageFeedback.vue'
+import DeathOverlay from '@/components/DeathOverlay.vue'
 import PickupToast from '@/components/PickupToast.vue'
 import type { PickupEntry } from '@/components/PickupToast.vue'
 import type { FpsTelemetry } from '@/lib/ui/fpsHudTypes'
+import type { Inventory } from '@/lib/inventory/types'
 import { parseKeyPrompt } from '@/lib/ui/parseKeyPrompt'
 import { Timer } from '@/lib/Timer'
 import { uiAudio } from '@/audio/UiAudioDirector'
@@ -206,6 +209,56 @@ controller.onFpsTelemetry = (t) => {
   Object.assign(fpsTelemetry, t)
 }
 
+/** Red-vignette opacity driven by the controller's damage timer. */
+const damageFlash = ref(0)
+/** Black death-fade opacity driven by the controller's death timer. */
+const deathFade = ref(0)
+/** True once the YOU DIED message + REWIND overlay should be visible. */
+const deathMessageVisible = ref(false)
+/** Shuttle inventory snapshot taken on station mount; restored on death. */
+let inventorySnapshot: Inventory | null = null
+
+controller.onDamageFlash = (opacity) => {
+  damageFlash.value = opacity
+}
+controller.onDeathFade = (opacity) => {
+  deathFade.value = opacity
+}
+controller.onDeathMessage = (visible) => {
+  deathMessageVisible.value = visible
+  if (visible && typeof document !== 'undefined' && document.pointerLockElement) {
+    // Pop the cursor out once the REWIND button shows so it's clickable.
+    document.exitPointerLock()
+  }
+}
+controller.onPlayerDeath = () => {
+  // Pop the cursor immediately so the cinematic isn't fighting for input.
+  if (typeof document !== 'undefined' && document.pointerLockElement) {
+    document.exitPointerLock()
+  }
+}
+
+/**
+ * Death-restart handler. Restores the shuttle inventory to the
+ * pre-station snapshot (so any chests looted this run are forfeited),
+ * clears in-run buffs, and tells the controller to refill HP and
+ * teleport the player back to spawn.
+ */
+function handleRestart(): void {
+  if (inventorySnapshot) {
+    saveInventory(inventorySnapshot)
+  }
+  buffs.value = []
+  hasVaultKeycard.value = false
+  pickups.value = []
+  chestPreview.value = null
+  inventoryFullWarning.value = null
+  deathMessageVisible.value = false
+  deathFade.value = 0
+  damageFlash.value = 0
+  controller.restart()
+}
+
 controller.onPrompt = (prompt) => {
   promptText.value = prompt
 }
@@ -315,6 +368,9 @@ function handleChestOpen(event: string): void {
 
 onMounted(async () => {
   if (!container.value) return
+  // Snapshot the shuttle inventory before we touch anything. On death we
+  // roll back to this so the run's loot is forfeit.
+  inventorySnapshot = loadInventory()
   const raw = route.query.station
   const stationId = Array.isArray(raw) ? (raw[0] ?? '') : (raw ?? '')
   const resolved = stationId ? String(stationId) : DEFAULT_STATION_ID
@@ -341,14 +397,21 @@ function onPointerDown(): void {
 
 <template>
   <div ref="container" class="station-view" @pointerdown="onPointerDown" />
+  <div class="helmet-visor" />
   <KeyPrompt
     v-if="parsedPrompt"
     :key-label="parsedPrompt.key"
     :action="parsedPrompt.label"
     tone="cyan"
-    position="bottom-low"
+    position="bottom-mid"
   />
   <FpsHud :telemetry="fpsTelemetry" variant="station" hide-movement-readout />
+  <DamageFeedback :flash-opacity="damageFlash" />
+  <div v-if="deathFade > 0" class="station-death-fade" :style="{ opacity: deathFade }" />
+  <div v-if="deathMessageVisible" class="station-death-message">
+    <span class="station-death-message__text">YOU DIED</span>
+  </div>
+  <DeathOverlay :visible="deathMessageVisible" cause="STATION HAZARD" @restart="handleRestart" />
   <PickupToast :pickups="pickups" />
   <div v-if="chestPreview" class="station-chest-preview" :class="{ 'station-chest-preview--blocked': chestPreview.cannotCarry }">
     <img :src="chestPreview.iconUrl" :alt="chestPreview.label" class="station-chest-preview__icon" />
@@ -507,5 +570,55 @@ function onPointerDown(): void {
 .pickup-failed-leave-to {
   opacity: 0;
   transform: translate(-50%, 6px);
+}
+
+/* Helmet visor frame — first-person framing shared with /level. */
+.helmet-visor {
+  position: fixed;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  border: 2px solid rgba(80, 100, 120, 0.2);
+  border-radius: 20% / 12%;
+  box-shadow:
+    0 0 0 9999px rgba(0, 0, 0, 0.95),
+    inset 0 0 60px rgba(0, 10, 30, 0.5),
+    inset 0 0 150px rgba(0, 5, 15, 0.25);
+  background: radial-gradient(
+    ellipse at center,
+    transparent 0%,
+    transparent 65%,
+    rgba(20, 40, 60, 0.06) 85%,
+    rgba(10, 30, 50, 0.12) 100%
+  );
+}
+
+.station-death-fade {
+  position: fixed;
+  inset: 0;
+  background: black;
+  z-index: 50;
+  pointer-events: none;
+}
+.station-death-message {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 60;
+  pointer-events: none;
+}
+.station-death-message__text {
+  font-family: 'Datatype', ui-monospace, monospace;
+  font-size: 3rem;
+  color: #ef4444;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  animation: station-death-pulse 2s ease-in-out infinite;
+}
+@keyframes station-death-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
 }
 </style>

@@ -94,6 +94,7 @@
       "height": 2,
       "anchor": { "x": 19.172, "z": 14.048 },
       "yaw": 0,
+      "hazard": "lava",
       "entrances": [
         {
           "side": "W",

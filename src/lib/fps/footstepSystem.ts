@@ -78,6 +78,10 @@ export class FootstepSystem {
   private sprinting = false
   /** Seconds since the last actually-played step. Used as the cooldown gate. */
   private timeSinceLastStep = Infinity
+  /** Override for walk interval — `null` falls back to the surface default. */
+  private walkIntervalOverride: number | null = null
+  /** Override for sprint interval — `null` falls back to the surface default. */
+  private sprintIntervalOverride: number | null = null
 
   /**
    * @param surface - Which surface sound recipe to use.
@@ -85,6 +89,21 @@ export class FootstepSystem {
   constructor(surface: FootstepSurface) {
     this.surface = surface
     this.nextInterval = WALK_INTERVAL[surface]
+  }
+
+  /**
+   * Override the cadence used for walking and sprinting independent of
+   * the surface preset. Useful for scenes that scale the player's move
+   * speed (e.g. cramped interiors run footsteps at a slower interval so
+   * they stay in step with the slower gait). Pass `null` for either
+   * value to revert it to the surface default.
+   *
+   * @param walk - Seconds between steps while walking, or `null` to clear.
+   * @param sprint - Seconds between steps while sprinting, or `null` to clear.
+   */
+  setIntervals(walk: number | null, sprint: number | null): void {
+    this.walkIntervalOverride = walk
+    this.sprintIntervalOverride = sprint
   }
 
   /**
@@ -149,7 +168,10 @@ export class FootstepSystem {
   }
 
   private baseInterval(): number {
-    return this.sprinting ? SPRINT_INTERVAL[this.surface] : WALK_INTERVAL[this.surface]
+    if (this.sprinting) {
+      return this.sprintIntervalOverride ?? SPRINT_INTERVAL[this.surface]
+    }
+    return this.walkIntervalOverride ?? WALK_INTERVAL[this.surface]
   }
 
   private jitteredInterval(): number {
