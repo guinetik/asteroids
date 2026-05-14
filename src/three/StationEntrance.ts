@@ -27,8 +27,15 @@ export type {
 import type { EntranceOpenStyle } from '@/lib/station/StationLayout'
 import type { StationRect } from '@/lib/station/StationCollider'
 
+/**
+ * Beat between pressing F and the hinge starting to swing. Gives the
+ * door SFX and the camera-turn its first frames before motion begins
+ * — without this, the open feels instant and the audio reads as
+ * detached from the swing.
+ */
+const DOOR_OPEN_DELAY = 0.145
 /** Animation seconds the door takes to open fully. */
-const DOOR_OPEN_DURATION = 0.55
+const DOOR_OPEN_DURATION = 0.95
 /** Hinge rotation (radians) for a `'full'` open — door swings clear of the frame. */
 const DOOR_ANGLE_FULL = Math.PI / 2
 /** Hinge rotation (radians) for a `'crack'` open — door barely cracks. */
@@ -125,6 +132,12 @@ export class StationEntrance {
   }
   /** Fired exactly once when the open animation reaches its target. */
   private onComplete: (() => void) | null = null
+  /**
+   * Optional hook fired once per cycle on the open → closing transition.
+   * Used by the view controller to play the close-door SFX. Stays set
+   * across cycles — not consumed on fire.
+   */
+  onCloseStart: (() => void) | null = null
 
   /**
    * Build an entrance instance from its assembled group + door.
@@ -248,7 +261,8 @@ export class StationEntrance {
     this.phaseT += dt
     switch (this.phase) {
       case 'opening': {
-        const t = Math.min(1, this.phaseT / DOOR_OPEN_DURATION)
+        if (this.phaseT < DOOR_OPEN_DELAY) break
+        const t = Math.min(1, (this.phaseT - DOOR_OPEN_DELAY) / DOOR_OPEN_DURATION)
         this.hinge.rotation.y = this.hingeClosedAngle + this.openAngle * this.openDirection * t
         if (t >= 1) {
           this.phase = 'open'
@@ -263,6 +277,7 @@ export class StationEntrance {
         if (this.phaseT >= DOOR_HOLD_DURATION && this.shouldAutoClose(playerPosition)) {
           this.phase = 'closing'
           this.phaseT = 0
+          this.onCloseStart?.()
         }
         break
       }

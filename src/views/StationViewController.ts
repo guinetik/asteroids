@@ -27,6 +27,7 @@ import { StarFieldController } from '@/three/StarFieldController'
 import { FpsCamera } from '@/three/FpsCamera'
 import { FpsPlayerController } from '@/three/FpsPlayerController'
 import { FpsAudioDirector } from '@/audio/FpsAudioDirector'
+import { StationAudioDirector } from '@/audio/StationAudioDirector'
 import { FpsPointerLockSession } from '@/lib/fps/FpsPointerLockSession'
 import { buildFpsPlayerConfig } from '@/lib/fps/buildFpsPlayerConfig'
 import { StationCollider, type StationRect } from '@/lib/station/StationCollider'
@@ -189,6 +190,10 @@ export class StationViewController implements Tickable {
    * it from `update(dt, state)`; rolling our own here would double-fire.
    */
   private readonly fpsAudio = new FpsAudioDirector('habitat')
+  /** Station-scoped audio: ambiance, door whooshes, terminal beep, lava SFX. */
+  private readonly stationAudio = new StationAudioDirector()
+  /** True last tick we were inside a hazard rect — handed to the audio director. */
+  private inHazardThisFrame = false
   private readonly pointerLock = new FpsPointerLockSession()
   private router: Router | null = null
   /** Called when pointer lock state changes. */
@@ -298,6 +303,10 @@ export class StationViewController implements Tickable {
       this.mountExteriorSun(layout.exteriorSun)
     }
 
+    for (const entrance of this.station.entrances) {
+      entrance.onCloseStart = () => this.stationAudio.notifyDoorClose()
+    }
+
     const collider = new StationCollider(this.station.floors, this.station.passages)
     this.stationCollider = collider
     this.updateDoorBlockers()
@@ -317,6 +326,8 @@ export class StationViewController implements Tickable {
       this.deathMessageShown = false
       // Silence breathing + active loops on death — corpses don't pant.
       this.fpsAudio.stop()
+      this.stationAudio.stopHazard()
+      this.inHazardThisFrame = false
       this.onPlayerDeath?.()
     }
     this.playerController.group.position.copy(this.spawnPos)
@@ -343,6 +354,7 @@ export class StationViewController implements Tickable {
       STATION_SPRINT_FOOTSTEP_INTERVAL,
     )
     this.fpsAudio.start()
+    this.stationAudio.start()
     this.gameLoop = new GameLoop(this.tickHandler)
     this.gameLoop.start()
   }
@@ -389,6 +401,7 @@ export class StationViewController implements Tickable {
       o2Level: this.playerController.o2Level,
       o2Capacity: this.playerController.o2Capacity,
     })
+    this.stationAudio.update(dt, { inHazard: this.inHazardThisFrame })
   }
 
   /**
@@ -457,6 +470,7 @@ export class StationViewController implements Tickable {
           this.currentPrompt = null
           this.onPrompt?.(null)
         }
+        this.stationAudio.notifyTerminalInteract()
         this.startDoorLookSequence(activeInteractor.anchor)
         this.onInteract?.(activeInteractor.event)
       } else if (activeEntrance) {
@@ -471,6 +485,7 @@ export class StationViewController implements Tickable {
             this.currentPrompt = null
             this.onPrompt?.(null)
           }
+          this.stationAudio.notifyDoorOpen()
           this.startDoorLookSequence(activeEntrance.anchor)
           activeEntrance.triggerOpen(pos, () => this.onInteract?.(event))
           this.updateDoorBlockers()
@@ -546,6 +561,7 @@ export class StationViewController implements Tickable {
     if (!entrance || !entrance.locked) return false
     entrance.locked = false
     const pos = this.playerController.group.position
+    this.stationAudio.notifyDoorOpen()
     this.startDoorLookSequence(entrance.anchor)
     entrance.triggerOpen(pos, () => this.onInteract?.(event))
     this.updateDoorBlockers()
@@ -701,16 +717,22 @@ export class StationViewController implements Tickable {
    */
   private tickHazards(dt: number): void {
     if (!this.station || !this.playerController) return
-    if (this.playerController.isDead) return
+    if (this.playerController.isDead) {
+      this.inHazardThisFrame = false
+      return
+    }
     const pos = this.playerController.group.position
+    let inHazard = false
     for (const hazard of this.station.hazards) {
       const r = hazard.rect
       if (pos.x < r.minX || pos.x > r.maxX || pos.z < r.minZ || pos.z > r.maxZ) continue
+      inHazard = true
       this.playerController.takeDamage(LAVA_DAMAGE_PER_SECOND * dt)
       this.fpsAudio.notifyHazardDamage()
       this.damageFlashTimer = DAMAGE_FLASH_DURATION
       break
     }
+    this.inHazardThisFrame = inHazard
   }
 
   /**
@@ -780,6 +802,8 @@ export class StationViewController implements Tickable {
     this.deathMessageShown = false
     this.footstepBaselineCaptured = false
     this.lastHp = null
+    this.stationAudio.stopHazard()
+    this.inHazardThisFrame = false
     // Bring breathing + footstep loops back online for the new run.
     this.fpsAudio.start()
     this.onDamageFlash?.(0)
@@ -828,6 +852,7 @@ export class StationViewController implements Tickable {
     this.sceneManager?.dispose()
     this.inputManager?.dispose()
     this.fpsAudio.dispose()
+    this.stationAudio.dispose()
   }
 
   /** Detach and free GPU resources owned by the exterior sun, if any. */

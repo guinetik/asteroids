@@ -88,6 +88,14 @@ export const AUDIO_SOUND_IDS = [
   'sfx.cargo.open',
   'sfx.cargo.close',
   'sfx.hatch.open',
+  // SFX — station interiors
+  'ambient.station',
+  'sfx.station.door',
+  'sfx.station.door.close',
+  'sfx.terminal.interact',
+  'sfx.burn',
+  'sfx.station.trigger',
+  'sfx.station.alarm',
   // SFX — footsteps
   'sfx.step.habitat.1',
   'sfx.step.habitat.2',
@@ -805,6 +813,93 @@ const manifestById: ManifestById = {
     load: 'lazy',
     playback: 'restart',
     volume: 0.7,
+    effect: 'none',
+  },
+
+  // ── SFX — station interiors ────────────────────────────────────────
+  /**
+   * Looping derelict-station ambiance bed. Played by `StationViewController`
+   * for the lifetime of a `/station` visit. This is a sound-effect drone
+   * (creaking, distant hums), not a music track — sits under any future
+   * station music layer.
+   */
+  'ambient.station': {
+    id: 'ambient.station',
+    src: '/sound/sfx.station.ambiance.mp3',
+    category: 'ambient',
+    load: 'lazy',
+    playback: 'single-instance',
+    volume: 0.45,
+    effect: 'none',
+  },
+  /** Sliding-door whoosh fired when a station entrance starts opening. */
+  'sfx.station.door': {
+    id: 'sfx.station.door',
+    src: '/sound/sfx.station.door.mp3',
+    category: 'sfx',
+    load: 'lazy',
+    playback: 'overlap',
+    volume: 0.7,
+    effect: 'none',
+  },
+  /** Sliding-door whoosh fired when a station entrance starts auto-closing. */
+  'sfx.station.door.close': {
+    id: 'sfx.station.door.close',
+    src: '/sound/sfx.station.door.close.mp3',
+    category: 'sfx',
+    load: 'lazy',
+    playback: 'overlap',
+    volume: 0.7,
+    effect: 'none',
+  },
+  /** Beep fired when the player presses F on a station prop (terminal, chest). */
+  'sfx.terminal.interact': {
+    id: 'sfx.terminal.interact',
+    src: '/sound/sfx.terminal.interact.mp3',
+    category: 'sfx',
+    load: 'lazy',
+    playback: 'restart',
+    volume: 0.6,
+    effect: 'none',
+  },
+  /**
+   * Sustained sizzle loop played while the player stands in a lava
+   * hazard. `single-instance` so back-to-back hazard ticks can't stack
+   * a chorus of burns on top of each other; the director starts the
+   * loop on the hazard-enter edge and stops it on the exit edge.
+   */
+  'sfx.burn': {
+    id: 'sfx.burn',
+    src: '/sound/sfx.burn.mp3',
+    category: 'sfx',
+    load: 'lazy',
+    playback: 'single-instance',
+    volume: 0.55,
+    effect: 'none',
+  },
+  /** One-shot "system arming" stinger fired the moment a hazard activates. */
+  'sfx.station.trigger': {
+    id: 'sfx.station.trigger',
+    src: '/sound/sfx.station.trigger.mp3',
+    category: 'sfx',
+    load: 'lazy',
+    playback: 'restart',
+    volume: 0.75,
+    effect: 'none',
+  },
+  /**
+   * Looping "you are being microwaved" alarm. Started on hazard entry,
+   * stopped on hazard exit or player death. `single-instance` keeps at
+   * most one handle alive; loop is requested per-instance via
+   * `play({ loop: true })`.
+   */
+  'sfx.station.alarm': {
+    id: 'sfx.station.alarm',
+    src: '/sound/sfx.station.alarm.mp3',
+    category: 'sfx',
+    load: 'lazy',
+    playback: 'single-instance',
+    volume: 0.6,
     effect: 'none',
   },
 
