@@ -194,7 +194,10 @@ export class MapHabitatFacade {
 
   /** Lazy-load the interior scene on first entry. Safe to call repeatedly. */
   ensureScene(): Promise<HabitatInteriorScene> {
-    if (this.scene) return Promise.resolve(this.scene)
+    if (this.scene) {
+      this.scene.setBackdropContext(this.deps?.getHabitatBackdropContext() ?? null)
+      return Promise.resolve(this.scene)
+    }
     if (this.scenePending) return this.scenePending
     this.scenePending = this.buildScene().finally(() => {
       this.scenePending = null
@@ -548,6 +551,7 @@ export class MapHabitatFacade {
   handleEnter(): void {
     const deps = this.deps
     if (!deps) return
+    this.scene?.setBackdropContext(deps.getHabitatBackdropContext())
     deps.callbacks.onHabitatActive?.(true)
     deps.armJourneyUiFromHabitatEntry()
     deps.setEarthStartupOrbitHudSuppressed(false)

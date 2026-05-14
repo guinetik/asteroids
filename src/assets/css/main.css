@@ -2812,6 +2812,10 @@ body,
   @apply text-sm text-slate-100;
 }
 
+.inventory-table__desc {
+  @apply text-xs leading-snug text-slate-400;
+}
+
 .inventory-table__meta {
   @apply text-xs text-slate-500;
 }

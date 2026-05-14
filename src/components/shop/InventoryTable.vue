@@ -23,6 +23,7 @@ const emit = defineEmits<{
 interface DisplayRow {
   itemId: string
   label: string
+  description: string
   category: ItemCategory
   categoryBorderUrl: string
   iconUrl: string
@@ -47,6 +48,7 @@ const rows = computed<DisplayRow[]>(() => {
     return {
       itemId: stack.itemId,
       label: def?.label ?? stack.itemId,
+      description: def?.description ?? '',
       category,
       categoryBorderUrl: getInventoryCategoryBorderUrl(category),
       iconUrl: def?.icon ? `/items/${def.icon}` : '',
@@ -118,6 +120,9 @@ function handleUse(itemId: string) {
         </div>
         <div class="inventory-table__info">
           <span class="inventory-table__name">{{ row.label }}</span>
+          <span v-if="mode === 'view' && row.description" class="inventory-table__desc">{{
+            row.description
+          }}</span>
           <span class="inventory-table__meta"
             >{{ row.quantity }} units &middot; {{ row.weightKg.toFixed(0) }} kg</span
           >
