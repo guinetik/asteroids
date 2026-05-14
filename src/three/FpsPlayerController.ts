@@ -416,6 +416,16 @@ export class FpsPlayerController implements Tickable {
     return Math.sqrt(vx * vx + vz * vz)
   }
 
+  /** Current sprint / stamina charge from the shared thruster system. */
+  get sprintCharge(): number {
+    return this.thrusterSystem.getState('sprint').charge
+  }
+
+  /** Maximum sprint / stamina capacity. */
+  get sprintCapacity(): number {
+    return this.thrusterSystem.getState('sprint').capacity
+  }
+
   /** Current hit points. */
   get hp(): number {
     return this._hp

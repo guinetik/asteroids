@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import KeyPrompt from '@/components/KeyPrompt.vue'
+import FpsHud from '@/components/FpsHud.vue'
 import PickupToast from '@/components/PickupToast.vue'
 import type { PickupEntry } from '@/components/PickupToast.vue'
+import type { FpsTelemetry } from '@/lib/ui/fpsHudTypes'
 import { parseKeyPrompt } from '@/lib/ui/parseKeyPrompt'
 import { Timer } from '@/lib/Timer'
 import { uiAudio } from '@/audio/UiAudioDirector'
@@ -174,6 +176,36 @@ function canAcceptLoot(itemId: string, quantity: number): boolean {
   return result.ok
 }
 
+/**
+ * Live FPS telemetry mirror for the HUD (HP / O2 / STA bars). The
+ * controller pushes a fresh snapshot each tick; we `Object.assign` into
+ * a single reactive instance so Vue can diff the bars without
+ * re-creating the object every frame.
+ */
+const fpsTelemetry = reactive<FpsTelemetry>({
+  hp: 100,
+  maxHp: 100,
+  o2Level: 100,
+  o2Capacity: 100,
+  sprintCharge: 50,
+  sprintCapacity: 50,
+  speed: 0,
+  grounded: true,
+  activeMode: 'science',
+  aiming: false,
+  isFiring: false,
+  rtgLevel: 0,
+  rtgCapacity: 0,
+  modeCharge: 0,
+  modeCapacity: 0,
+  headingRad: 0,
+  objectives: [],
+})
+
+controller.onFpsTelemetry = (t) => {
+  Object.assign(fpsTelemetry, t)
+}
+
 controller.onPrompt = (prompt) => {
   promptText.value = prompt
 }
@@ -316,6 +348,7 @@ function onPointerDown(): void {
     tone="cyan"
     position="bottom-low"
   />
+  <FpsHud :telemetry="fpsTelemetry" variant="station" hide-movement-readout />
   <PickupToast :pickups="pickups" />
   <div v-if="chestPreview" class="station-chest-preview" :class="{ 'station-chest-preview--blocked': chestPreview.cannotCarry }">
     <img :src="chestPreview.iconUrl" :alt="chestPreview.label" class="station-chest-preview__icon" />

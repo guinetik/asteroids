@@ -39,9 +39,10 @@ const props = withDefaults(
      * HUD variant. `'level'` (default) shows all elements including crosshair,
      * mode charge, hotbar, and sprint stamina. `'eva'` hides combat/tool UI
      * and keeps HP / O2 / RTG / SPD / HDG only. `'evaMap'` is map EVA: science
-     * reticle, SCI-only hotbar, no mining/laser.
+     * reticle, SCI-only hotbar, no mining/laser. `'station'` is for the
+     * station-interior view: HP + O2 + STA only — no combat, no RTG.
      */
-    variant?: 'level' | 'eva' | 'evaMap'
+    variant?: 'level' | 'eva' | 'evaMap' | 'station'
     /**
      * When true, hides the top-center SPD / HDG row — used in bunker interior
      * where {@link BunkerWaveHud} occupies the same band.
@@ -51,10 +52,18 @@ const props = withDefaults(
   { variant: 'level', hideMovementReadout: false },
 )
 
-const showCombatHud = (): boolean => props.variant !== 'eva'
+const showCombatHud = (): boolean =>
+  props.variant !== 'eva' && props.variant !== 'station'
 
 /** Map EVA: science tool HUD without DRL/LAS hotkeys. */
 const showEvaMapToolHud = (): boolean => props.variant === 'evaMap'
+
+/** Stamina/sprint bar visible on level + station; hidden on EVA variants. */
+const showStaminaBar = (): boolean =>
+  props.variant === 'level' || props.variant === 'station'
+
+/** RTG bar hidden in station interiors (no multi-tool, no RTG concept). */
+const showRtgBar = (): boolean => props.variant !== 'station'
 
 function pct(value: number, max: number): number {
   return max > 0 ? (value / max) * 100 : 0
@@ -263,7 +272,7 @@ function showRockTarget(): boolean {
             <span class="text-[10px] tracking-widest uppercase text-white/50">O2</span>
           </div>
           <div
-            v-if="showCombatHud() && !showEvaMapToolHud()"
+            v-if="showStaminaBar() && !showEvaMapToolHud()"
             class="flex flex-col items-center gap-0.5"
           >
             <div class="h-16 w-2.5 flex flex-col-reverse overflow-hidden rounded-sm bg-white/10">
@@ -324,7 +333,7 @@ function showRockTarget(): boolean {
         </div>
       </div>
 
-      <div class="flex w-32 shrink-0 flex-col gap-1">
+      <div v-if="showRtgBar()" class="flex w-32 shrink-0 flex-col gap-1">
         <span class="text-[10px] tracking-widest uppercase text-yellow-400/50">RTG</span>
         <div class="h-3 w-full overflow-hidden rounded-sm bg-white/10">
           <div

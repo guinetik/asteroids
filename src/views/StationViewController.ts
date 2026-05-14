@@ -32,6 +32,7 @@ import { buildFpsPlayerConfig } from '@/lib/fps/buildFpsPlayerConfig'
 import { StationCollider, type StationRect } from '@/lib/station/StationCollider'
 import { buildStation, type BuiltStation, type PropInteractor } from '@/three/StationBuilder'
 import type { PropInteractorMeta, PropStatus } from '@/three/stationProps'
+import type { FpsTelemetry } from '@/lib/ui/fpsHudTypes'
 import type { StationEntrance } from '@/three/StationEntrance'
 import { loadStationLayout } from '@/lib/station/loadStationLayout'
 import type { ExteriorSunSpec, StationLayout } from '@/lib/station/StationLayout'
@@ -154,6 +155,8 @@ export class StationViewController implements Tickable {
   onPointerLockChange: ((locked: boolean) => void) | null = null
   /** Prompt callback driven by entrance proximity. `null` clears the HUD. */
   onPrompt: ((prompt: string | null) => void) | null = null
+  /** Per-tick player telemetry for the HUD (HP / O2 / STA bars). */
+  onFpsTelemetry: ((telemetry: FpsTelemetry) => void) | null = null
   /**
    * Fires when the closest in-range prop interactor changes. The UI uses
    * this to render previews (e.g. "DRILLBITS x 20" above the F prompt
@@ -281,6 +284,7 @@ export class StationViewController implements Tickable {
     this.updateEntrancePrompt(dt)
     this.tickDoorLookSequence(dt)
     this.tickExteriorSun(dt)
+    this.emitFpsTelemetry()
 
     this.fpsAudio.update(dt, {
       grounded: this.playerController.grounded,
@@ -563,6 +567,35 @@ export class StationViewController implements Tickable {
     if (uTime) uTime.value = this.exteriorSunTime
     const coronaUTime = sun.coronaUniforms.uTime
     if (coronaUTime) coronaUTime.value = this.exteriorSunTime
+  }
+
+  /**
+   * Push a frozen {@link FpsTelemetry} snapshot to {@link onFpsTelemetry}.
+   * Mode/RTG/objective fields are stubbed because the station view
+   * doesn't run combat or compass — the `'station'` HUD variant hides
+   * those panels.
+   */
+  private emitFpsTelemetry(): void {
+    if (!this.onFpsTelemetry || !this.playerController || !this.fpsCamera) return
+    this.onFpsTelemetry({
+      hp: this.playerController.hp,
+      maxHp: this.playerController.maxHp,
+      o2Level: this.playerController.o2Level,
+      o2Capacity: this.playerController.o2Capacity,
+      sprintCharge: this.playerController.sprintCharge,
+      sprintCapacity: this.playerController.sprintCapacity,
+      speed: this.playerController.speed,
+      grounded: this.playerController.grounded,
+      activeMode: 'science',
+      aiming: false,
+      isFiring: false,
+      rtgLevel: 0,
+      rtgCapacity: 0,
+      modeCharge: 0,
+      modeCapacity: 0,
+      headingRad: this.fpsCamera.yaw,
+      objectives: [],
+    })
   }
 
   /** Refresh door collision blockers from the current entrance animation states. */
