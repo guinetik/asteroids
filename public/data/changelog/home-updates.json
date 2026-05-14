@@ -1,8 +1,20 @@
 [
   {
+    "title": "The Iconic Update",
+    "date": "May 15, 2026",
+    "backgroundImage": "/thumbnails/iconic-update.webp",
+    "description": "Every item, trade good, and station service now has a pixel icon, generated with Pixellab AI.",
+    "changes": [
+      "84 pixel-art item icons generated with Pixellab AI, covering all trade goods, minerals, consumables, and equipment.",
+      "Colored slot borders identify item type at a glance — yellow for minerals, green for consumables, cyan for equipment, orange for trade goods, and purple for mission materials.",
+      "Station services and fuel supplies have their own dedicated icons.",
+      "Item slots are larger across all shop and inventory views."
+    ]
+  },
+  {
     "title": "The Habitat Update",
     "date": "May 13, 2026",
-    "backgroundImage": "/thumbnails/cat-tower.webp",
+    "backgroundImage": "/thumbnails/habitat.webp",
     "description": "A new walkable shuttle habitat gives you a real home between contracts.",
     "changes": [
       "Walk around your glass habitat interior.",
