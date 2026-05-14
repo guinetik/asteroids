@@ -33,7 +33,7 @@ import type { StationRect } from '@/lib/station/StationCollider'
  * — without this, the open feels instant and the audio reads as
  * detached from the swing.
  */
-const DOOR_OPEN_DELAY = 0.145
+const DOOR_OPEN_DELAY = 0.25
 /** Animation seconds the door takes to open fully. */
 const DOOR_OPEN_DURATION = 0.95
 /** Hinge rotation (radians) for a `'full'` open — door swings clear of the frame. */

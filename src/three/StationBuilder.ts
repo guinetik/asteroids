@@ -12,7 +12,16 @@
  * @author guinetik
  * @date 2026-05-13
  */
-import { Group, Mesh, Vector3, type Material } from 'three'
+import {
+  Group,
+  Mesh,
+  PlaneGeometry,
+  Vector3,
+  type Material,
+  type ShaderMaterial,
+} from 'three'
+import { generateSafePath, type Tile } from '@/lib/station/safePath'
+import { createTronHologramMaterial } from '@/three/tronHologramMaterial'
 import { loadGLB } from '@/three/loadGLB'
 import { buildStationRoom, type StationRoom } from '@/three/StationRoomBuilder'
 import { StationEntrance } from '@/three/StationEntrance'
@@ -172,6 +181,13 @@ export interface BuiltStation {
   interactors: PropInteractor[]
   /** Hazardous floor regions sampled per-tick for damage application. */
   hazards: StationHazard[]
+  /**
+   * TRON-hologram shader materials owned by the station (lava + safe-path
+   * tile markers). The view controller must call
+   * {@link syncTronHologramTimeSeconds} on this list each frame so the
+   * scan bands and grid scroll animate.
+   */
+  hologramMaterials: ShaderMaterial[]
 }
 
 /** A hazardous floor rectangle the controller polls each tick. */
@@ -180,6 +196,12 @@ export interface StationHazard {
   kind: 'lava'
   /** World-space XZ rectangle the player must avoid. */
   rect: StationRect
+  /**
+   * Optional emissive marker the controller can flip visible when the
+   * player is standing on this tile. Hidden by default so a quiet room
+   * doesn't show every lava tile glowing at once.
+   */
+  marker: Mesh | null
 }
 
 /**
@@ -490,6 +512,50 @@ function entranceInnerTile(
 const RANDOM_PLACEMENT_MIN_DOOR_DISTANCE_FRACTION = 0.5
 
 /**
+ * Minimum tile count for the procedurally generated safe path through a
+ * lava-floor room (inclusive of both endpoints). Sized so a small 3×3
+ * room still gets at least one detour rather than a straight line.
+ */
+const SAFE_PATH_MIN_LENGTH = 5
+/**
+ * Maximum tile count for the safe path, expressed as a fraction of the
+ * room's total tiles. Caps how convoluted the path can be so the player
+ * doesn't burn their whole O2 reserve crossing a single room.
+ */
+const SAFE_PATH_MAX_FRACTION = 0.75
+
+/**
+ * Toggle the blue-emissive debug visualisation of safe tiles. Flip to
+ * `false` once playtesting is done; the rest of the system (per-tile
+ * hazards, path planning) keeps working unchanged.
+ */
+const DEBUG_SHOW_SAFE_PATH = true
+/** Per-tile-square inset so adjacent overlays don't z-fight at their seam. */
+const SAFE_PATH_DEBUG_INSET = 0.04
+/** Y offset above the floor for the debug plane. */
+const SAFE_PATH_DEBUG_Y_OFFSET = 0.012
+/** Primary tint for the lava-tile TRON hologram material (warm red). */
+const LAVA_TILE_TRON_COLOR = 0xff2a1a
+/** Slightly cooler grid bias so the lattice reads distinct from the hull tint. */
+const LAVA_TILE_TRON_GRID_TINT = 0xff5533
+/** Color gain on the lava hologram — punches the red brighter than a prop. */
+const LAVA_TILE_TRON_COLOR_GAIN = 1.55
+/** Alpha gain on the lava hologram — sits heavier than the default prop pass. */
+const LAVA_TILE_TRON_ALPHA_GAIN = 1.45
+/** Material opacity hint for the lava hologram. */
+const LAVA_TILE_TRON_OPACITY = 0.9
+/** Primary tint for the safe-path TRON hologram (cyan / Tron blue). */
+const SAFE_TILE_TRON_COLOR = 0x3399ff
+/** Cooler grid bias on the safe tiles. */
+const SAFE_TILE_TRON_GRID_TINT = 0x88ccff
+/** Color gain for safe tiles — calmer than the lava red. */
+const SAFE_TILE_TRON_COLOR_GAIN = 1.15
+/** Alpha gain for safe tiles. */
+const SAFE_TILE_TRON_ALPHA_GAIN = 1.1
+/** Material opacity hint for safe tiles. */
+const SAFE_TILE_TRON_OPACITY = 0.7
+
+/**
  * Pick a uniformly random tile centre inside a room, biased toward the
  * far end relative to its entrances. Tiles directly inside an entrance
  * and any tiles already picked this session are excluded.
@@ -506,7 +572,7 @@ const RANDOM_PLACEMENT_MIN_DOOR_DISTANCE_FRACTION = 0.5
 function pickRandomInnerTile(
   room: RoomSpec,
   used: Set<string>,
-): [number, number] | null {
+): { pos: [number, number]; tile: Tile } | null {
   const entranceTiles = (room.entrances ?? []).map((e) => entranceInnerTile(room, e))
   const blocked = new Set(entranceTiles.map((t) => `${t.col}:${t.row}`))
   const candidates: Array<{ col: number; row: number; dist: number; key: string }> = []
@@ -529,9 +595,105 @@ function pickRandomInnerTile(
   const pool = farTiles.length > 0 ? farTiles : candidates
   const pick = pool[Math.floor(Math.random() * pool.length)]!
   used.add(pick.key)
-  const x = (pick.col - (room.width - 1) / 2) * ROOM_TILE_SIZE
-  const z = (pick.row - (room.depth - 1) / 2) * ROOM_TILE_SIZE
+  const pos = tileLocalPos(room, pick)
+  return { pos, tile: { col: pick.col, row: pick.row } }
+}
+
+/**
+ * Convert a `(col, row)` tile to its local-frame XZ centre (pre-yaw).
+ *
+ * @param room - Room owning the grid.
+ * @param tile - Tile to project.
+ * @returns Local `[x, z]` centre of the tile.
+ */
+function tileLocalPos(room: RoomSpec, tile: Tile): [number, number] {
+  const x = (tile.col - (room.width - 1) / 2) * ROOM_TILE_SIZE
+  const z = (tile.row - (room.depth - 1) / 2) * ROOM_TILE_SIZE
   return [x, z]
+}
+
+/**
+ * World-space XZ rectangle covering a single tile of a room, accounting
+ * for the room's yaw + anchor.
+ *
+ * @param room - Room owning the tile.
+ * @param tile - Tile to project.
+ * @returns Axis-aligned world rect around the tile centre.
+ */
+function tileWorldRect(room: RoomSpec, tile: Tile): StationRect {
+  const [lx, lz] = tileLocalPos(room, tile)
+  const roomYaw = (room.yaw ?? 0) as YawTurns
+  const world = rotateVec2({ x: lx, z: lz }, roomYaw)
+  const cx = room.anchor.x + world.x
+  const cz = room.anchor.z + world.z
+  const half = ROOM_TILE_SIZE / 2
+  return { minX: cx - half, maxX: cx + half, minZ: cz - half, maxZ: cz + half }
+}
+
+/**
+ * Spawn a thin emissive plane over the given tile in the room's local
+ * frame, parented under the room wrapper. Used as a debug visualisation
+ * of safe tiles while playtesting the path planner — gated by
+ * {@link DEBUG_SHOW_SAFE_PATH}.
+ *
+ * @param wrapper - Room wrapper group the marker is parented to.
+ * @param room - Room owning the tile.
+ * @param tile - Tile to highlight.
+ */
+/**
+ * Spawn a red glow plane over a single lava tile, parented to the room
+ * wrapper. Hidden by default — the view controller flips
+ * `mesh.visible = true` while the player is standing on this exact
+ * tile, then hides it again on exit.
+ *
+ * @param wrapper - Room wrapper group the marker is parented to.
+ * @param room - Room owning the tile.
+ * @param tile - Tile to highlight.
+ * @returns The created mesh so the caller can wire it into a hazard.
+ */
+function addLavaTileGlowMarker(
+  wrapper: Group,
+  room: RoomSpec,
+  tile: Tile,
+): { mesh: Mesh; material: ShaderMaterial } {
+  const [lx, lz] = tileLocalPos(room, tile)
+  const size = ROOM_TILE_SIZE - SAFE_PATH_DEBUG_INSET * 2
+  const material = createTronHologramMaterial({
+    color: LAVA_TILE_TRON_COLOR,
+    gridTint: LAVA_TILE_TRON_GRID_TINT,
+    colorGain: LAVA_TILE_TRON_COLOR_GAIN,
+    alphaGain: LAVA_TILE_TRON_ALPHA_GAIN,
+    opacity: LAVA_TILE_TRON_OPACITY,
+  })
+  const mesh = new Mesh(new PlaneGeometry(size, size), material)
+  mesh.rotation.x = -Math.PI / 2
+  mesh.position.set(lx, STATION_FLOOR_Y + SAFE_PATH_DEBUG_Y_OFFSET, lz)
+  mesh.visible = false
+  mesh.name = `lava-tile:${tile.col}:${tile.row}`
+  wrapper.add(mesh)
+  return { mesh, material }
+}
+
+function addSafeTileDebugMarker(
+  wrapper: Group,
+  room: RoomSpec,
+  tile: Tile,
+): ShaderMaterial {
+  const [lx, lz] = tileLocalPos(room, tile)
+  const size = ROOM_TILE_SIZE - SAFE_PATH_DEBUG_INSET * 2
+  const material = createTronHologramMaterial({
+    color: SAFE_TILE_TRON_COLOR,
+    gridTint: SAFE_TILE_TRON_GRID_TINT,
+    colorGain: SAFE_TILE_TRON_COLOR_GAIN,
+    alphaGain: SAFE_TILE_TRON_ALPHA_GAIN,
+    opacity: SAFE_TILE_TRON_OPACITY,
+  })
+  const mesh = new Mesh(new PlaneGeometry(size, size), material)
+  mesh.rotation.x = -Math.PI / 2
+  mesh.position.set(lx, STATION_FLOOR_Y + SAFE_PATH_DEBUG_Y_OFFSET, lz)
+  mesh.name = `safe-tile:${tile.col}:${tile.row}`
+  wrapper.add(mesh)
+  return material
 }
 
 /**
@@ -557,11 +719,11 @@ function synthesizeRewardChests(
     const roll = rollReward(reward, pickedItemIds)
     if (!roll) continue
     pickedItemIds.add(roll.itemId)
-    const pos = pickRandomInnerTile(room, used)
-    if (!pos) continue
+    const pick = pickRandomInnerTile(room, used)
+    if (!pick) continue
     out.push({
       kind: 'chest',
-      pos,
+      pos: pick.pos,
       loot: { itemId: roll.itemId, qtyMin: roll.quantity, qtyMax: roll.quantity },
       interact: {
         prompt: 'F  Open Chest',
@@ -581,6 +743,7 @@ export async function buildStation(layout: StationLayout): Promise<BuiltStation>
   const propBlockers: StationRect[] = []
   const interactors: PropInteractor[] = []
   const hazards: StationHazard[] = []
+  const hologramMaterials: ShaderMaterial[] = []
   const passages = buildPassages(layout)
 
   // Rooms — reuse the existing parametric builder, then wrap in a
@@ -610,17 +773,6 @@ export async function buildStation(layout: StationLayout): Promise<BuiltStation>
       y: STATION_FLOOR_Y,
     }
     floors.push(floorRect)
-    if (room.hazard === 'lava') {
-      hazards.push({
-        kind: 'lava',
-        rect: {
-          minX: floorRect.minX,
-          maxX: floorRect.maxX,
-          minZ: floorRect.minZ,
-          maxZ: floorRect.maxZ,
-        },
-      })
-    }
 
     // Shared tile-claim ledger so authored random-placement props and
     // reward-synthesized chests never land on the same tile.
@@ -629,11 +781,27 @@ export async function buildStation(layout: StationLayout): Promise<BuiltStation>
       ...(room.props ?? []),
       ...synthesizeRewardChests(room, claimedTiles),
     ]
-    for (const propSpec of propSpecs) {
+    /**
+     * Tile chosen for each random-placement prop, in spec order. The
+     * first one (the "target" prop for a lava room — typically the
+     * keycard terminal) is the path planner's endpoint. Other random
+     * props in the same room are stuck on the safe path so the player
+     * can actually reach them.
+     */
+    const randomTilesByPropIndex = new Map<number, Tile>()
+    for (let i = 0; i < propSpecs.length; i++) {
+      const propSpec = propSpecs[i]!
+      if (propSpec.placement !== 'random') continue
+      const pick = pickRandomInnerTile(room, claimedTiles)
+      if (!pick) continue
+      randomTilesByPropIndex.set(i, pick.tile)
+      propSpec.pos = pick.pos
+    }
+
+    for (let i = 0; i < propSpecs.length; i++) {
+      const propSpec = propSpecs[i]!
       const prop = createStationProp(propSpec.kind)
-      const resolvedPos =
-        propSpec.placement === 'random' ? pickRandomInnerTile(room, claimedTiles) : null
-      const [localX, localZ] = resolvedPos ?? propSpec.pos ?? [0, 0]
+      const [localX, localZ] = propSpec.pos ?? [0, 0]
       const scale = propSpec.scale ?? defaultPropScale(propSpec.kind)
       const propYaw = (propSpec.yaw ?? 0) as YawTurns
       prop.group.position.set(localX, STATION_FLOOR_Y, localZ)
@@ -680,6 +848,51 @@ export async function buildStation(layout: StationLayout): Promise<BuiltStation>
         })
       }
     }
+
+    if (room.hazard === 'lava') {
+      const entranceTiles = (room.entrances ?? []).map((e) => entranceInnerTile(room, e))
+      const targetTile = randomTilesByPropIndex.get(0) ?? entranceTiles[0] ?? null
+      const safeTileKeys = new Set<string>()
+      if (targetTile) {
+        const minLen = Math.max(SAFE_PATH_MIN_LENGTH, 2)
+        const maxLen = Math.max(minLen, Math.floor(room.width * room.depth * SAFE_PATH_MAX_FRACTION))
+        for (const entranceTile of entranceTiles) {
+          const path = generateSafePath(
+            room.width,
+            room.depth,
+            entranceTile,
+            targetTile,
+            minLen,
+            maxLen,
+          )
+          for (const t of path) safeTileKeys.add(`${t.col}:${t.row}`)
+        }
+        // Any other random-placement props in this room also need to be
+        // reachable, so add their tiles to the safe set.
+        for (const tile of randomTilesByPropIndex.values()) {
+          safeTileKeys.add(`${tile.col}:${tile.row}`)
+        }
+      }
+
+      for (let col = 0; col < room.width; col++) {
+        for (let row = 0; row < room.depth; row++) {
+          const key = `${col}:${row}`
+          if (safeTileKeys.has(key)) continue
+          const tile = { col, row }
+          const lava = addLavaTileGlowMarker(wrapper, room, tile)
+          hologramMaterials.push(lava.material)
+          hazards.push({ kind: 'lava', rect: tileWorldRect(room, tile), marker: lava.mesh })
+        }
+      }
+
+      if (DEBUG_SHOW_SAFE_PATH) {
+        for (const key of safeTileKeys) {
+          const [col, row] = key.split(':').map(Number) as [number, number]
+          const safeMat = addSafeTileDebugMarker(wrapper, room, { col, row })
+          hologramMaterials.push(safeMat)
+        }
+      }
+    }
   }
 
   // Pre-load entrance + door GLBs once if any corridor declares an
@@ -716,5 +929,15 @@ export async function buildStation(layout: StationLayout): Promise<BuiltStation>
   }
 
   patchGlassTransparency(group)
-  return { group, entrances, floors, passages, props, propBlockers, interactors, hazards }
+  return {
+    group,
+    entrances,
+    floors,
+    passages,
+    props,
+    propBlockers,
+    interactors,
+    hazards,
+    hologramMaterials,
+  }
 }

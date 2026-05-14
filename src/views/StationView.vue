@@ -406,7 +406,7 @@ function onPointerDown(): void {
     position="bottom-mid"
   />
   <FpsHud :telemetry="fpsTelemetry" variant="station" hide-movement-readout />
-  <DamageFeedback :flash-opacity="damageFlash" />
+  <DamageFeedback :flash-opacity="damageFlash" :intensity="1.8" />
   <div v-if="deathFade > 0" class="station-death-fade" :style="{ opacity: deathFade }" />
   <div v-if="deathMessageVisible" class="station-death-message">
     <span class="station-death-message__text">YOU DIED</span>

@@ -33,6 +33,10 @@ import { buildFpsPlayerConfig } from '@/lib/fps/buildFpsPlayerConfig'
 import { StationCollider, type StationRect } from '@/lib/station/StationCollider'
 import { buildStation, type BuiltStation, type PropInteractor } from '@/three/StationBuilder'
 import { computeDeathPresentationState, stepDamageFlash } from '@/lib/fps/fpsPresentation'
+import {
+  syncTronHologramTimeSeconds,
+  disposeTronHologramMaterials,
+} from '@/three/tronHologramMaterial'
 import type { PropInteractorMeta, PropStatus } from '@/three/stationProps'
 import type { FpsTelemetry } from '@/lib/ui/fpsHudTypes'
 import type { StationEntrance } from '@/three/StationEntrance'
@@ -183,6 +187,8 @@ export class StationViewController implements Tickable {
   private exteriorSun: SunMeshResult | null = null
   /** Sim time accumulated for the exterior sun's shader uniforms. */
   private exteriorSunTime = 0
+  /** Sim time accumulated for the TRON hologram tile markers. */
+  private hologramTime = 0
   /**
    * Audio director constructed with the `'habitat'` footstep surface so
    * step recipes + cadence match the `/habitat` scene's hard-floor feel.
@@ -370,6 +376,7 @@ export class StationViewController implements Tickable {
     this.updateEntrancePrompt(dt)
     this.tickDoorLookSequence(dt)
     this.tickExteriorSun(dt)
+    this.tickHologramMaterials(dt)
     this.tickHazards(dt)
     this.tickPassiveDamage(dt)
     this.tickDamageFlash(dt)
@@ -719,20 +726,42 @@ export class StationViewController implements Tickable {
     if (!this.station || !this.playerController) return
     if (this.playerController.isDead) {
       this.inHazardThisFrame = false
+      this.hideAllHazardMarkers()
       return
     }
     const pos = this.playerController.group.position
     let inHazard = false
+    let activeMarker: import('three').Mesh | null = null
     for (const hazard of this.station.hazards) {
       const r = hazard.rect
       if (pos.x < r.minX || pos.x > r.maxX || pos.z < r.minZ || pos.z > r.maxZ) continue
       inHazard = true
+      activeMarker = hazard.marker
       this.playerController.takeDamage(LAVA_DAMAGE_PER_SECOND * dt)
       this.fpsAudio.notifyHazardDamage()
       this.damageFlashTimer = DAMAGE_FLASH_DURATION
       break
     }
+    for (const hazard of this.station.hazards) {
+      if (!hazard.marker) continue
+      hazard.marker.visible = hazard.marker === activeMarker
+    }
     this.inHazardThisFrame = inHazard
+  }
+
+  /** Push the per-frame time uniform into every station hologram material. */
+  private tickHologramMaterials(dt: number): void {
+    if (!this.station || this.station.hologramMaterials.length === 0) return
+    this.hologramTime += dt
+    syncTronHologramTimeSeconds(this.station.hologramMaterials, this.hologramTime)
+  }
+
+  /** Force every lava-tile glow marker off (used on death). */
+  private hideAllHazardMarkers(): void {
+    if (!this.station) return
+    for (const hazard of this.station.hazards) {
+      if (hazard.marker) hazard.marker.visible = false
+    }
   }
 
   /**
@@ -844,6 +873,7 @@ export class StationViewController implements Tickable {
     this.disposeExteriorSun()
     if (this.station) {
       for (const prop of this.station.props) prop.dispose()
+      disposeTronHologramMaterials(this.station.hologramMaterials)
     }
     this.playerController?.dispose()
     this.fpsCamera?.dispose()

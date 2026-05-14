@@ -33,10 +33,19 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 interface Props {
   flashOpacity: number
   directionDuration?: number
+  /**
+   * Multiplier on the red-vignette intensity. `1` matches the original
+   * "ranged hit" feel; values above `1` push the vignette further into
+   * the centre and raise the peak alpha. Used by hazardous scenes (lava
+   * floors) where the player needs unmissable feedback that they're
+   * actively burning.
+   */
+  intensity?: number
 }
 
 const props = withDefaults(defineProps<Props>(), {
   directionDuration: 0.6,
+  intensity: 1,
 })
 
 const SLICE_COUNT = 12
@@ -146,8 +155,13 @@ function sliceOpacity(sliceIndex: number): number {
 /** Faint base radial-gradient vignette driven by `flashOpacity`. */
 const baseVignette = computed(() => {
   if (props.flashOpacity <= 0) return 'none'
-  const alpha = props.flashOpacity * 0.35
-  return `radial-gradient(ellipse at center, transparent 50%, rgba(255, 0, 0, ${alpha}))`
+  const intensity = Math.max(0.0001, props.intensity)
+  const alpha = Math.min(1, props.flashOpacity * 0.35 * intensity)
+  // Higher intensity pulls the transparent-to-red transition closer to
+  // the centre, so the red bleeds further inward instead of staying
+  // only in the corners.
+  const transparentStop = Math.max(10, 50 - (intensity - 1) * 25)
+  return `radial-gradient(ellipse at center, transparent ${transparentStop}%, rgba(255, 0, 0, ${alpha}))`
 })
 
 /**
