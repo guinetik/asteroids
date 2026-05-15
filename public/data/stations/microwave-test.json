@@ -23,6 +23,8 @@
           "returnPrompt": "F  Toward Exit",
           "event": "enter:r-hub:south",
           "openStyle": "full",
+          "locked": true,
+          "lockedPrompt": "POWER OFFLINE  ·  RESTORE GENERATOR",
           "target": { "kind": "corridor", "nodeId": "c-entrance-top", "worldSide": "N" }
         },
         {
@@ -123,6 +125,42 @@
       "rewards": [{ "type": "tradeable", "qtyMin": 5, "qtyMax": 10 }]
     },
     {
+      "id": "r-power",
+      "width": 2,
+      "depth": 2,
+      "height": 2,
+      "anchor": { "x": -7.86, "z": 1.925 },
+      "yaw": 0,
+      "entrances": [
+        {
+          "side": "E",
+          "index": 0,
+          "storey": 0,
+          "prompt": "F  Enter Power Room",
+          "returnPrompt": "F  Return to Entrance",
+          "event": "enter:r-power",
+          "openStyle": "full",
+          "target": { "kind": "corridor", "nodeId": "c-entrance-bot", "worldSide": "W" }
+        }
+      ],
+      "props": [
+        {
+          "kind": "powergen",
+          "pos": [0, 0],
+          "yaw": 0
+        },
+        {
+          "kind": "terminal",
+          "pos": [-2.3, 2.3],
+          "yaw": 1,
+          "interact": {
+            "prompt": "F  Read Generator Diagnostics",
+            "event": "terminal:use:r-power"
+          }
+        }
+      ]
+    },
+    {
       "id": "r-vault",
       "width": 3,
       "depth": 2,
@@ -158,7 +196,8 @@
       "yaw": 1,
       "ports": {
         "S": { "kind": "exit", "prompt": "F  Leave Station", "event": "station:exit" },
-        "N": { "kind": "corridor", "nodeId": "c-entrance-top", "worldSide": "S" }
+        "N": { "kind": "corridor", "nodeId": "c-entrance-top", "worldSide": "S" },
+        "W": { "kind": "room", "roomId": "r-power", "entranceIndex": 0 }
       }
     },
     {

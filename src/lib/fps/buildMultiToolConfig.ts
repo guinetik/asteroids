@@ -25,6 +25,11 @@ export function buildMultiToolConfig(): MultiToolConfig {
   const efficiency = getCurrentUpgradeValue('multitoolEfficiency')
   const rtgCapacity = getCurrentUpgradeValue('multitoolRtgCapacity')
   const rtgCharge = getCurrentUpgradeValue('multitoolRtgCharge')
+  // The Science Upgrade scales the *science* mode's idle-recharge rate
+  // so investing in SCI doesn't just multiply mission CR / station
+  // repair — it also restores the mode bar between shots faster, which
+  // is what the player actually feels when chaining SCI bolts.
+  const sciencePower = getCurrentUpgradeValue('multitoolScience')
   return {
     ...base,
     rtg: {
@@ -44,6 +49,7 @@ export function buildMultiToolConfig(): MultiToolConfig {
         science: {
           ...base.rtg.thrusters.science,
           burnRate: base.rtg.thrusters.science.burnRate * efficiency,
+          rechargeRate: base.rtg.thrusters.science.rechargeRate * sciencePower,
         },
       },
     },

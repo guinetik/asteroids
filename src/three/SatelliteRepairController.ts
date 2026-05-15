@@ -18,6 +18,7 @@ import type { SatelliteServicingMiniGame } from '@/lib/minigame/satelliteServici
 import type { ActiveVisitRelayMission } from '@/lib/missions/types'
 import { validateManifest } from '@/lib/satellites/satelliteManifests'
 import { Timer } from '@/lib/Timer'
+import { getScienceHealingMultiplier } from '@/lib/fps/scienceHealing'
 
 /** Orange wireframe — mid progress while shooting a panel. */
 const AIM_ORANGE = 0xfb923c
@@ -263,7 +264,10 @@ export class SatelliteRepairController {
    */
   private applyScienceHit(c: DamagedComponent): void {
     if (!this.cfg || c.fading) return
-    c.scienceHitsRemaining = Math.max(0, c.scienceHitsRemaining - 1)
+    // Read on each impact so installing `multitoolScience` mid-mission
+    // ramps repair speed immediately. Uses the doubled "healing
+    // equipment" curve shared with the station power-gen repair.
+    c.scienceHitsRemaining = Math.max(0, c.scienceHitsRemaining - getScienceHealingMultiplier())
     if (c.scienceHitsRemaining > 0) {
       this.setWireframeProgressColor(c.wireframe, c.scienceHitsRemaining)
       return

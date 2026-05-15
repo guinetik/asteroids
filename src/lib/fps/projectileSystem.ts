@@ -193,6 +193,10 @@ export class ProjectileSystem implements Tickable {
   private readonly rocks: MineableRockEntry[] = []
   private readonly danParticles: DanParticleEntry[] = []
   private terrainCollisionEnabled = true
+  /** Length scale applied to each spawned bolt mesh. `1` = native `BOLT_LENGTH`. */
+  private boltLengthScale = 1
+  /** Width scale applied to each spawned bolt mesh. `1` = native `BOLT_WIDTH`. */
+  private boltWidthScale = 1
   private lander: LanderController | null = null
   private mapEvaShuttleHullHeal: MapEvaShuttleHullHealTarget | null = null
   /** Map EVA satellite-servicing minigame — science bolts repair rigged sub-objects. */
@@ -335,6 +339,31 @@ export class ProjectileSystem implements Tickable {
   /** Register an enemy for projectile collision checks. */
   addEnemy(enemy: Enemy): void {
     this.enemies.push(enemy)
+  }
+
+  /**
+   * Override the visual scale applied to every spawned bolt mesh. The
+   * underlying `CylinderGeometry` is fixed (`BOLT_LENGTH` × `BOLT_WIDTH`)
+   * so bolts share one geometry across modes; this method just scales
+   * each pooled mesh in-place. Collision is unaffected — it's a moving
+   * point test, not a swept volume — so changing this only adjusts what
+   * the player sees.
+   *
+   * Use a smaller scale inside the station to keep the beam from
+   * spanning multiple props in a tight room: a length 6× a fuel cell
+   * misleads the player into thinking they grazed nearby cells when
+   * the point collision actually only consumed the one they aimed at.
+   *
+   * @param lengthScale - Multiplier on the bolt's cylindrical length.
+   * @param widthScale - Multiplier on the bolt's cylindrical radius.
+   */
+  setBoltVisualScale(lengthScale: number, widthScale: number): void {
+    this.boltLengthScale = lengthScale
+    this.boltWidthScale = widthScale
+    // Apply to any already-pooled or in-flight meshes so the change
+    // takes effect immediately without waiting for the next spawn.
+    for (const p of this.projectiles) p.mesh.scale.set(widthScale, widthScale, lengthScale)
+    for (const p of this.pool) p.mesh.scale.set(widthScale, widthScale, lengthScale)
   }
 
   /**
@@ -522,6 +551,7 @@ export class ProjectileSystem implements Tickable {
     const material = projectile.material
 
     mesh.position.copy(origin)
+    mesh.scale.set(this.boltWidthScale, this.boltWidthScale, this.boltLengthScale)
     mesh.lookAt(this._lookTarget.copy(origin).add(direction))
     material.uniforms['uColor']!.value.copy(color)
     material.uniforms['uTime']!.value = 0
