@@ -85,7 +85,8 @@
             "event": "terminal:use:r-terminal"
           }
         }
-      ]
+      ],
+      "rewards": [{ "type": "tradeable", "qtyMin": 5, "qtyMax": 10 }]
     },
     {
       "id": "r-microwave",
@@ -117,7 +118,8 @@
             "event": "terminal:use:r-microwave"
           }
         }
-      ]
+      ],
+      "rewards": [{ "type": "tradeable", "qtyMin": 5, "qtyMax": 10 }]
     },
     {
       "id": "r-vault",

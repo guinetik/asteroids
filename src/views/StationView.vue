@@ -301,9 +301,19 @@ function dropBuff(itemId: string): void {
   buffs.value = buffs.value.filter((b) => b.itemId !== itemId)
 }
 
+/** Seconds the peek terminal in r-terminal keeps the hazard map on-screen. */
+const MAZE_PEEK_DURATION_S = 20
+
 controller.onInteract = (event) => {
   if (event === 'station:exit') {
     void router.push('/')
+    return
+  }
+  if (event === 'terminal:use:r-terminal') {
+    // Peek terminal — repeatable, doesn't consume. Shows the microwave
+    // room's tile layout on the screen for ~20s so the player can
+    // memorise the safe path before crossing.
+    controller.peekMazeOnTerminal(event, 'r-microwave', MAZE_PEEK_DURATION_S)
     return
   }
   if (event === 'terminal:use:r-microwave') {
@@ -403,7 +413,7 @@ function onPointerDown(): void {
     :key-label="parsedPrompt.key"
     :action="parsedPrompt.label"
     tone="cyan"
-    position="bottom-mid"
+    position="bottom"
   />
   <FpsHud :telemetry="fpsTelemetry" variant="station" hide-movement-readout />
   <DamageFeedback :flash-opacity="damageFlash" :intensity="1.8" />
@@ -480,7 +490,7 @@ function onPointerDown(): void {
 .station-chest-preview {
   position: fixed;
   left: 50%;
-  bottom: 18%;
+  bottom: 26%;
   transform: translateX(-50%);
   display: inline-flex;
   align-items: center;

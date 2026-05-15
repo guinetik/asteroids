@@ -25,6 +25,27 @@ export interface Tile {
 }
 
 /**
+ * Plain-data snapshot of the planner's output for one hazard room.
+ * Surfaces enough info for the peek-terminal puzzle to render the
+ * room's tile layout from a UI / canvas layer without round-tripping
+ * back into the builder.
+ */
+export interface MazeMap {
+  /** Source room id (e.g. `'r-microwave'`). */
+  roomId: string
+  /** Grid width in tiles. */
+  width: number
+  /** Grid depth in tiles. */
+  depth: number
+  /** `"col:row"` keys of every safe tile (entrance, path, target). */
+  safeTileKeys: Set<string>
+  /** Entrance tiles (one per entrance) — drawn with a distinct accent. */
+  entranceTiles: Tile[]
+  /** Target tile (terminal / keycard kiosk) — `null` when none was rolled. */
+  targetTile: Tile | null
+}
+
+/**
  * Plan a winding safe-tile path between two tiles in a `width × depth`
  * grid. Walks the grid with randomized DFS, succeeding the first time
  * the target is reached with a path length inside the requested

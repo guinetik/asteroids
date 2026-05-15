@@ -20,7 +20,7 @@ import {
   type Material,
   type ShaderMaterial,
 } from 'three'
-import { generateSafePath, type Tile } from '@/lib/station/safePath'
+import { generateSafePath, type MazeMap, type Tile } from '@/lib/station/safePath'
 import { createTronHologramMaterial } from '@/three/tronHologramMaterial'
 import { loadGLB } from '@/three/loadGLB'
 import { buildStationRoom, type StationRoom } from '@/three/StationRoomBuilder'
@@ -188,6 +188,12 @@ export interface BuiltStation {
    * scan bands and grid scroll animate.
    */
   hologramMaterials: ShaderMaterial[]
+  /**
+   * Procedurally planned tile maps for every hazard room. Keyed by
+   * `RoomSpec.id`. Used by the peek-terminal puzzle to render the path
+   * the player must memorise before crossing the lava floor.
+   */
+  mazeMaps: Map<string, MazeMap>
 }
 
 /** A hazardous floor rectangle the controller polls each tick. */
@@ -197,11 +203,18 @@ export interface StationHazard {
   /** World-space XZ rectangle the player must avoid. */
   rect: StationRect
   /**
-   * Optional emissive marker the controller can flip visible when the
-   * player is standing on this tile. Hidden by default so a quiet room
-   * doesn't show every lava tile glowing at once.
+   * Red "you stepped on lava" marker. Hidden by default; the controller
+   * flips it visible while the player's footprint sits on this tile.
    */
   marker: Mesh | null
+  /**
+   * Blue "secure floor" marker. Always visible — gives the player a
+   * uniform floor texture so the lava layout isn't obvious until they
+   * misstep. Paired with {@link marker}: when the red marker shows the
+   * blue one hides, so the two additive materials don't blend into a
+   * muddy purple.
+   */
+  secureMarker: Mesh | null
 }
 
 /**
@@ -524,12 +537,6 @@ const SAFE_PATH_MIN_LENGTH = 5
  */
 const SAFE_PATH_MAX_FRACTION = 0.75
 
-/**
- * Toggle the blue-emissive debug visualisation of safe tiles. Flip to
- * `false` once playtesting is done; the rest of the system (per-tile
- * hazards, path planning) keeps working unchanged.
- */
-const DEBUG_SHOW_SAFE_PATH = true
 /** Per-tile-square inset so adjacent overlays don't z-fight at their seam. */
 const SAFE_PATH_DEBUG_INSET = 0.04
 /** Y offset above the floor for the debug plane. */
@@ -667,18 +674,18 @@ function addLavaTileGlowMarker(
   })
   const mesh = new Mesh(new PlaneGeometry(size, size), material)
   mesh.rotation.x = -Math.PI / 2
-  mesh.position.set(lx, STATION_FLOOR_Y + SAFE_PATH_DEBUG_Y_OFFSET, lz)
+  mesh.position.set(lx, STATION_FLOOR_Y + SAFE_PATH_DEBUG_Y_OFFSET + 0.006, lz)
   mesh.visible = false
   mesh.name = `lava-tile:${tile.col}:${tile.row}`
   wrapper.add(mesh)
   return { mesh, material }
 }
 
-function addSafeTileDebugMarker(
+function addSecureTileMarker(
   wrapper: Group,
   room: RoomSpec,
   tile: Tile,
-): ShaderMaterial {
+): { mesh: Mesh; material: ShaderMaterial } {
   const [lx, lz] = tileLocalPos(room, tile)
   const size = ROOM_TILE_SIZE - SAFE_PATH_DEBUG_INSET * 2
   const material = createTronHologramMaterial({
@@ -691,9 +698,9 @@ function addSafeTileDebugMarker(
   const mesh = new Mesh(new PlaneGeometry(size, size), material)
   mesh.rotation.x = -Math.PI / 2
   mesh.position.set(lx, STATION_FLOOR_Y + SAFE_PATH_DEBUG_Y_OFFSET, lz)
-  mesh.name = `safe-tile:${tile.col}:${tile.row}`
+  mesh.name = `secure-tile:${tile.col}:${tile.row}`
   wrapper.add(mesh)
-  return material
+  return { mesh, material }
 }
 
 /**
@@ -744,6 +751,7 @@ export async function buildStation(layout: StationLayout): Promise<BuiltStation>
   const interactors: PropInteractor[] = []
   const hazards: StationHazard[] = []
   const hologramMaterials: ShaderMaterial[] = []
+  const mazeMaps = new Map<string, MazeMap>()
   const passages = buildPassages(layout)
 
   // Rooms — reuse the existing parametric builder, then wrap in a
@@ -867,31 +875,46 @@ export async function buildStation(layout: StationLayout): Promise<BuiltStation>
           )
           for (const t of path) safeTileKeys.add(`${t.col}:${t.row}`)
         }
-        // Any other random-placement props in this room also need to be
-        // reachable, so add their tiles to the safe set.
-        for (const tile of randomTilesByPropIndex.values()) {
-          safeTileKeys.add(`${tile.col}:${tile.row}`)
-        }
+        // Any other random-placement prop or reward chest in this room
+        // also needs to be reachable, so add every claimed tile to the
+        // safe set. `claimedTiles` tracks both authored random props
+        // and synthesized reward chests, so this single loop covers
+        // them all.
+        for (const key of claimedTiles) safeTileKeys.add(key)
       }
 
+      // Every tile in a hazard room reads as a uniform blue "secure
+      // floor" — the lava layout isn't visible until the player steps
+      // wrong. Lava tiles get a red marker stacked on top of their
+      // blue one; the controller toggles them as a pair so the
+      // misstep flash isn't muddied by the underlying blue.
       for (let col = 0; col < room.width; col++) {
         for (let row = 0; row < room.depth; row++) {
           const key = `${col}:${row}`
-          if (safeTileKeys.has(key)) continue
           const tile = { col, row }
-          const lava = addLavaTileGlowMarker(wrapper, room, tile)
-          hologramMaterials.push(lava.material)
-          hazards.push({ kind: 'lava', rect: tileWorldRect(room, tile), marker: lava.mesh })
+          const secure = addSecureTileMarker(wrapper, room, tile)
+          hologramMaterials.push(secure.material)
+          if (!safeTileKeys.has(key)) {
+            const lava = addLavaTileGlowMarker(wrapper, room, tile)
+            hologramMaterials.push(lava.material)
+            hazards.push({
+              kind: 'lava',
+              rect: tileWorldRect(room, tile),
+              marker: lava.mesh,
+              secureMarker: secure.mesh,
+            })
+          }
         }
       }
 
-      if (DEBUG_SHOW_SAFE_PATH) {
-        for (const key of safeTileKeys) {
-          const [col, row] = key.split(':').map(Number) as [number, number]
-          const safeMat = addSafeTileDebugMarker(wrapper, room, { col, row })
-          hologramMaterials.push(safeMat)
-        }
-      }
+      mazeMaps.set(room.id, {
+        roomId: room.id,
+        width: room.width,
+        depth: room.depth,
+        safeTileKeys,
+        entranceTiles,
+        targetTile,
+      })
     }
   }
 
@@ -939,5 +962,6 @@ export async function buildStation(layout: StationLayout): Promise<BuiltStation>
     interactors,
     hazards,
     hologramMaterials,
+    mazeMaps,
   }
 }

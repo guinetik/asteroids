@@ -33,6 +33,8 @@ import { buildFpsPlayerConfig } from '@/lib/fps/buildFpsPlayerConfig'
 import { StationCollider, type StationRect } from '@/lib/station/StationCollider'
 import { buildStation, type BuiltStation, type PropInteractor } from '@/three/StationBuilder'
 import { computeDeathPresentationState, stepDamageFlash } from '@/lib/fps/fpsPresentation'
+import { drawMazeCanvas } from '@/views/stationMazeCanvas'
+import { getCurrentUpgradeValue } from '@/lib/upgrades'
 import {
   syncTronHologramTimeSeconds,
   disposeTronHologramMaterials,
@@ -99,10 +101,17 @@ const STATION_SPRINT_FOOTSTEP_INTERVAL = 0.46
 /**
  * Per-second passive O2 drain inside a derelict station. The base FPS
  * config tunes this for outdoor EVA (0.2/s → ~8 min run). Derelicts are
- * meant to feel like a hostile leak — bump it so the player can watch
- * the bar fall and feel pressure to leave / find a regen point.
+ * meant to feel like a hostile leak — bumped above the outdoor rate so
+ * the player can watch the bar fall and feel pressure to leave / find
+ * a regen point. Halved from the original 1.5 because the procgen
+ * puzzle adds dwell time the original test floor didn't have.
+ *
+ * The `suitO2Capacity` upgrade flows through twice: once via
+ * {@link buildFpsPlayerConfig} (bigger tank), and again here (we scale
+ * the drain down by the upgrade), so investing in O2 pays double
+ * dividends in hazard rooms.
  */
-const STATION_O2_DRAIN_PER_SECOND = 1.5
+const STATION_O2_DRAIN_PER_SECOND = 0.75
 /** Lerp factor per second for turning the camera toward an interacted station door. */
 const DOOR_CAMERA_TURN_RATE = 6
 /** Seconds the door-look sequence owns camera yaw/pitch after F is pressed. */
@@ -189,6 +198,12 @@ export class StationViewController implements Tickable {
   private exteriorSunTime = 0
   /** Sim time accumulated for the TRON hologram tile markers. */
   private hologramTime = 0
+  /** Seconds left before the active peek-terminal map clears. `0` = idle. */
+  private mazePeekRemaining = 0
+  /** Interactor event id whose terminal is currently displaying a map. */
+  private mazePeekTerminalEvent: string | null = null
+  /** Lazily-created canvas reused across map peeks (one per controller). */
+  private mazePeekCanvas: HTMLCanvasElement | null = null
   /**
    * Audio director constructed with the `'habitat'` footstep surface so
    * step recipes + cadence match the `/habitat` scene's hard-floor feel.
@@ -268,7 +283,8 @@ export class StationViewController implements Tickable {
       maxSpeed: config.movement.maxSpeed * STATION_MOVEMENT_SPEED_SCALE,
       maxSprintSpeed: config.movement.maxSprintSpeed * STATION_MOVEMENT_SPEED_SCALE,
     }
-    config.o2 = { ...config.o2, baseDrainRate: STATION_O2_DRAIN_PER_SECOND }
+    const o2Upgrade = Math.max(1e-3, getCurrentUpgradeValue('suitO2Capacity'))
+    config.o2 = { ...config.o2, baseDrainRate: STATION_O2_DRAIN_PER_SECOND / o2Upgrade }
 
     // Merge FPS movement (WASD + jump + sprint + tools) with habitat's
     // F-key interact binding so the entrance prompt can fire.
@@ -334,6 +350,7 @@ export class StationViewController implements Tickable {
       this.fpsAudio.stop()
       this.stationAudio.stopHazard()
       this.inHazardThisFrame = false
+      this.clearMazePeek()
       this.onPlayerDeath?.()
     }
     this.playerController.group.position.copy(this.spawnPos)
@@ -377,6 +394,7 @@ export class StationViewController implements Tickable {
     this.tickDoorLookSequence(dt)
     this.tickExteriorSun(dt)
     this.tickHologramMaterials(dt)
+    this.tickMazePeek(dt)
     this.tickHazards(dt)
     this.tickPassiveDamage(dt)
     this.tickDamageFlash(dt)
@@ -743,8 +761,12 @@ export class StationViewController implements Tickable {
       break
     }
     for (const hazard of this.station.hazards) {
-      if (!hazard.marker) continue
-      hazard.marker.visible = hazard.marker === activeMarker
+      const isActive = hazard.marker !== null && hazard.marker === activeMarker
+      if (hazard.marker) hazard.marker.visible = isActive
+      // Hide the blue secure overlay on the tile the player is
+      // currently burning on so the red flash isn't muddied by the
+      // underlying additive blue layer.
+      if (hazard.secureMarker) hazard.secureMarker.visible = !isActive
     }
     this.inHazardThisFrame = inHazard
   }
@@ -756,11 +778,55 @@ export class StationViewController implements Tickable {
     syncTronHologramTimeSeconds(this.station.hologramMaterials, this.hologramTime)
   }
 
+  /**
+   * Show the planned tile layout for `mazeRoomId` on the prop that owns
+   * `terminalEvent`. The map stays visible for `durationS` seconds then
+   * clears automatically. Re-calling while a peek is active resets the
+   * timer so the player can hold the interact key to keep looking.
+   *
+   * No-op when the interactor or maze map can't be resolved — that's
+   * the safe default for authoring typos (the F prompt still fires its
+   * event, the puzzle just doesn't display).
+   *
+   * @param terminalEvent - Event id of the peek terminal's interactor.
+   * @param mazeRoomId - Room id whose `MazeMap` should be rendered.
+   * @param durationS - Seconds the map remains visible.
+   */
+  peekMazeOnTerminal(terminalEvent: string, mazeRoomId: string, durationS: number): void {
+    if (!this.station) return
+    const interactor = this.findInteractorByEvent(terminalEvent)
+    if (!interactor || !interactor.prop.showMap) return
+    const maze = this.station.mazeMaps.get(mazeRoomId)
+    if (!maze) return
+    if (!this.mazePeekCanvas) this.mazePeekCanvas = document.createElement('canvas')
+    drawMazeCanvas(this.mazePeekCanvas, maze)
+    interactor.prop.showMap(this.mazePeekCanvas)
+    this.mazePeekTerminalEvent = terminalEvent
+    this.mazePeekRemaining = durationS
+  }
+
+  /** Force-clear any active maze peek (death, view dispose, etc.). */
+  private clearMazePeek(): void {
+    if (!this.mazePeekTerminalEvent) return
+    const interactor = this.findInteractorByEvent(this.mazePeekTerminalEvent)
+    interactor?.prop.hideMap?.()
+    this.mazePeekTerminalEvent = null
+    this.mazePeekRemaining = 0
+  }
+
+  /** Count down the active map peek and clear it when the timer runs out. */
+  private tickMazePeek(dt: number): void {
+    if (!this.mazePeekTerminalEvent || this.mazePeekRemaining <= 0) return
+    this.mazePeekRemaining -= dt
+    if (this.mazePeekRemaining <= 0) this.clearMazePeek()
+  }
+
   /** Force every lava-tile glow marker off (used on death). */
   private hideAllHazardMarkers(): void {
     if (!this.station) return
     for (const hazard of this.station.hazards) {
       if (hazard.marker) hazard.marker.visible = false
+      if (hazard.secureMarker) hazard.secureMarker.visible = true
     }
   }
 
@@ -833,6 +899,7 @@ export class StationViewController implements Tickable {
     this.lastHp = null
     this.stationAudio.stopHazard()
     this.inHazardThisFrame = false
+    this.clearMazePeek()
     // Bring breathing + footstep loops back online for the new run.
     this.fpsAudio.start()
     this.onDamageFlash?.(0)

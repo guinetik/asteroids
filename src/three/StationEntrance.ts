@@ -199,9 +199,17 @@ export class StationEntrance {
     return this.phase !== 'idle'
   }
 
-  /** True when the gameplay collider should allow passage through the door hole. */
+  /**
+   * True when the gameplay collider should allow passage through the
+   * door hole. Includes `'opening'` (not just fully-open) so the
+   * player isn't bumped against the closed blocker for the ~1.1s the
+   * hinge takes to swing — pressing F and stepping forward should
+   * read as a single continuous motion, not "press F, wait, step".
+   * The visual delay constants (`DOOR_OPEN_DELAY` etc.) still play
+   * out for SFX + camera; only collision opens early.
+   */
   get isPassable(): boolean {
-    return this.phase === 'open' || this.phase === 'closing'
+    return this.phase === 'opening' || this.phase === 'open' || this.phase === 'closing'
   }
 
   /**

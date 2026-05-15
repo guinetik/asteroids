@@ -81,6 +81,12 @@ const STATUS_STRIP_FRONT_OFFSET = 0.07
 /** Cycling glyph offset in front of the emissive screen plane. */
 const GLYPH_FRONT_OFFSET = 0.12
 
+/**
+ * Diegetic UI plane offset in front of the emissive screen — sits just
+ * ahead of the glyph plane so the canvas occludes them while shown.
+ */
+const MAP_PLANE_FRONT_OFFSET = 0.14
+
 /** Outer radius of the central terminal glyph. */
 const GLYPH_OUTER_RADIUS = 0.92
 
@@ -289,6 +295,10 @@ export class TerminalModel {
   private glyphIndex = 0
   /** The emissive screen panel mesh — used by {@link setScreenEmissive}. */
   private readonly screenMesh: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshStandardMaterial>
+  /** Optional canvas-textured plane mounted on the screen for diegetic UI. */
+  private mapPlane: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial> | null = null
+  /** Texture wrapping the {@link mapPlane}'s canvas source, refreshed on show. */
+  private mapTexture: THREE.CanvasTexture | null = null
 
   /** World-space position of this terminal. */
   get position(): THREE.Vector3 {
@@ -468,6 +478,55 @@ export class TerminalModel {
       }),
       enabled: () => this.group.visible,
     }
+  }
+
+  /**
+   * Mount a `<canvas>` as a textured plane in front of the terminal's
+   * emissive screen. Used by the station puzzle pipeline to show the
+   * hazard-room layout on the peek terminal.
+   *
+   * Idempotent — subsequent calls swap the canvas behind the same plane
+   * and force-update the underlying texture so the plane visually
+   * refreshes without a teardown / re-add. Hides the rotating glyphs
+   * while a map is active so they don't clash with the diegetic UI.
+   *
+   * @param canvas - Pre-drawn canvas source. Caller owns its lifetime;
+   *   the terminal does not retain a reference past disposal.
+   */
+  showMapTexture(canvas: HTMLCanvasElement): void {
+    if (!this.mapPlane || !this.mapTexture) {
+      const texture = new THREE.CanvasTexture(canvas)
+      texture.colorSpace = THREE.SRGBColorSpace
+      texture.minFilter = THREE.LinearFilter
+      texture.magFilter = THREE.LinearFilter
+      const mat = new THREE.MeshBasicMaterial({
+        map: texture,
+        transparent: true,
+        toneMapped: false,
+      })
+      const geo = new THREE.PlaneGeometry(SCREEN_WIDTH, SCREEN_HEIGHT)
+      const plane = new THREE.Mesh(geo, mat)
+      plane.name = 'survey-terminal-map-plane'
+      const pos = this.screenMesh.position
+      plane.position.set(pos.x, pos.y, pos.z + MAP_PLANE_FRONT_OFFSET)
+      this.group.add(plane)
+      this.mapPlane = plane
+      this.mapTexture = texture
+    } else {
+      this.mapTexture.image = canvas
+      this.mapTexture.needsUpdate = true
+      this.mapPlane.visible = true
+    }
+    this.glyph.visible = false
+  }
+
+  /**
+   * Hide the map overlay and restore the rotating glyphs. Safe to call
+   * even when no map is currently mounted.
+   */
+  hideMapTexture(): void {
+    if (this.mapPlane) this.mapPlane.visible = false
+    this.glyph.visible = true
   }
 
   /**

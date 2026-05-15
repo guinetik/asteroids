@@ -95,6 +95,13 @@ export interface StationPropInstance {
    * fired with a warning step, etc.
    */
   setStatus?: (status: PropStatus) => void
+  /**
+   * Optional diegetic-UI hook: mount the given `<canvas>` as a texture
+   * on the prop's screen (terminal). No-op for props without a screen.
+   */
+  showMap?: (canvas: HTMLCanvasElement) => void
+  /** Companion to {@link showMap} — hide / restore the prop's idle screen. */
+  hideMap?: () => void
 }
 
 /**
@@ -119,6 +126,8 @@ export function createStationProp(kind: string): StationPropInstance {
           halfZ: TERMINAL_BASE_DEPTH / 2,
         },
         setStatus: (status) => model.setScreenEmissive(TERMINAL_STATUS_COLOR[status]),
+        showMap: (canvas) => model.showMapTexture(canvas),
+        hideMap: () => model.hideMapTexture(),
       }
     }
     case 'chest': {
