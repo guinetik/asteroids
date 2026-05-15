@@ -25,6 +25,16 @@ const DEFAULT_STATION_ID = 'yamada-titania'
 /** Pickup toast lifetime — long enough to register without lingering. */
 const PICKUP_LIFETIME_SEC = 2.4
 
+/**
+ * Vault door's locked-state prompt while the player has no keycard.
+ * Mirrors the JSON spec — duplicated here so we can restore it on
+ * death (which forfeits the keycard) without re-reading the layout.
+ */
+const VAULT_PROMPT_NO_KEYCARD = 'VAULT LOCKED  ·  KEYCARD REQUIRED'
+
+/** Vault door's locked-state prompt once the keycard has been picked up. */
+const VAULT_PROMPT_HAS_KEYCARD = 'F  Unlock Vault'
+
 const container = ref<HTMLElement | null>(null)
 const controller = new StationViewController()
 const route = useRoute()
@@ -257,6 +267,10 @@ function handleRestart(): void {
   deathFade.value = 0
   damageFlash.value = 0
   controller.resetInteractor('terminal:use:r-microwave')
+  // Death forfeits the keycard, so the vault door must reflect that —
+  // otherwise it keeps offering "F  Unlock Vault" with nothing to spend.
+  const vault = controller.findEntrance('enter:r-vault')
+  if (vault) vault.lockedPrompt = VAULT_PROMPT_NO_KEYCARD
   controller.restart()
 }
 
@@ -326,7 +340,7 @@ controller.onInteract = (event) => {
     // Swap the vault door's locked prompt so the player sees an unlock
     // affordance the next time they approach it.
     const vault = controller.findEntrance('enter:r-vault')
-    if (vault) vault.lockedPrompt = 'F  Unlock Vault'
+    if (vault) vault.lockedPrompt = VAULT_PROMPT_HAS_KEYCARD
     return
   }
   if (event === 'enter:r-vault' && hasVaultKeycard.value) {
