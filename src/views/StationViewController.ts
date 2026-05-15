@@ -18,6 +18,7 @@ import { ProjectileSystem } from '@/lib/fps/projectileSystem'
 import { buildMultiToolConfig } from '@/lib/fps/buildMultiToolConfig'
 import { ParticleEmitter } from '@/three/ParticleEmitter'
 import { WallImpactDecalPool } from '@/three/WallImpactDecalPool'
+import { StationTurretDirector } from '@/three/StationTurretDirector'
 import type { MultiToolMode } from '@/lib/fps/multiToolState'
 import { DevConsole } from '@/lib/devConsole'
 import { GameLoop } from '@/lib/GameLoop'
@@ -41,7 +42,12 @@ import { StationCollider, type StationRect } from '@/lib/station/StationCollider
 import { buildStation, type BuiltStation, type PropInteractor } from '@/three/StationBuilder'
 import { computeDeathPresentationState, stepDamageFlash } from '@/lib/fps/fpsPresentation'
 import { drawMazeCanvas } from '@/views/stationMazeCanvas'
-import { drawPowerGenStatusCanvas } from '@/views/stationPowerGenCanvas'
+import {
+  drawPowerGenPuzzleCanvas,
+  drawPowerGenStatusCanvas,
+  drawPowerGenTutorialCanvas,
+} from '@/views/stationPowerGenCanvas'
+import type { PowerGenPuzzleState } from '@/three/StationPowerGenModel'
 import { getCurrentUpgradeValue } from '@/lib/upgrades'
 import {
   syncTronHologramTimeSeconds,
@@ -97,14 +103,6 @@ const POWER_GATE_LOCKED_PROMPT = 'POWER OFFLINE  ·  RESTORE GENERATOR'
 
 /** Event id of the diagnostics terminal that mirrors the powergen status. */
 const POWER_DIAGNOSTICS_TERMINAL_EVENT = 'terminal:use:r-power'
-
-/**
- * Seconds between diagnostics terminal repaints. The canvas paint is
- * cheap (a few rects + text) but updating the `CanvasTexture` every
- * frame is wasted GPU bandwidth — quarter-second cadence is well below
- * perceptible latency and keeps the texture upload pipeline quiet.
- */
-const POWER_DIAGNOSTICS_REPAINT_INTERVAL = 0.25
 
 /**
  * Multitool bolt-length multiplier inside the station. The default
@@ -268,6 +266,8 @@ export class StationViewController implements Tickable {
   private impactEmitter: ParticleEmitter | null = null
   /** Wall-aligned glow decals stamped at each projectile impact. */
   private wallImpactDecals: WallImpactDecalPool | null = null
+  /** Coordinates ceiling turrets + enemy projectiles + alarm SFX. */
+  private turretDirector: StationTurretDirector | null = null
   /** Ambient fill — brightens once station power is restored. */
   private ambientLight: AmbientLight | null = null
   /** Directional fill — brightens once station power is restored. */
@@ -288,6 +288,19 @@ export class StationViewController implements Tickable {
     terminalEvent: string
     /** Seconds since the last repaint, accumulated by the tick loop. */
     sinceRepaint: number
+    /**
+     * Which screen the terminal is showing. `tutorial` before the player
+     * confirms the emergency-restart prompt, `puzzle` once the minigame
+     * has been engaged (and on subsequent retries after a wrong-shot
+     * purge).
+     */
+    stage: 'tutorial' | 'puzzle'
+    /** Flip the host powergen model into its live repair state. */
+    start: () => void
+    /** Latest puzzle snapshot — sourced from the powergen model. */
+    puzzleState: PowerGenPuzzleState | null
+    /** Latest cell progress — kept for legacy status-canvas fallbacks. */
+    getPuzzleState: () => PowerGenPuzzleState | null
   } | null = null
   /** Reused upward velocity scratch for impact-emitter spawns. */
   private readonly _impactUp = new Vector3(0, 1, 0)
@@ -524,6 +537,21 @@ export class StationViewController implements Tickable {
       this.bindPowerDiagnosticsTerminal(prop.scienceRepair)
     }
 
+    // Ceiling turrets: spawn at door corners, register their enemies
+    // with the player's bolt system, and route their dart-on-player
+    // hits to the existing damage flash + HP-loss pipeline.
+    this.turretDirector = new StationTurretDirector(this.sceneManager.scene, (enemy) =>
+      this.projectileSystem!.addEnemy(enemy),
+    )
+    this.turretDirector.setOnPlayerHit((damage) => {
+      this.playerController?.takeDamage(damage)
+      this.damageFlashTimer = DAMAGE_FLASH_DURATION
+    })
+    this.turretDirector.setCollider(this.stationCollider)
+    this.turretDirector.populateFromEntrances(this.station.entrances, STATION_CEILING_Y, {
+      spawnXZ: { x: this.spawnPos.x, z: this.spawnPos.z },
+    })
+
     // Tick order.
     this.tickHandler.register(this.playerController, TICK_PRIORITY_PHYSICS)
     this.tickHandler.register(this.multiToolState, TICK_PRIORITY_PHYSICS + 1)
@@ -572,6 +600,7 @@ export class StationViewController implements Tickable {
     this.tickDeathPresentation(dt)
     this.tickMultiTool()
     this.tickPowerDiagnostics(dt)
+    this.tickTurrets(dt)
     this.emitFpsTelemetry()
 
     // Realised speed = actual displacement / dt. Using this instead of
@@ -835,6 +864,7 @@ export class StationViewController implements Tickable {
     if (diag) {
       const interactor = this.findInteractorByEvent(diag.terminalEvent)
       interactor?.prop.setStatus?.('success')
+      diag.puzzleState = diag.getPuzzleState()
       this.repaintPowerDiagnostics()
     }
   }
@@ -849,6 +879,9 @@ export class StationViewController implements Tickable {
    */
   private bindPowerDiagnosticsTerminal(scienceRepair: {
     getComponentProgress: () => Array<{ index: number; progress: number }>
+    start: () => void
+    getPuzzleState: () => PowerGenPuzzleState | null
+    onPuzzleStateChanged: (cb: () => void) => void
   }): void {
     if (!this.station) return
     const interactor = this.findInteractorByEvent(POWER_DIAGNOSTICS_TERMINAL_EVENT)
@@ -859,7 +892,44 @@ export class StationViewController implements Tickable {
       canvas,
       terminalEvent: POWER_DIAGNOSTICS_TERMINAL_EVENT,
       sinceRepaint: 0,
+      stage: 'tutorial',
+      start: scienceRepair.start,
+      puzzleState: scienceRepair.getPuzzleState(),
+      getPuzzleState: scienceRepair.getPuzzleState.bind(scienceRepair),
     }
+    scienceRepair.onPuzzleStateChanged(() => {
+      const diag = this.powerDiagnostics
+      if (!diag) return
+      diag.puzzleState = diag.getPuzzleState()
+      // A wrong-shot purge wipes the lattice; return the screen to the
+      // tutorial frame so the player reads the procedure again and
+      // re-engages the terminal to redraft a sequence.
+      if (diag.puzzleState?.resetPending) {
+        diag.stage = 'tutorial'
+      }
+      this.repaintPowerDiagnostics()
+    })
+    this.repaintPowerDiagnostics()
+  }
+
+  /**
+   * Advance the diagnostics terminal from its tutorial frame into the
+   * live repair screen and start the underlying powergen minigame so
+   * SCI bolts begin charging fuel cells. Fires when the player presses
+   * F on the r-power terminal. Idempotent once already live; no-op if
+   * the terminal isn't in the layout.
+   */
+  beginPowerGenMinigame(): void {
+    const diag = this.powerDiagnostics
+    if (!diag) return
+    // `start()` is idempotent while active; on a wrong-shot purge it
+    // drafts a fresh sequence and re-shows the wireframes. Stage stays
+    // on `puzzle` either way so the canvas keeps painting the ignition
+    // panel rather than reverting to the tutorial.
+    diag.stage = 'puzzle'
+    diag.sinceRepaint = 0
+    diag.start()
+    diag.puzzleState = diag.getPuzzleState()
     this.repaintPowerDiagnostics()
   }
 
@@ -871,8 +941,17 @@ export class StationViewController implements Tickable {
   private repaintPowerDiagnostics(): void {
     const diag = this.powerDiagnostics
     if (!diag) return
-    const cells = diag.source.getComponentProgress()
-    drawPowerGenStatusCanvas(diag.canvas, cells, this.stationPowerRestored)
+    if (diag.stage === 'tutorial') {
+      drawPowerGenTutorialCanvas(diag.canvas)
+    } else if (diag.puzzleState) {
+      drawPowerGenPuzzleCanvas(diag.canvas, diag.puzzleState)
+    } else {
+      // Fallback for legacy callers — the status canvas is no longer the
+      // primary surface but stays available so existing wiring still
+      // renders something readable if the puzzle state is missing.
+      const cells = diag.source.getComponentProgress()
+      drawPowerGenStatusCanvas(diag.canvas, cells, this.stationPowerRestored)
+    }
     const interactor = this.findInteractorByEvent(diag.terminalEvent)
     interactor?.prop.showMap?.(diag.canvas)
   }
@@ -885,12 +964,26 @@ export class StationViewController implements Tickable {
    *
    * @param dt - Frame delta in seconds.
    */
-  private tickPowerDiagnostics(dt: number): void {
-    if (!this.powerDiagnostics || this.stationPowerRestored) return
-    this.powerDiagnostics.sinceRepaint += dt
-    if (this.powerDiagnostics.sinceRepaint < POWER_DIAGNOSTICS_REPAINT_INTERVAL) return
-    this.powerDiagnostics.sinceRepaint = 0
-    this.repaintPowerDiagnostics()
+  /**
+   * Per-frame turret update. Reads the player position and forwards to
+   * the director, which ticks every turret + the enemy projectile sim.
+   * No-op when the level has no turrets (director is `null` until
+   * `init()` finishes).
+   *
+   * @param dt - Frame delta in seconds.
+   */
+  private tickTurrets(dt: number): void {
+    if (!this.turretDirector || !this.playerController) return
+    if (this.playerController.isDead) return
+    const pos = this.playerController.group.position
+    this.turretDirector.tick(dt, pos.x, pos.y, pos.z)
+  }
+
+  private tickPowerDiagnostics(_dt: number): void {
+    // No-op: every frame the puzzle/tutorial canvas might need is
+    // already pushed by {@link onPuzzleStateChanged} or
+    // {@link beginPowerGenMinigame}. Kept as a hook in case future
+    // animations on the screen need per-frame redraws.
   }
 
   /**
@@ -1299,6 +1392,7 @@ export class StationViewController implements Tickable {
     this.projectileSystem?.dispose()
     this.impactEmitter?.dispose()
     this.wallImpactDecals?.dispose()
+    this.turretDirector?.dispose()
     this.multiTool?.dispose()
     this.playerController?.dispose()
     this.fpsCamera?.dispose()

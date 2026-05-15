@@ -174,6 +174,23 @@ export interface StationPropInstance {
      * frame.
      */
     getComponentProgress: () => Array<{ index: number; progress: number }>
+    /**
+     * Reveal the per-component repair affordance (wireframe overlays)
+     * and start accepting SCI bolt hits. Called by the host view when
+     * the player confirms the diagnostics-terminal tutorial. Idempotent.
+     */
+    start: () => void
+    /**
+     * Latest puzzle snapshot used by the diagnostics-terminal canvas.
+     * Returns `null` for components that don't expose a puzzle layer.
+     */
+    getPuzzleState: () => import('@/three/StationPowerGenModel').PowerGenPuzzleState | null
+    /**
+     * Register a callback that fires whenever the puzzle state changes
+     * (start, charge progress, wrong-shot purge). Host views repaint
+     * the terminal canvas on each notification.
+     */
+    onPuzzleStateChanged: (cb: () => void) => void
   }
 }
 
@@ -242,6 +259,11 @@ export function createStationProp(kind: string): StationPropInstance {
             model.onPowerRestored = cb
           },
           getComponentProgress: () => model.getCellProgress(),
+          start: () => model.startMinigame(),
+          getPuzzleState: () => model.getPuzzleState(),
+          onPuzzleStateChanged: (cb) => {
+            model.onPuzzleStateChanged = cb
+          },
         },
       }
     }

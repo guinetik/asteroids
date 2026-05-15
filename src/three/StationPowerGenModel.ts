@@ -89,9 +89,9 @@ const SEGMENT_ENTRY_T_EPSILON = 1e-5
  * Total duration in seconds of the power-on shake. Short enough to read
  * as a startup kick rather than an ongoing rumble.
  */
-const POWER_ON_SHAKE_DURATION = 0.55
+const POWER_ON_SHAKE_DURATION = 0.75
 /** Peak lateral shake amplitude (metres) at t=0 of the shake. */
-const POWER_ON_SHAKE_AMPLITUDE_XZ = 0.035
+const POWER_ON_SHAKE_AMPLITUDE_XZ = 0.005
 /** Peak vertical shake amplitude (metres). Lower than lateral. */
 const POWER_ON_SHAKE_AMPLITUDE_Y = 0.005
 /** Shake oscillation frequency (Hz) — fast enough to read as a jolt. */
@@ -117,6 +117,29 @@ interface GlowMaterialState {
   originalMap: THREE.Texture | null
 }
 
+/**
+ * Which side of the generator a fuel cell sits on. `numbers` is the row
+ * closest to the door (player approach), `letters` is the far row. The
+ * puzzle UI shows the letter row on top, numbers on bottom — flipping
+ * spatial near/far into top/bottom on the diagnostic console.
+ */
+type FuelCellSide = 'numbers' | 'letters'
+
+/** Pixel size of the per-cell label canvas — drives perceived sharpness. */
+const LABEL_CANVAS_SIZE = 128
+/** Font used for the symbol on the label canvas. */
+const LABEL_FONT = 'bold 88px "Space Grotesk", "Segoe UI", monospace'
+/** Translucent dark fill behind the symbol so it reads against bright meshes. */
+const LABEL_BG_COLOR = 'rgba(8, 38, 32, 0.78)'
+/** Stroke colour around the label background. */
+const LABEL_STROKE_COLOR = '#fde68a'
+/** Symbol fill colour. */
+const LABEL_TEXT_COLOR = '#fde68a'
+/** Sprite scale applied at the cell's local space — multiplied by prop scale. */
+const LABEL_SPRITE_SCALE = 0.05
+/** Local-Y offset above the cell origin where the sprite floats. */
+const LABEL_HEIGHT_OFFSET = 0.05
+
 /** Per-cell repair state. */
 interface FuelCell {
   /** 1-based index matching the GLB node name (`fuel_<index>`). */
@@ -135,6 +158,42 @@ interface FuelCell {
   fading: boolean
   /** True once the green hold expired and the wireframe was removed. */
   restored: boolean
+  /** Which side of the generator this cell sits on (filled at load). */
+  side: FuelCellSide
+  /**
+   * Slot index `0..2` along that side, left-to-right when the player
+   * faces the generator from the door. Maps to the symbol on the UI:
+   * numbers row uses `slot + 1`, letters row uses `'ABC'[slot]`.
+   */
+  slot: number
+}
+
+/** Symbols rendered on the letters row of the puzzle UI, by slot index. */
+export const LETTER_SYMBOLS: ReadonlyArray<string> = ['A', 'B', 'C']
+
+/**
+ * Read-only puzzle-state snapshot used by the diagnostics terminal to
+ * paint the puzzle canvas. Slot indices are `0..2` and run left-to-right
+ * along each side; the canvas decodes them via {@link LETTER_SYMBOLS} or
+ * `slot + 1` for numbers.
+ */
+export interface PowerGenPuzzleState {
+  /** Ignition order for the letters row, in slot indices (perm of 0/1/2). */
+  letterOrder: ReadonlyArray<number>
+  /** Ignition order for the numbers row, in slot indices (perm of 0/1/2). */
+  numberOrder: ReadonlyArray<number>
+  /** Target diamond colour `#RRGGBB` derived from the letter/number pairs. */
+  hexColor: string
+  /** How many letters have been successfully charged in order (`0..3`). */
+  lettersCharged: number
+  /** How many numbers have been successfully charged in order (`0..3`). */
+  numbersCharged: number
+  /** True while the minigame is accepting SCI bolts. */
+  active: boolean
+  /** True after a wrong-shot purge — player must re-interact to redraft. */
+  resetPending: boolean
+  /** True once every cell is repaired and power is online. */
+  restored: boolean
 }
 
 /**
@@ -150,12 +209,61 @@ export class StationPowerGenModel {
   onFuelCellRepaired: ((index: number) => void) | null = null
   /** Fires once when every fuel cell is repaired. */
   onPowerRestored: (() => void) | null = null
+  /**
+   * Fires whenever the puzzle state changes: minigame start (sequence
+   * drafted), cell progress advances, or a wrong-shot triggers a purge
+   * reset. The host view repaints the diagnostics terminal on each
+   * notification.
+   */
+  onPuzzleStateChanged: (() => void) | null = null
 
   private inner: THREE.Group | null = null
   private readonly fuelCells: Map<number, FuelCell> = new Map()
   private loadStarted = false
   private loaded = false
   private powerRestoredFired = false
+  /**
+   * False until the diagnostics terminal hands control to the puzzle
+   * screen. While inactive, every fuel cell stays dim (no wireframe
+   * overlay) and SCI bolt sweeps short-circuit so the player can't
+   * stumble into the repair without ever reading the tutorial.
+   */
+  private minigameActive = false
+  /**
+   * True after a wrong-shot purge until the player re-interacts with
+   * the diagnostics terminal. Used by the UI to swap the puzzle screen
+   * into a "REINITIATE" prompt without losing the cell→symbol mapping.
+   */
+  private resetPending = false
+  /**
+   * Ignition order for the numbers row, in slot indices `0..2`. Drafted
+   * fresh on each {@link startMinigame} so a wrong shot forces a new
+   * puzzle without changing the cell→slot mapping.
+   */
+  private numberOrder: number[] = [0, 1, 2]
+  /** Ignition order for the letters row, in slot indices. */
+  private letterOrder: number[] = [0, 1, 2]
+  /** How many letters have been successfully charged in order. */
+  private lettersCharged = 0
+  /** How many numbers have been successfully charged in order. */
+  private numbersCharged = 0
+  /** `true` once the cell→side/slot mapping has been computed. */
+  private sidesAssigned = false
+  /**
+   * Reference-label sprites keyed by their host cell's `index`. Each
+   * minigame start picks a random slot on each side and rebuilds these
+   * — players see one symbol per row to anchor the puzzle UI to the
+   * physical cells without the generator looking like a chalkboard.
+   */
+  private readonly referenceLabels: Map<number, THREE.Sprite> = new Map()
+  /**
+   * Monotonic counter bumped on every {@link resetMinigame}. Each green
+   * hold captures the value at the moment it was scheduled; if the
+   * counter has advanced by the time the timer fires, the callback is a
+   * no-op so an in-flight cell completion can't strip a freshly rebuilt
+   * wireframe.
+   */
+  private minigameEpoch = 0
   /**
    * Multiplier on the per-shot "inverse damage" SCI bolts deal to a
    * fuel cell. Driven by the `multitoolScience` upgrade so investing in
@@ -253,6 +361,56 @@ export class StationPowerGenModel {
   }
 
   /**
+   * Whether the puzzle screen has handed control to the live repair
+   * flow. While `false`, wireframes are hidden and SCI bolt sweeps
+   * short-circuit. Flipped by {@link startMinigame}.
+   */
+  isMinigameActive(): boolean {
+    return this.minigameActive
+  }
+
+  /**
+   * Reveal the per-cell wireframe overlays, draft a fresh ignition
+   * sequence, and start accepting SCI bolt hits. Called by the host
+   * view when the player confirms the diagnostics terminal. Idempotent
+   * while already active; after a {@link resetPending} purge it redrafts
+   * the sequence and clears the reset flag.
+   */
+  startMinigame(): void {
+    if (this.minigameActive) return
+    this.assignCellSides()
+    this.draftIgnitionSequence()
+    this.refreshReferenceLabels()
+    this.minigameActive = true
+    this.resetPending = false
+    this.lettersCharged = 0
+    this.numbersCharged = 0
+    for (const cell of this.fuelCells.values()) {
+      if (cell.restored) continue
+      cell.wireframe.visible = true
+    }
+    this.onPuzzleStateChanged?.()
+  }
+
+  /**
+   * Read-only snapshot of the puzzle state for the diagnostics terminal.
+   * Cheap — allocates only the wrapping object; the inner arrays are
+   * shared references.
+   */
+  getPuzzleState(): PowerGenPuzzleState {
+    return {
+      letterOrder: this.letterOrder,
+      numberOrder: this.numberOrder,
+      hexColor: this.computePuzzleColor(),
+      lettersCharged: this.lettersCharged,
+      numbersCharged: this.numbersCharged,
+      active: this.minigameActive,
+      resetPending: this.resetPending,
+      restored: this.powerRestoredFired,
+    }
+  }
+
+  /**
    * Override the per-shot science-bolt repair multiplier. Defaults to
    * `1` (one hit per bolt); host views read the `multitoolScience`
    * upgrade and pass the result here so SCI investment makes the
@@ -305,10 +463,19 @@ export class StationPowerGenModel {
     to: THREE.Vector3,
     outEntry: THREE.Vector3,
   ): boolean {
-    if (!this.loaded || this.fuelCells.size === 0) return false
+    if (!this.loaded || !this.minigameActive || this.fuelCells.size === 0) return false
     this._segDelta.subVectors(to, from)
     const segLenSq = this._segDelta.lengthSq()
     if (segLenSq < MIN_BOLT_SEGMENT_LENGTH_SQ) return false
+
+    // Bolt-origin offset from the prop centre in the horizontal plane.
+    // Used to reject candidate cells that sit on the opposite side of
+    // the reactor body so a bolt aimed at an already-charged near cell
+    // can't punch through and trip the puzzle by hitting a far cell.
+    const propX = this.group.position.x
+    const propZ = this.group.position.z
+    const boltSideX = from.x - propX
+    const boltSideZ = from.z - propZ
 
     let bestCell: FuelCell | null = null
     let bestT = Number.POSITIVE_INFINITY
@@ -319,6 +486,14 @@ export class StationPowerGenModel {
       this.refreshCellBounds(cell)
       const b = cell.worldBounds
       if (b.isEmpty()) continue
+      // Horizontal sign test: if the cell centre sits on the opposite
+      // side of the prop centre from the bolt origin (negative dot in
+      // XZ), the reactor body blocks the line of sight even though the
+      // bolt segment's AABB test would otherwise succeed.
+      b.getCenter(this._hitScratch)
+      const cellSideX = this._hitScratch.x - propX
+      const cellSideZ = this._hitScratch.z - propZ
+      if (boltSideX * cellSideX + boltSideZ * cellSideZ < 0) continue
       if (!segmentIntersectsAabb3(from, to, b.min, b.max, this._hitScratch)) continue
 
       this._towardHit.subVectors(this._hitScratch, from)
@@ -327,10 +502,7 @@ export class StationPowerGenModel {
       if (tAlong > 1) tAlong = 1
 
       b.getSize(this._boundsSize)
-      const vol = Math.max(
-        1e-9,
-        this._boundsSize.x * this._boundsSize.y * this._boundsSize.z,
-      )
+      const vol = Math.max(1e-9, this._boundsSize.x * this._boundsSize.y * this._boundsSize.z)
       const earlierAlongBolt = bestCell === null || tAlong < bestT - SEGMENT_ENTRY_T_EPSILON
       const tieBreakSmallerCell =
         bestCell !== null && Math.abs(tAlong - bestT) <= SEGMENT_ENTRY_T_EPSILON && vol < bestVol
@@ -379,6 +551,7 @@ export class StationPowerGenModel {
       this.disposeObject(cell.wireframe)
       for (const entry of cell.glowMaterials) entry.material.dispose()
     }
+    this.disposeReferenceLabels()
     this.fuelCells.clear()
     if (this.inner) {
       this.inner.traverse((child) => {
@@ -408,8 +581,7 @@ export class StationPowerGenModel {
           cloned.push(original)
           continue
         }
-        const emissiveSum =
-          original.emissive.r + original.emissive.g + original.emissive.b
+        const emissiveSum = original.emissive.r + original.emissive.g + original.emissive.b
         const hasGlow = emissiveSum > EMISSIVE_RGB_THRESHOLD || original.emissiveIntensity > 0
         if (!hasGlow) {
           cloned.push(original)
@@ -437,6 +609,9 @@ export class StationPowerGenModel {
     })
 
     const wireframe = this.buildWireframeOverlay(source)
+    // Built up-front so the geometry is ready, but hidden until the
+    // diagnostics terminal starts the minigame.
+    wireframe.visible = false
     source.add(wireframe)
 
     const worldBounds = new THREE.Box3()
@@ -449,7 +624,263 @@ export class StationPowerGenModel {
       worldBounds,
       fading: false,
       restored: false,
+      // Filled by {@link assignCellSides} on the first {@link startMinigame}.
+      side: 'numbers',
+      slot: 0,
     }
+  }
+
+  /**
+   * Build the canvas-backed billboard sprite for a reference cell. The
+   * sprite paints {@link symbol} (e.g. `"2"` or `"B"`) inside a small
+   * translucent panel so it reads cleanly against the cell's PBR glow.
+   * `depthTest` is off so the sprite isn't occluded by the cell mesh
+   * itself when the label sits close to the cell's silhouette — these
+   * are tutorial overlays, readability beats correctness.
+   */
+  private buildReferenceLabel(symbol: string): THREE.Sprite {
+    const canvas = document.createElement('canvas')
+    canvas.width = LABEL_CANVAS_SIZE
+    canvas.height = LABEL_CANVAS_SIZE
+    const ctx = canvas.getContext('2d')
+    if (ctx) {
+      ctx.clearRect(0, 0, LABEL_CANVAS_SIZE, LABEL_CANVAS_SIZE)
+      const pad = 10
+      ctx.fillStyle = LABEL_BG_COLOR
+      ctx.beginPath()
+      const r = 22
+      ctx.moveTo(pad + r, pad)
+      ctx.arcTo(LABEL_CANVAS_SIZE - pad, pad, LABEL_CANVAS_SIZE - pad, pad + r, r)
+      ctx.arcTo(
+        LABEL_CANVAS_SIZE - pad,
+        LABEL_CANVAS_SIZE - pad,
+        LABEL_CANVAS_SIZE - pad - r,
+        LABEL_CANVAS_SIZE - pad,
+        r,
+      )
+      ctx.arcTo(pad, LABEL_CANVAS_SIZE - pad, pad, LABEL_CANVAS_SIZE - pad - r, r)
+      ctx.arcTo(pad, pad, pad + r, pad, r)
+      ctx.closePath()
+      ctx.fill()
+      ctx.strokeStyle = LABEL_STROKE_COLOR
+      ctx.lineWidth = 3
+      ctx.stroke()
+      ctx.fillStyle = LABEL_TEXT_COLOR
+      ctx.font = LABEL_FONT
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText(symbol, LABEL_CANVAS_SIZE / 2, LABEL_CANVAS_SIZE / 2 + 4)
+    }
+    const texture = new THREE.CanvasTexture(canvas)
+    texture.anisotropy = 4
+    const material = new THREE.SpriteMaterial({
+      map: texture,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+    })
+    const sprite = new THREE.Sprite(material)
+    sprite.scale.set(LABEL_SPRITE_SCALE, LABEL_SPRITE_SCALE, 1)
+    sprite.renderOrder = 999
+    return sprite
+  }
+
+  /**
+   * Pick exactly one random cell across both sides, build a symbol
+   * sprite for it, and park the sprite above the cell in prop-group
+   * local space (world-up regardless of cell tilt). One hint is enough
+   * — the player infers the rest from the puzzle UI's tile positions.
+   * Disposes any prior label so each minigame draft picks fresh.
+   */
+  private refreshReferenceLabels(): void {
+    this.disposeReferenceLabels()
+    const candidates = Array.from(this.fuelCells.values()).filter((c) => !c.restored)
+    if (candidates.length === 0) return
+    const pick = candidates[Math.floor(Math.random() * candidates.length)]
+    if (!pick) return
+    const symbol =
+      pick.side === 'numbers' ? String(pick.slot + 1) : (LETTER_SYMBOLS[pick.slot] ?? '?')
+    const sprite = this.buildReferenceLabel(symbol)
+    const scratch = new THREE.Vector3()
+    pick.source.updateWorldMatrix(true, false)
+    pick.source.getWorldPosition(scratch)
+    this.group.worldToLocal(scratch)
+    sprite.position.set(scratch.x, scratch.y + LABEL_HEIGHT_OFFSET, scratch.z)
+    this.group.add(sprite)
+    this.referenceLabels.set(pick.index, sprite)
+  }
+
+  /** Dispose all active reference-label sprites. */
+  private disposeReferenceLabels(): void {
+    for (const sprite of this.referenceLabels.values()) {
+      if (sprite.parent) sprite.parent.remove(sprite)
+      const mat = sprite.material as THREE.SpriteMaterial
+      mat.map?.dispose()
+      mat.dispose()
+    }
+    this.referenceLabels.clear()
+  }
+
+  /**
+   * Assign each cell to a row (`numbers`/`letters`) and a slot index by
+   * inspecting their local-space positions. The row with the lower mean
+   * Z is treated as door-facing (numbers); within each row cells are
+   * sorted by X for left-to-right slots. Idempotent — runs once on the
+   * first {@link startMinigame}.
+   */
+  private assignCellSides(): void {
+    if (this.sidesAssigned) return
+    const cells = Array.from(this.fuelCells.values())
+    if (cells.length !== 6) {
+      // Unexpected layout — keep defaults so we don't mislabel cells.
+      // The minigame would still run but validation would always fail.
+      this.sidesAssigned = true
+      return
+    }
+    const entries = cells.map((cell) => {
+      const v = new THREE.Vector3()
+      cell.source.updateWorldMatrix(true, false)
+      cell.source.getWorldPosition(v)
+      if (this.inner) this.inner.worldToLocal(v)
+      return { cell, pos: v }
+    })
+    // Pick the side axis: whichever of X/Z has the largest gap between
+    // the 3rd and 4th entry after sorting. That gap is the boundary
+    // between the two rows of three; the other axis becomes the slot
+    // axis (left-to-right ordering within each row). Robust to the
+    // generator being authored with rows along either world axis.
+    const byX = [...entries].sort((a, b) => a.pos.x - b.pos.x)
+    const byZ = [...entries].sort((a, b) => a.pos.z - b.pos.z)
+    const xGap = Math.abs((byX[3]?.pos.x ?? 0) - (byX[2]?.pos.x ?? 0))
+    const zGap = Math.abs((byZ[3]?.pos.z ?? 0) - (byZ[2]?.pos.z ?? 0))
+    const sideAxis: 'x' | 'z' = zGap >= xGap ? 'z' : 'x'
+    const slotAxis: 'x' | 'z' = sideAxis === 'z' ? 'x' : 'z'
+    const sortedBySide = sideAxis === 'z' ? byZ : byX
+    const frontGroup = sortedBySide.slice(0, 3)
+    const backGroup = sortedBySide.slice(3, 6)
+    frontGroup.sort((a, b) => a.pos[slotAxis] - b.pos[slotAxis])
+    backGroup.sort((a, b) => a.pos[slotAxis] - b.pos[slotAxis])
+    // Lower-axis row → letters (near-door); higher-axis row → numbers
+    // (far-from-door). Matches the puzzle UI's letters-bottom /
+    // numbers-top layout.
+    for (let i = 0; i < frontGroup.length; i++) {
+      const entry = frontGroup[i]
+      if (!entry) continue
+      entry.cell.side = 'letters'
+      entry.cell.slot = i
+    }
+    for (let i = 0; i < backGroup.length; i++) {
+      const entry = backGroup[i]
+      if (!entry) continue
+      entry.cell.side = 'numbers'
+      entry.cell.slot = i
+    }
+    this.sidesAssigned = true
+  }
+
+  /** Fisher-Yates shuffle in place. */
+  private shuffleSlots(out: number[]): void {
+    for (let i = out.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      const a = out[i] ?? 0
+      const b = out[j] ?? 0
+      out[i] = b
+      out[j] = a
+    }
+  }
+
+  /** Redraft the ignition sequences for both rows. */
+  private draftIgnitionSequence(): void {
+    this.numberOrder = [0, 1, 2]
+    this.letterOrder = [0, 1, 2]
+    this.shuffleSlots(this.numberOrder)
+    this.shuffleSlots(this.letterOrder)
+  }
+
+  /**
+   * Compute the diamond colour `#RRGGBB` from the current ignition
+   * sequences. Each channel byte is `letter+number` packed nibble-wise
+   * (letters as hex digits A/B/C, numbers as 1/2/3) so colours land in
+   * the muted-pastel range 161–195 per channel — readable and varied
+   * without leaving the engineering-readout palette.
+   */
+  private computePuzzleColor(): string {
+    const channels: string[] = []
+    for (let i = 0; i < 3; i++) {
+      const letterSlot = this.letterOrder[i] ?? 0
+      const numberSlot = this.numberOrder[i] ?? 0
+      const letterDigit = LETTER_SYMBOLS[letterSlot] ?? 'A'
+      const numberDigit = String(numberSlot + 1)
+      channels.push(letterDigit + numberDigit)
+    }
+    return `#${channels.join('')}`
+  }
+
+  /**
+   * Wrong-shot purge: hide every wireframe, refill every cell's hit
+   * budget, lock the minigame, and flag the diagnostics terminal that
+   * the player needs to re-interact to redraft the sequence.
+   */
+  private resetMinigame(): void {
+    this.minigameActive = false
+    this.resetPending = true
+    this.lettersCharged = 0
+    this.numbersCharged = 0
+    // Bump the epoch so any in-flight green-hold Timer callbacks
+    // (fading cells) no-op when they fire — otherwise they'd remove the
+    // wireframe we're about to rebuild.
+    this.minigameEpoch += 1
+    for (const cell of this.fuelCells.values()) {
+      this.rebuildCellAsBroken(cell)
+    }
+    // Drop reference labels too — the next `startMinigame` will roll a
+    // fresh random pair of slots and rebuild from scratch.
+    this.disposeReferenceLabels()
+    this.onPuzzleStateChanged?.()
+  }
+
+  /**
+   * Force a fuel cell back to its broken state: re-dim the cloned glow
+   * materials, refill the hit budget, and re-attach a fresh wireframe
+   * overlay (rebuilt from scratch if a prior green-hold already disposed
+   * the previous one). Used by {@link resetMinigame} so a wrong shot
+   * truly wipes the slate, even for cells the player had already
+   * finished charging.
+   */
+  private rebuildCellAsBroken(cell: FuelCell): void {
+    for (const entry of cell.glowMaterials) {
+      const mat = entry.material
+      mat.color.setHex(BROKEN_BASE_COLOR)
+      mat.emissive.setHex(0x000000)
+      mat.emissiveIntensity = 0
+      mat.map = null
+      mat.needsUpdate = true
+    }
+    // If the wireframe was disposed by a prior completion, rebuild it.
+    if (cell.restored || cell.wireframe.parent !== cell.source) {
+      this.disposeObject(cell.wireframe)
+      cell.wireframe = this.buildWireframeOverlay(cell.source)
+      cell.source.add(cell.wireframe)
+    }
+    cell.wireframe.visible = false
+    this.setWireframeColor(cell.wireframe, DAMAGE_WIREFRAME_COLOR)
+    cell.hitsRemaining = FUEL_CELL_REPAIR_HITS
+    cell.fading = false
+    cell.restored = false
+  }
+
+  /**
+   * Validate a candidate cell against the current next-expected slot on
+   * its side. Returns `true` when the cell is the live ignition target
+   * (and the player may charge it); `false` triggers a purge.
+   */
+  private isExpectedCell(cell: FuelCell): boolean {
+    if (cell.side === 'numbers') {
+      const expected = this.numberOrder[this.numbersCharged]
+      return expected !== undefined && cell.slot === expected
+    }
+    const expected = this.letterOrder[this.lettersCharged]
+    return expected !== undefined && cell.slot === expected
   }
 
   /**
@@ -499,12 +930,21 @@ export class StationPowerGenModel {
    */
   private applyScienceHit(cell: FuelCell): void {
     if (cell.fading || cell.restored) return
+    if (!this.isExpectedCell(cell)) {
+      // Wrong cell — purge the lattice and force the player back to the
+      // diagnostics terminal for a fresh sequence draft.
+      this.resetMinigame()
+      return
+    }
     cell.hitsRemaining = Math.max(0, cell.hitsRemaining - this.scienceHitMultiplier)
     if (cell.hitsRemaining > 0) {
       this.setWireframeColor(cell.wireframe, this.progressColor(cell.hitsRemaining))
       return
     }
     cell.fading = true
+    if (cell.side === 'numbers') this.numbersCharged += 1
+    else this.lettersCharged += 1
+    this.onPuzzleStateChanged?.()
     this.setWireframeColor(cell.wireframe, REPAIR_COMPLETE_COLOR)
     // Restore the glow now so the underlying cell already reads as
     // "powered" while the green wireframe celebrates above it.
@@ -518,9 +958,23 @@ export class StationPowerGenModel {
     }
     const wireframeRef = cell.wireframe
     const index = cell.index
+    const scheduledEpoch = this.minigameEpoch
     Timer.after(REPAIR_HOLD_SECONDS, () => {
+      // A purge reset bumped the epoch — drop this completion so the
+      // freshly rebuilt wireframe stays attached.
+      if (this.minigameEpoch !== scheduledEpoch) return
       if (wireframeRef.parent) wireframeRef.parent.remove(wireframeRef)
       this.disposeObject(wireframeRef)
+      // Drop the reference label for this cell if it was the one wearing
+      // a symbol — the host is now powered, no need to keep the hint.
+      const label = this.referenceLabels.get(index)
+      if (label) {
+        if (label.parent) label.parent.remove(label)
+        const mat = label.material as THREE.SpriteMaterial
+        mat.map?.dispose()
+        mat.dispose()
+        this.referenceLabels.delete(index)
+      }
       cell.restored = true
       cell.fading = false
       this.onFuelCellRepaired?.(index)

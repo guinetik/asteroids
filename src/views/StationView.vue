@@ -332,6 +332,12 @@ controller.onInteract = (event) => {
     void router.push('/')
     return
   }
+  if (event === 'terminal:use:r-power') {
+    // Tutorial → live status: hand the player the per-cell wireframes
+    // and start accepting SCI bolt hits on the powergen.
+    controller.beginPowerGenMinigame()
+    return
+  }
   if (event === 'terminal:use:r-terminal') {
     // Peek terminal — repeatable, doesn't consume. Shows the microwave
     // room's tile layout on the screen for ~20s so the player can
