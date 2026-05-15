@@ -16,10 +16,10 @@
  */
 import type { Group } from 'three'
 import {
-  TerminalModel,
-  TERMINAL_BASE_DEPTH,
-  TERMINAL_BASE_WIDTH,
-} from '@/three/TerminalModel'
+  StationTerminalModel,
+  STATION_TERMINAL_BASE_HALF_X,
+  STATION_TERMINAL_BASE_HALF_Z,
+} from '@/three/StationTerminalModel'
 import { BunkerChestModel } from '@/three/bunker/BunkerChestModel'
 import { ITEM_CATALOG } from '@/lib/inventory/catalog'
 // Side-effect: registers trade-good item definitions into ITEM_CATALOG
@@ -28,12 +28,12 @@ import '@/lib/shop/tradeGoods'
 import type { RewardSpec } from '@/lib/station/StationLayout'
 
 /**
- * Default uniform scale applied to {@link TerminalModel} when used as a
- * station-interior prop. The outdoor terminal is sized for EVA flat
- * zones (~16 m tall) — at interior wall-height (~3 m) we need to shrink
- * it dramatically so it reads as a kiosk in the room.
+ * Default uniform scale applied to {@link StationTerminalModel} when used
+ * as a station-interior prop. The GLB ships at human kiosk scale (~1.84 m
+ * tall) so it slots into a 3 m room near 1:1; this leaves a knob for fine
+ * tuning if rooms shrink.
  */
-const TERMINAL_INTERIOR_SCALE = 0.12
+const TERMINAL_INTERIOR_SCALE = 1
 
 /** Uniform scale applied to `BunkerChestModel` when used as a station prop. */
 const CHEST_INTERIOR_SCALE = 0.35
@@ -115,15 +115,15 @@ export interface StationPropInstance {
 export function createStationProp(kind: string): StationPropInstance {
   switch (kind) {
     case 'terminal': {
-      const model = new TerminalModel()
+      const model = new StationTerminalModel()
       model.setScreenEmissive(TERMINAL_STATUS_COLOR.idle)
       return {
         group: model.group,
         tick: (dt) => model.tick(dt),
         dispose: () => model.dispose(),
         localFootprint: {
-          halfX: TERMINAL_BASE_WIDTH / 2,
-          halfZ: TERMINAL_BASE_DEPTH / 2,
+          halfX: STATION_TERMINAL_BASE_HALF_X,
+          halfZ: STATION_TERMINAL_BASE_HALF_Z,
         },
         setStatus: (status) => model.setScreenEmissive(TERMINAL_STATUS_COLOR[status]),
         showMap: (canvas) => model.showMapTexture(canvas),

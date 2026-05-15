@@ -47,6 +47,7 @@
     "models:asteroid:build": "gltf-transform optimize \"3d/asteroid.glb\" \"public/models/asteroid.glb\" --texture-compress webp --texture-size 2048 --simplify-ratio 0.62 --simplify-error 0.0008 --meshopt-level high",
     "models:hubble:build": "gltf-transform optimize \"3d/hubble_rigged.glb\" \"public/models/hubble.glb\" --join false --flatten false --simplify false --texture-compress webp --texture-size 2048 --meshopt-level high",
     "models:voyager:build": "gltf-transform optimize \"3d/voyager_rigged.glb\" \"public/models/voyager.glb\" --join false --flatten false --simplify false --texture-compress webp --texture-size 2048 --meshopt-level high",
+    "models:station-terminal:build": "gltf-transform optimize \"3d/station_terminal.glb\" \"public/models/station_terminal.glb\" --join false --flatten false --simplify false --texture-compress webp --texture-size 1024 --meshopt-level high",
     "models:satellite:build": "node scripts/build-satellite-glb.mjs",
     "models:heavy-runtime:build": "run-s models:bootstrap-heavy-sources models:bed:build models:table:build models:city:build models:asteroid:build models:hubble:build models:voyager:build models:satellite:build models:virus:build models:arcade-machine:build models:cat-tower:build models:coffee-machine:build models:lounge-chair:build models:record-player:build models:refractor-telescope:build models:lamp:build",
     "models:virus:build": "node scripts/optimize-virus-glb.mjs",
