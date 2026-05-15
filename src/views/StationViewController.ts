@@ -12,6 +12,13 @@
 import type { Router } from 'vue-router'
 import type { Tickable } from '@/lib/Tickable'
 import { AmbientLight, Color, DirectionalLight, MathUtils, Vector3 } from 'three'
+import { MultiToolController } from '@/three/MultiToolController'
+import { MultiToolState } from '@/lib/fps/multiToolState'
+import { ProjectileSystem } from '@/lib/fps/projectileSystem'
+import { buildMultiToolConfig } from '@/lib/fps/buildMultiToolConfig'
+import { ParticleEmitter } from '@/three/ParticleEmitter'
+import { WallImpactDecalPool } from '@/three/WallImpactDecalPool'
+import type { MultiToolMode } from '@/lib/fps/multiToolState'
 import { DevConsole } from '@/lib/devConsole'
 import { GameLoop } from '@/lib/GameLoop'
 import { TickHandler } from '@/lib/TickHandler'
@@ -70,6 +77,20 @@ const STATION_THEME_LUT_URLS: Readonly<Record<StationTheme, string>> = {
 /** Floor surface Y, used by the player collider. Matches the visible
  * top of the raised floor tiles in the room builder. */
 const FLOOR_Y = 0.25
+/**
+ * Ceiling Y for projectile collision. Matches `WALL_HEIGHT` in
+ * `StationBuilder.ts` plus a small margin so bolts grazing the actual
+ * geometry still register as ceiling hits. Used to stop multitool bolts
+ * that would otherwise fly out the open top of a half-cylinder room.
+ */
+const STATION_CEILING_Y = 3.2
+
+/** Per-mode hex tints applied to wall-impact decals (matches bolt color). */
+const WALL_DECAL_COLOR: Readonly<Record<MultiToolMode, number>> = {
+  drill: 0x3b82f6,
+  weapon: 0xff00ff,
+  science: 0x22c55e,
+}
 /** Spawn yaw facing the exit hatch at the south end of the hub corridor. */
 const SPAWN_YAW = Math.PI
 /** Maximum distance for an entrance to show its interact prompt. */
@@ -201,6 +222,20 @@ export class StationViewController implements Tickable {
   private station: BuiltStation | null = null
   private stationCollider: StationCollider | null = null
   private postProcessing: StationPostProcessing | null = null
+  /** Multitool view-model GLB attached to the FPS camera. */
+  private multiTool: MultiToolController | null = null
+  /** Multitool mode + RTG state machine (pure TS). */
+  private multiToolState: MultiToolState | null = null
+  /** Bolt projectiles + station wall/floor/ceiling collision. */
+  private projectileSystem: ProjectileSystem | null = null
+  /** Orange spark burst played when a bolt detonates on a wall, floor, or prop. */
+  private impactEmitter: ParticleEmitter | null = null
+  /** Wall-aligned glow decals stamped at each projectile impact. */
+  private wallImpactDecals: WallImpactDecalPool | null = null
+  /** Reused upward velocity scratch for impact-emitter spawns. */
+  private readonly _impactUp = new Vector3(0, 1, 0)
+  /** Reused emit-velocity scratch for impact-emitter spawns. */
+  private readonly _impactVel = new Vector3()
   private spawnPos: Vector3 = new Vector3()
   private starfield: StarFieldController | null = null
   private exteriorSun: SunMeshResult | null = null
@@ -377,10 +412,49 @@ export class StationViewController implements Tickable {
     this.sceneManager.onResizeCallback = (width, height) =>
       this.postProcessing?.resize(width, height)
 
+    // Multitool: GLB view-model, RTG state, projectile system. The
+    // projectile system reuses the station collider for wall/door/prop
+    // collisions — same AABB union the player capsule uses — and the
+    // FLOOR_Y + STATION_CEILING_Y bracket catches bolts angled at the
+    // floor or out through the open top of the half-cylinder roof.
+    this.multiTool = new MultiToolController()
+    await this.multiTool.load(this.fpsCamera.camera, this.sceneManager.scene)
+    this.multiToolState = new MultiToolState(buildMultiToolConfig())
+    this.projectileSystem = new ProjectileSystem(this.sceneManager.scene, null)
+    this.projectileSystem.setStationCollider(this.stationCollider, FLOOR_Y, STATION_CEILING_Y)
+    this.projectileSystem.prewarmPool()
+    this.impactEmitter = new ParticleEmitter({
+      poolSize: 64,
+      color: new Color(0xffaa44),
+      size: 6.5,
+      lifetime: 0.6,
+      spread: 12,
+      opacity: 1,
+      soft: true,
+      sizeGrowth: 1.55,
+    })
+    this.sceneManager.addToScene(this.impactEmitter.points)
+    this.wallImpactDecals = new WallImpactDecalPool(this.sceneManager.scene)
+    this.projectileSystem.onImpact = (pos, context) => {
+      for (let i = 0; i < 8; i++) {
+        this._impactVel.copy(this._impactUp).multiplyScalar(5)
+        this.impactEmitter!.emit(pos, this._impactVel)
+      }
+      if (context.normal) {
+        this.wallImpactDecals!.spawn(pos, context.normal, WALL_DECAL_COLOR[context.boltKind])
+      }
+    }
+    this.multiTool.setProjectileSystem(this.projectileSystem)
+
     // Tick order.
     this.tickHandler.register(this.playerController, TICK_PRIORITY_PHYSICS)
+    this.tickHandler.register(this.multiToolState, TICK_PRIORITY_PHYSICS + 1)
+    this.tickHandler.register(this.projectileSystem, TICK_PRIORITY_PHYSICS + 2)
+    this.tickHandler.register(this.impactEmitter, TICK_PRIORITY_PHYSICS + 3)
+    this.tickHandler.register(this.wallImpactDecals, TICK_PRIORITY_PHYSICS + 4)
     this.tickHandler.register(this, TICK_PRIORITY_RENDER - TICK_OFFSET_PRE_RENDER)
     this.tickHandler.register(this.fpsCamera, TICK_PRIORITY_RENDER - TICK_OFFSET_CAMERA)
+    this.tickHandler.register(this.multiTool, TICK_PRIORITY_RENDER - TICK_OFFSET_CAMERA + 1)
     this.tickHandler.register(this.sceneManager, TICK_PRIORITY_RENDER)
 
     this.setupPointerLock()
@@ -418,6 +492,7 @@ export class StationViewController implements Tickable {
     this.tickPassiveDamage(dt)
     this.tickDamageFlash(dt)
     this.tickDeathPresentation(dt)
+    this.tickMultiTool()
     this.emitFpsTelemetry()
 
     // Realised speed = actual displacement / dt. Using this instead of
@@ -760,6 +835,7 @@ export class StationViewController implements Tickable {
    */
   private emitFpsTelemetry(): void {
     if (!this.onFpsTelemetry || !this.playerController || !this.fpsCamera) return
+    const ms = this.multiToolState
     this.onFpsTelemetry({
       hp: this.playerController.hp,
       maxHp: this.playerController.maxHp,
@@ -769,13 +845,13 @@ export class StationViewController implements Tickable {
       sprintCapacity: this.playerController.sprintCapacity,
       speed: this.playerController.speed,
       grounded: this.playerController.grounded,
-      activeMode: 'science',
-      aiming: false,
-      isFiring: false,
-      rtgLevel: 0,
-      rtgCapacity: 0,
-      modeCharge: 0,
-      modeCapacity: 0,
+      activeMode: ms?.mode ?? 'science',
+      aiming: ms?.aiming ?? false,
+      isFiring: ms?.isFiring ?? false,
+      rtgLevel: ms?.rtgLevel ?? 0,
+      rtgCapacity: ms?.rtgCapacity ?? 1,
+      modeCharge: ms?.modeCharge ?? 0,
+      modeCapacity: ms?.modeChargeCapacity ?? 1,
       headingRad: this.fpsCamera.yaw,
       objectives: [],
     })
@@ -929,6 +1005,53 @@ export class StationViewController implements Tickable {
   }
 
   /**
+   * Drive the multitool: keys 1/2/3 swap mode, RMB aims, LMB fires.
+   * Mirrors the `tickEva` block in `LevelViewController.ts`. Skipped
+   * while the player is dead so weapon SFX don't fire over the death
+   * fade and the trigger state can't carry across a restart.
+   */
+  private tickMultiTool(): void {
+    if (
+      !this.inputManager ||
+      !this.multiToolState ||
+      !this.multiTool ||
+      !this.playerController ||
+      !this.fpsCamera
+    ) {
+      return
+    }
+    if (this.playerController.isDead) return
+
+    if (this.inputManager.wasActionPressed('toolDrill')) this.multiToolState.setMode('drill')
+    if (this.inputManager.wasActionPressed('toolWeapon')) this.multiToolState.setMode('weapon')
+    if (this.inputManager.wasActionPressed('toolScience')) this.multiToolState.setMode('science')
+
+    this.multiToolState.setAiming(this.pointerLock.isRightMouseDown)
+    this.multiToolState.setInput(
+      this.pointerLock.isLeftMouseDown,
+      this.pointerLock.consumeLeftMouseJustPressed(),
+    )
+    this.multiToolState.setSpeed(this.playerController.speed)
+
+    this.multiTool.setMode(this.multiToolState.modeConfig.color, this.multiToolState.mode)
+    this.multiTool.setAiming(this.multiToolState.aiming)
+    this.multiTool.setRtgLevel(this.multiToolState.rtgLevel / this.multiToolState.rtgCapacity)
+    this.multiTool.setModeChargeLevel(
+      this.multiToolState.modeCharge / this.multiToolState.modeChargeCapacity,
+    )
+    this.multiTool.setState(
+      this.playerController.speed,
+      this.playerController.isSprinting,
+      this.playerController.grounded,
+    )
+
+    if (this.multiToolState.isFiring) this.multiTool.fire()
+
+    const ads = this.multiToolState.adsConfig
+    this.fpsCamera.setAiming(this.multiToolState.aiming, ads.fovMultiplier, ads.zoomSpeed)
+  }
+
+  /**
    * Reset the player after a death: refill HP / O2 / stamina, teleport
    * back to the station spawn at world origin, and clear the damage
    * flash so the next visit starts clean. The inventory rollback is
@@ -989,6 +1112,10 @@ export class StationViewController implements Tickable {
       for (const prop of this.station.props) prop.dispose()
       disposeTronHologramMaterials(this.station.hologramMaterials)
     }
+    this.projectileSystem?.dispose()
+    this.impactEmitter?.dispose()
+    this.wallImpactDecals?.dispose()
+    this.multiTool?.dispose()
     this.playerController?.dispose()
     this.fpsCamera?.dispose()
     this.pointerLock.releaseLock()

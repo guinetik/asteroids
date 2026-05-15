@@ -15,6 +15,7 @@
 import * as THREE from 'three'
 import type { Tickable } from '@/lib/Tickable'
 import type { Heightmap } from '@/lib/terrain/heightmap'
+import type { StationCollider } from '@/lib/station/StationCollider'
 import type { Enemy } from './enemy'
 import type { Hostage } from './hostage'
 import type { LanderController } from '@/three/LanderController'
@@ -33,6 +34,14 @@ const BOLT_WIDTH = 0.04
 const BOLT_MAX_LIFETIME = 4.0
 /** Terrain collision margin — bolt Y vs floor Y. */
 const TERRAIN_HIT_MARGIN = 0.5
+/**
+ * Maximum world-unit spacing between samples along a bolt's per-frame
+ * segment when testing against a station collider. The bolt covers
+ * ~3 units per frame at 60fps; with this spacing we test ~5 points per
+ * step, which catches sub-unit blockers (door panels, prop AABBs) that
+ * a single end-point test would skip over.
+ */
+const STATION_SAMPLE_STEP = 0.6
 /** Damage per weapon/drill bolt hit on enemies; weapon bolts also damage hostages (friendly fire). */
 const BOLT_DAMAGE = 25
 
@@ -71,6 +80,15 @@ export type ProjectileImpactKind =
 export interface ProjectileImpactContext {
   boltKind: MultiToolMode
   kind: ProjectileImpactKind
+  /**
+   * **Transient** surface normal at the impact point, pointing away from
+   * the struck surface. Only populated for station-collider hits; legacy
+   * heightmap/combat paths leave this `null`. Like
+   * {@link ProjectileSystem.onImpact}'s `position`, this vector is mutated
+   * on the next callback — copy if you need to keep it past the synchronous
+   * handler body.
+   */
+  normal: THREE.Vector3 | null
 }
 
 /**
@@ -163,7 +181,13 @@ export class ProjectileSystem implements Tickable {
   }
 
   private readonly scene: THREE.Scene
-  private readonly heightmap: Heightmap
+  private readonly heightmap: Heightmap | null
+  /** Station-interior collider — when set, bolts stop on walls/closed doors/props. */
+  private stationCollider: StationCollider | null = null
+  /** Floor Y inside a station interior; bolts crossing below this register as floor hits. */
+  private stationFloorY = 0
+  /** Ceiling Y inside a station interior; bolts crossing above this register as ceiling hits. */
+  private stationCeilingY = Number.POSITIVE_INFINITY
   private readonly enemies: Enemy[] = []
   private readonly hostages: Hostage[] = []
   private readonly rocks: MineableRockEntry[] = []
@@ -272,10 +296,40 @@ export class ProjectileSystem implements Tickable {
    * must copy if they need to keep the value past the synchronous call.
    */
   private readonly _callbackPos = new THREE.Vector3()
+  /** Scratch normal handed to {@link onImpact}; null when not a station hit. */
+  private readonly _callbackNormal = new THREE.Vector3()
+  /** Whether {@link _callbackNormal} was populated this impact (station hits only). */
+  private _hasCallbackNormal = false
+  /** Reused 2D wall-normal scratch consumed by {@link StationCollider.findWallNormal}. */
+  private readonly _wallNormal2D = { nx: 0, nz: 0, t: 0 }
 
-  constructor(scene: THREE.Scene, heightmap: Heightmap) {
+  constructor(scene: THREE.Scene, heightmap: Heightmap | null) {
     this.scene = scene
     this.heightmap = heightmap
+  }
+
+  /**
+   * Register the station-interior collider for projectile wall/floor/ceiling
+   * collisions. Passing `null` disables station collision (used by `/level`).
+   *
+   * When set, bolts stop at any point whose (x, z) is outside the walkable
+   * union or inside a dynamic blocker (closed door, prop AABB), and at any
+   * point whose Y is below `floorY` or above `ceilingY`. Each of these
+   * resolves through {@link onImpact} as `kind: 'terrain'` so the existing
+   * spark VFX fires uniformly.
+   *
+   * @param collider - Station collider, or `null` to disable.
+   * @param floorY - Floor Y. Bolts below this register as floor hits.
+   * @param ceilingY - Ceiling Y. Bolts above this register as ceiling hits.
+   */
+  setStationCollider(
+    collider: StationCollider | null,
+    floorY: number = 0,
+    ceilingY: number = Number.POSITIVE_INFINITY,
+  ): void {
+    this.stationCollider = collider
+    this.stationFloorY = floorY
+    this.stationCeilingY = ceilingY
   }
 
   /** Register an enemy for projectile collision checks. */
@@ -633,9 +687,92 @@ export class ProjectileSystem implements Tickable {
         }
       }
 
-      // Terrain collision
-      const floorY = this.terrainCollisionEnabled ? this.heightmap.heightAt(pos.x, pos.z) : null
-      const hitTerrain = floorY !== null && pos.y <= floorY + TERRAIN_HIT_MARGIN
+      // Terrain / station collision. Station collider wins when set
+      // (no station is also a planet), and resolves through the same
+      // `kind: 'terrain'` impact path so spark VFX fires uniformly.
+      // Bolts step ~3 units per frame at 60fps, so a single point test
+      // at `pos` would skip over thin door blockers — we sample along
+      // the segment `_prevPos → pos` and stop at the first blocked
+      // sample so the impact pos lands on the surface.
+      let hitTerrain = false
+      this._hasCallbackNormal = false
+      if (this.stationCollider) {
+        const dx = pos.x - this._prevPos.x
+        const dy = pos.y - this._prevPos.y
+        const dz = pos.z - this._prevPos.z
+        const stepLen = Math.hypot(dx, dy, dz)
+        const samples = Math.max(1, Math.ceil(stepLen / STATION_SAMPLE_STEP))
+        let prevSampleX = this._prevPos.x
+        let prevSampleY = this._prevPos.y
+        let prevSampleZ = this._prevPos.z
+        for (let s = 1; s <= samples; s++) {
+          const t = s / samples
+          const sx = this._prevPos.x + dx * t
+          const sy = this._prevPos.y + dy * t
+          const sz = this._prevPos.z + dz * t
+          const floorHit = sy <= this.stationFloorY + TERRAIN_HIT_MARGIN
+          const ceilingHit = !floorHit && sy >= this.stationCeilingY
+          const wallHit =
+            !floorHit &&
+            !ceilingHit &&
+            this.stationCollider.findWallNormal(prevSampleX, prevSampleZ, sx, sz, this._wallNormal2D)
+          if (floorHit || ceilingHit || wallHit) {
+            if (floorHit) {
+              // Project the impact onto the floor plane so the decal
+              // sits exactly on the surface, not above where the swept
+              // sample first dipped below the floor.
+              const subDy = sy - prevSampleY
+              const surfaceY = this.stationFloorY
+              const subT =
+                Math.abs(subDy) > 1e-5
+                  ? Math.max(0, Math.min(1, (surfaceY - prevSampleY) / subDy))
+                  : 1
+              pos.set(
+                prevSampleX + (sx - prevSampleX) * subT,
+                surfaceY,
+                prevSampleZ + (sz - prevSampleZ) * subT,
+              )
+              this._callbackNormal.set(0, 1, 0)
+            } else if (ceilingHit) {
+              const subDy = sy - prevSampleY
+              const surfaceY = this.stationCeilingY
+              const subT =
+                Math.abs(subDy) > 1e-5
+                  ? Math.max(0, Math.min(1, (surfaceY - prevSampleY) / subDy))
+                  : 1
+              pos.set(
+                prevSampleX + (sx - prevSampleX) * subT,
+                surfaceY,
+                prevSampleZ + (sz - prevSampleZ) * subT,
+              )
+              this._callbackNormal.set(0, -1, 0)
+            } else {
+              // Wall hit. Project the impact onto the AABB face plane
+              // using the entry `t` from `findWallNormal` so the decal
+              // anchors to the actual wall surface — without this, the
+              // decal sits at the swept sample (up to one sample-step
+              // past the wall) and reads as floating closer to the
+              // camera than where the bolt visually struck.
+              const wt = Math.max(0, Math.min(1, this._wallNormal2D.t))
+              pos.set(
+                prevSampleX + (sx - prevSampleX) * wt,
+                prevSampleY + (sy - prevSampleY) * wt,
+                prevSampleZ + (sz - prevSampleZ) * wt,
+              )
+              this._callbackNormal.set(this._wallNormal2D.nx, 0, this._wallNormal2D.nz)
+            }
+            this._hasCallbackNormal = true
+            hitTerrain = true
+            break
+          }
+          prevSampleX = sx
+          prevSampleY = sy
+          prevSampleZ = sz
+        }
+      } else if (this.terrainCollisionEnabled && this.heightmap) {
+        const floorY = this.heightmap.heightAt(pos.x, pos.z)
+        hitTerrain = floorY !== null && pos.y <= floorY + TERRAIN_HIT_MARGIN
+      }
 
       // Remove on hit or timeout
       if (
@@ -671,7 +808,11 @@ export class ProjectileSystem implements Tickable {
           } else {
             kind = 'terrain'
           }
-          this.onImpact?.(this._callbackPos, { boltKind: p.boltKind, kind })
+          this.onImpact?.(this._callbackPos, {
+            boltKind: p.boltKind,
+            kind,
+            normal: this._hasCallbackNormal ? this._callbackNormal : null,
+          })
         }
         this.removeProjectile(i)
       }

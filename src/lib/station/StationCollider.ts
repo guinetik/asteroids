@@ -103,6 +103,180 @@ export class StationCollider {
   }
 
   /**
+   * Whether `(x, z)` is blocked by station geometry — outside the
+   * walkable union of (room floors ∪ doorway passages), or inside any
+   * dynamic blocker rect (closed door panels, prop AABBs).
+   *
+   * Used by the projectile system for wall/door/prop collision: bolts
+   * stop the moment they cross into a blocked point. The radius arg is
+   * 0 by default so the test is a true point-in-region (callers can
+   * pass a small margin if they want bolts to detonate slightly before
+   * the surface).
+   *
+   * @param x - World X.
+   * @param z - World Z.
+   * @returns `true` when the point sits in a wall, closed door, or prop.
+   */
+  isPointBlocked(x: number, z: number): boolean {
+    return !this._isInsideUnion(x, z, 0)
+  }
+
+  /**
+   * Resolve the wall normal (in XZ) at the point a bolt entered a
+   * blocked region between `(prevX, prevZ)` and `(x, z)`. The bolt
+   * segment is assumed to start unblocked and end blocked.
+   *
+   * - Blocker (door panel / prop AABB) hit: the normal is the outward
+   *   face of the AABB the bolt entered through, computed by picking the
+   *   smallest positive `t` among the four face-crossing planes.
+   * - Walkable-edge hit (bolt left every floor + passage rect): finds the
+   *   floor rect the segment started in and returns the outward face of
+   *   that rect the bolt crossed.
+   *
+   * Both cases yield axis-aligned `(±1, 0)` or `(0, ±1)` normals, which
+   * matches a station made of half-cylinder rooms (AABB floor footprints)
+   * and AABB blockers — no smoothed curvature.
+   *
+   * @param prevX - Previous bolt X (unblocked).
+   * @param prevZ - Previous bolt Z (unblocked).
+   * @param x - Current bolt X (blocked).
+   * @param z - Current bolt Z (blocked).
+   * @param out - Reused 2D normal scratch; populated on hit.
+   * @returns `true` when the segment hit a wall, `false` otherwise.
+   */
+  findWallNormal(
+    prevX: number,
+    prevZ: number,
+    x: number,
+    z: number,
+    out: { nx: number; nz: number; t: number },
+  ): boolean {
+    const dx = x - prevX
+    const dz = z - prevZ
+
+    for (const b of this._blockers) {
+      if (x >= b.minX && x <= b.maxX && z >= b.minZ && z <= b.maxZ) {
+        StationCollider._fillEntryNormal(prevX, prevZ, dx, dz, b, out)
+        return true
+      }
+    }
+
+    if (this._isInsideUnion(x, z, 0)) return false
+
+    for (const f of this._floors) {
+      if (prevX >= f.minX && prevX <= f.maxX && prevZ >= f.minZ && prevZ <= f.maxZ) {
+        StationCollider._fillExitNormal(prevX, prevZ, dx, dz, f, out)
+        return true
+      }
+    }
+
+    const len = Math.hypot(dx, dz)
+    if (len > 1e-5) {
+      out.nx = -dx / len
+      out.nz = -dz / len
+    } else {
+      out.nx = 0
+      out.nz = 1
+    }
+    out.t = 1
+    return true
+  }
+
+  /** Outward AABB face the segment entered through (blocker hits). */
+  private static _fillEntryNormal(
+    prevX: number,
+    prevZ: number,
+    dx: number,
+    dz: number,
+    rect: StationRect,
+    out: { nx: number; nz: number; t: number },
+  ): void {
+    let bestT = Number.POSITIVE_INFINITY
+    let nx = 0
+    let nz = 0
+    if (dx > 0) {
+      const t = (rect.minX - prevX) / dx
+      if (t >= 0 && t < bestT) {
+        bestT = t
+        nx = -1
+        nz = 0
+      }
+    } else if (dx < 0) {
+      const t = (rect.maxX - prevX) / dx
+      if (t >= 0 && t < bestT) {
+        bestT = t
+        nx = 1
+        nz = 0
+      }
+    }
+    if (dz > 0) {
+      const t = (rect.minZ - prevZ) / dz
+      if (t >= 0 && t < bestT) {
+        bestT = t
+        nx = 0
+        nz = -1
+      }
+    } else if (dz < 0) {
+      const t = (rect.maxZ - prevZ) / dz
+      if (t >= 0 && t < bestT) {
+        bestT = t
+        nx = 0
+        nz = 1
+      }
+    }
+    out.nx = nx
+    out.nz = nz
+    out.t = bestT === Number.POSITIVE_INFINITY ? 1 : bestT
+  }
+
+  /** Outward AABB face the segment exited through (walkable-edge hits). */
+  private static _fillExitNormal(
+    prevX: number,
+    prevZ: number,
+    dx: number,
+    dz: number,
+    rect: StationRect,
+    out: { nx: number; nz: number; t: number },
+  ): void {
+    let bestT = Number.POSITIVE_INFINITY
+    let nx = 0
+    let nz = 0
+    if (dx > 0) {
+      const t = (rect.maxX - prevX) / dx
+      if (t >= 0 && t < bestT) {
+        bestT = t
+        nx = 1
+        nz = 0
+      }
+    } else if (dx < 0) {
+      const t = (rect.minX - prevX) / dx
+      if (t >= 0 && t < bestT) {
+        bestT = t
+        nx = -1
+        nz = 0
+      }
+    }
+    if (dz > 0) {
+      const t = (rect.maxZ - prevZ) / dz
+      if (t >= 0 && t < bestT) {
+        bestT = t
+        nx = 0
+        nz = 1
+      }
+    } else if (dz < 0) {
+      const t = (rect.minZ - prevZ) / dz
+      if (t >= 0 && t < bestT) {
+        bestT = t
+        nx = 0
+        nz = -1
+      }
+    }
+    out.nx = nx
+    out.nz = nz
+    out.t = bestT === Number.POSITIVE_INFINITY ? 1 : bestT
+  }
+
+  /**
    * Resolve a desired lateral move so the player stays inside the union
    * of (room floors ∪ doorway passages), shrunk by the player capsule
    * radius. Tries axis-decomposed steps so the player slides along walls

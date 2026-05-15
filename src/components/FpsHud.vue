@@ -39,8 +39,9 @@ const props = withDefaults(
      * HUD variant. `'level'` (default) shows all elements including crosshair,
      * mode charge, hotbar, and sprint stamina. `'eva'` hides combat/tool UI
      * and keeps HP / O2 / RTG / SPD / HDG only. `'evaMap'` is map EVA: science
-     * reticle, SCI-only hotbar, no mining/laser. `'station'` is for the
-     * station-interior view: HP + O2 + STA only — no combat, no RTG.
+     * reticle, SCI-only hotbar, no mining/laser. `'station'` is the
+     * station-interior view: full multitool (DRL/LAS/SCI hotbar, mode bar,
+     * RTG) plus STA — same as `'level'` but without level-specific overlays.
      */
     variant?: 'level' | 'eva' | 'evaMap' | 'station'
     /**
@@ -52,8 +53,7 @@ const props = withDefaults(
   { variant: 'level', hideMovementReadout: false },
 )
 
-const showCombatHud = (): boolean =>
-  props.variant !== 'eva' && props.variant !== 'station'
+const showCombatHud = (): boolean => props.variant !== 'eva'
 
 /** Map EVA: science tool HUD without DRL/LAS hotkeys. */
 const showEvaMapToolHud = (): boolean => props.variant === 'evaMap'
@@ -61,9 +61,6 @@ const showEvaMapToolHud = (): boolean => props.variant === 'evaMap'
 /** Stamina/sprint bar visible on level + station; hidden on EVA variants. */
 const showStaminaBar = (): boolean =>
   props.variant === 'level' || props.variant === 'station'
-
-/** RTG bar hidden in station interiors (no multi-tool, no RTG concept). */
-const showRtgBar = (): boolean => props.variant !== 'station'
 
 function pct(value: number, max: number): number {
   return max > 0 ? (value / max) * 100 : 0
@@ -333,7 +330,7 @@ function showRockTarget(): boolean {
         </div>
       </div>
 
-      <div v-if="showRtgBar()" class="flex w-32 shrink-0 flex-col gap-1">
+      <div class="flex w-32 shrink-0 flex-col gap-1">
         <span class="text-[10px] tracking-widest uppercase text-yellow-400/50">RTG</span>
         <div class="h-3 w-full overflow-hidden rounded-sm bg-white/10">
           <div
