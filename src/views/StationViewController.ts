@@ -540,8 +540,10 @@ export class StationViewController implements Tickable {
     // Ceiling turrets: spawn at door corners, register their enemies
     // with the player's bolt system, and route their dart-on-player
     // hits to the existing damage flash + HP-loss pipeline.
-    this.turretDirector = new StationTurretDirector(this.sceneManager.scene, (enemy) =>
-      this.projectileSystem!.addEnemy(enemy),
+    this.turretDirector = new StationTurretDirector(
+      this.sceneManager.scene,
+      (enemy) => this.projectileSystem!.addEnemy(enemy),
+      (enemy) => this.projectileSystem!.removeEnemy(enemy),
     )
     this.turretDirector.setOnPlayerHit((damage) => {
       this.playerController?.takeDamage(damage)

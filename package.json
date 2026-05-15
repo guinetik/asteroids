@@ -49,6 +49,7 @@
     "models:voyager:build": "gltf-transform optimize \"3d/voyager_rigged.glb\" \"public/models/voyager.glb\" --join false --flatten false --simplify false --texture-compress webp --texture-size 2048 --meshopt-level high",
     "models:station-terminal:build": "gltf-transform optimize \"3d/station_terminal.glb\" \"public/models/station_terminal.glb\" --join false --flatten false --simplify false --texture-compress webp --texture-size 1024 --meshopt-level high",
     "models:furniture-pack:build": "gltf-transform optimize \"3d/furniture_pack.glb\" \"public/models/furniture_pack.glb\" --join false --flatten false --simplify false --texture-compress webp --texture-size 1024 --meshopt-level high",
+    "models:turret:build": "gltf-transform optimize \"3d/turret.glb\" \"public/models/turret.glb\" --join false --flatten false --simplify false --texture-compress webp --texture-size 1024 --meshopt-level high",
     "models:powergen:build": "run-s models:powergen:optimize models:powergen:center",
     "models:powergen:optimize": "gltf-transform optimize \"3d/powergen.glb\" \"public/models/powergen.glb\" --join false --flatten false --simplify false --texture-compress webp --texture-size 1024 --meshopt-level high",
     "models:powergen:center": "node scripts/optimize-powergen-glb.mjs",
