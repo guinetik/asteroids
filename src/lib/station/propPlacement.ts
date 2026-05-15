@@ -456,20 +456,8 @@ export type Rng = () => number
 
 /**
  * Affinity placer with relational attachment AND collision
- * rejection. Behaves like {@link placeByAffinity} but, before scoring
- * each prop, synthesises attachment anchors from prior placements
- * whose host tags intersect the prop's {@link PropSpec.attachTo}
- * list. Synthesised anchors are scored alongside the room pool, so
- * a high `attachment` affinity (e.g. chair → 5) outranks a mild edge
- * preference (chair → 2).
- *
- * Each candidate is then validated against every prior placement: if
- * the prop's {@link PropSpec.footprint} (centred on the candidate)
- * would overlap any placed prop's footprint (plus `clearance`), the
- * candidate is dropped. Footprint-less props skip the check.
- *
- * When `rng` is supplied, ties at the highest *valid* score are
- * broken by sampling uniformly at random.
+ * rejection. Thin wrapper around {@link placeFillers} — equivalent
+ * to placing `props` into an empty room.
  *
  * @param props - Props in priority order.
  * @param pool - Room-level anchors (corners + edges + center).
@@ -486,11 +474,65 @@ export function placeWithAttachments(
   rng?: Rng,
   clearance: number = 0,
 ): Placement[] {
-  const propById = new Map(props.map((p) => [p.id, p]))
-  const placed: Placement[] = []
+  return placeFillers([], [], props, pool, budget, rng, clearance)
+}
+
+/**
+ * Place `fillProps` into a room that already contains
+ * `seedPlacements` (e.g. JSON-authored gameplay props that were
+ * positioned by hand). Seed placements participate in collision
+ * checks and can act as attachment hosts, but they are NOT returned
+ * in the result — the caller already knows about them.
+ *
+ * Anchor scoring, RNG tie-breaks, budget enforcement and the
+ * skip-and-continue failure mode are identical to
+ * {@link placeWithAttachments}; this overload only differs in the
+ * pre-seeding.
+ *
+ * Typical use:
+ *
+ * ```ts
+ * const fillPlacements = placeFillers(
+ *   authoredAsSpecs, authoredPlacements,
+ *   sortByClass(fillCatalog),
+ *   anchors,
+ *   roomBudget(room) - sumWeights(authoredAsSpecs),
+ *   mulberry32(hashString(`${stationId}/${roomId}`)),
+ *   0.1,
+ * )
+ * ```
+ *
+ * @param seedProps - PropSpec metadata for already-placed props. Used
+ *   to look up tags and footprints during attachment + collision.
+ * @param seedPlacements - Where the seed props ended up. Length and
+ *   order need not match `seedProps`, but every `seedPlacement.propId`
+ *   must appear in `seedProps`.
+ * @param fillProps - New props to place, in priority order.
+ * @param pool - Room-level anchors.
+ * @param budget - Maximum total weight to spend on `fillProps` (does
+ *   not count seed weight — the caller subtracts that upstream).
+ * @param rng - Optional PRNG for tie-breaking.
+ * @param clearance - Minimum gap between any two placed props' edges.
+ * @returns Only the new fill placements, in pick order. Seed
+ *   placements are not echoed back.
+ */
+export function placeFillers(
+  seedProps: PropSpec[],
+  seedPlacements: Placement[],
+  fillProps: PropSpec[],
+  pool: Anchor[],
+  budget: number,
+  rng?: Rng,
+  clearance: number = 0,
+): Placement[] {
+  const propById = new Map<string, PropSpec>()
+  for (const p of seedProps) propById.set(p.id, p)
+  for (const p of fillProps) propById.set(p.id, p)
+  const placed: Placement[] = [...seedPlacements]
   const used = new Set<string>()
+  const seedCount = placed.length
   let spent = 0
-  for (const prop of props) {
+  for (const prop of fillProps) {
     if (spent + prop.weight > budget) continue
     const candidates = collectCandidateAnchors(prop, placed, propById, pool)
     const valid = filterByCollision(prop, candidates, placed, propById, clearance)
@@ -506,7 +548,7 @@ export function placeWithAttachments(
     })
     spent += prop.weight
   }
-  return placed
+  return placed.slice(seedCount)
 }
 
 /**

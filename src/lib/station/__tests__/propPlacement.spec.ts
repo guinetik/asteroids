@@ -11,6 +11,8 @@ import {
   edgeAnchors,
   placeAtAnchors,
   placeByAffinity,
+  placeFillers,
+  type Placement,
   placeWithAttachments,
   type PropAffinity,
   type PropClass,
@@ -579,6 +581,108 @@ describe('placeWithAttachments — collision rejection', () => {
     const placements = placeWithAttachments([big('a'), big('b')], fullPool, Infinity, undefined, 5)
     expect(placements[0]?.anchorId).toBe('corner-nw')
     expect(placements[1]?.anchorId).not.toBe('corner-ne')
+  })
+})
+
+describe('placeFillers', () => {
+  const room = { width: 8, depth: 6 }
+  const pool = [
+    ...cornerAnchors(room, 0),
+    ...edgeAnchors(room, 1, 0),
+    ...centerAnchor(room),
+  ]
+
+  /** A JSON-authored terminal sitting against the north wall, no attachment hooks. */
+  const authoredTerminal: PropSpec = {
+    id: 'authored-terminal',
+    weight: 2,
+    footprint: { halfX: 0.6, halfZ: 0.4 },
+  }
+  const authoredPlacement: Placement = {
+    propId: 'authored-terminal',
+    anchorId: 'authored-0',
+    x: 0,
+    z: -2.6,
+  }
+
+  /** A filler container that loves corners. */
+  const fillBox = (id: string): PropSpec => ({
+    id,
+    weight: 1,
+    affinity: { corner: 3, edge: 0, center: -2 },
+    footprint: { halfX: 0.5, halfZ: 0.5 },
+  })
+
+  it('returns only the new fill placements — never echoes the seed back', () => {
+    const result = placeFillers(
+      [authoredTerminal],
+      [authoredPlacement],
+      [fillBox('box-1'), fillBox('box-2')],
+      pool,
+      Infinity,
+    )
+    expect(result).toHaveLength(2)
+    expect(result.every((p) => p.propId.startsWith('box-'))).toBe(true)
+  })
+
+  it('honors seed placements in the collision check — fill anchors that overlap a seed are dropped', () => {
+    const fatTerminalSeed: Placement = { ...authoredPlacement, x: -2.4, z: -1.4 }
+    const fatTerminal: PropSpec = {
+      ...authoredTerminal,
+      footprint: { halfX: 2.5, halfZ: 2.5 },
+    }
+    const result = placeFillers(
+      [fatTerminal],
+      [fatTerminalSeed],
+      [fillBox('box-1')],
+      pool,
+      Infinity,
+    )
+    expect(result[0]?.anchorId).not.toBe('corner-nw')
+  })
+
+  it('lets fill props attach to a seed prop tagged as a host', () => {
+    const desk: PropSpec = {
+      id: 'authored-desk',
+      weight: 3,
+      tags: ['table'],
+      footprint: { halfX: 0.6, halfZ: 0.4 },
+    }
+    const deskPlacement: Placement = {
+      propId: 'authored-desk',
+      anchorId: 'authored-0',
+      x: 0,
+      z: 0,
+    }
+    const chair: PropSpec = {
+      id: 'fill-chair',
+      weight: 2,
+      affinity: { attachment: 5, edge: 2, corner: -1, center: -1 },
+      attachTo: ['table'],
+      footprint: { halfX: 0.25, halfZ: 0.25 },
+    }
+    const result = placeFillers([desk], [deskPlacement], [chair], pool, Infinity)
+    expect(result[0]?.anchorId).toBe('attach-authored-0-back')
+  })
+
+  it('charges only the fill weights against the budget — seeds are free', () => {
+    const result = placeFillers(
+      [authoredTerminal],
+      [authoredPlacement],
+      [fillBox('box-1'), fillBox('box-2'), fillBox('box-3')],
+      pool,
+      2,
+    )
+    // Three weight-1 boxes vs budget 2 → two boxes fit, third skips.
+    // Authored terminal weight is irrelevant.
+    expect(result).toHaveLength(2)
+  })
+
+  it('degenerates to placeWithAttachments when there are no seeds', () => {
+    const props = [fillBox('a'), fillBox('b')]
+    const withWrapper = placeWithAttachments(props, pool, Infinity)
+    const withFiller = placeFillers([], [], props, pool, Infinity)
+    expect(withFiller).toEqual(withWrapper)
   })
 })
 

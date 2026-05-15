@@ -20,8 +20,15 @@ import {
   STATION_TERMINAL_BASE_HALF_X,
   STATION_TERMINAL_BASE_HALF_Z,
 } from '@/three/StationTerminalModel'
+import {
+  StationPowerGenModel,
+  STATION_POWERGEN_BASE_HALF_X,
+  STATION_POWERGEN_BASE_HALF_Z,
+} from '@/three/StationPowerGenModel'
+import { FurniturePackProp } from '@/three/FurniturePackProp'
 import { BunkerChestModel } from '@/three/bunker/BunkerChestModel'
 import { ITEM_CATALOG } from '@/lib/inventory/catalog'
+import { getScienceHealingMultiplier } from '@/lib/fps/scienceHealing'
 // Side-effect: registers trade-good item definitions into ITEM_CATALOG
 // so `rollTradeableReward` can sample from them.
 import '@/lib/shop/tradeGoods'
@@ -37,6 +44,43 @@ const TERMINAL_INTERIOR_SCALE = 1
 
 /** Uniform scale applied to `BunkerChestModel` when used as a station prop. */
 const CHEST_INTERIOR_SCALE = 0.35
+
+/**
+ * Default uniform scale for {@link StationPowerGenModel}. Native GLB is
+ * ~0.73 m tall — at scale 2.5 it reads as a chunky waist-to-shoulder
+ * industrial generator inside a 2×2 tile (≈ 7.7 m) room without
+ * crowding the entrance.
+ */
+const POWERGEN_INTERIOR_SCALE = 2.5
+
+/**
+ * Target longest visible dimension for the furniture-pack `box`
+ * crate, in metres. The loader auto-scales the GLB so its longest
+ * axis matches this — small storage crate, knee-high.
+ */
+const BOX_TARGET_LONGEST = 0.6
+
+/** Half-extent along X for the box's collision footprint. */
+const BOX_HALF_X = 0.3
+
+/** Half-extent along Z for the box's collision footprint. */
+const BOX_HALF_Z = 0.3
+
+/**
+ * Target longest visible dimension for the furniture-pack `table`,
+ * in metres. Reads as a small office desk rather than a banquet.
+ */
+const TABLE_TARGET_LONGEST = 1.9
+
+/**
+ * Half-extent along X for the table's collision footprint. Source
+ * aspect is ~30:32 on X:Z, so at 1.9 m longest the X side is ~1.78 m
+ * → 0.89 m half-extent.
+ */
+const TABLE_HALF_X = 0.89
+
+/** Half-extent along Z for the table's collision footprint. */
+const TABLE_HALF_Z = 0.95
 
 /** Half-extents of the crate body at native scale (matches `DepositCrateModel`). */
 const CHEST_NATIVE_HALF_WIDTH = 2.3
@@ -102,6 +146,34 @@ export interface StationPropInstance {
   showMap?: (canvas: HTMLCanvasElement) => void
   /** Companion to {@link showMap} — hide / restore the prop's idle screen. */
   hideMap?: () => void
+  /**
+   * Optional handle for props that participate in the SCI-bolt repair
+   * flow (currently only `'powergen'`). The host view registers
+   * {@link scienceRepair.target} with the projectile system at
+   * station-load time and subscribes to {@link scienceRepair.onAllRepaired}
+   * to drive "power restored" side-effects (room lights, door unlock).
+   */
+  scienceRepair?: {
+    /**
+     * Implements {@link EvaSatelliteServicingScienceBoltTarget} so the
+     * existing projectile-system slot can dispatch into the prop.
+     */
+    target: {
+      tryScienceRepairSegment: (
+        from: import('three').Vector3,
+        to: import('three').Vector3,
+        outEntry: import('three').Vector3,
+      ) => boolean
+    }
+    /** Register a callback that fires once when every component is repaired. */
+    onAllRepaired: (cb: () => void) => void
+    /**
+     * Read-only snapshot of per-component repair progress (0 → broken,
+     * 1 → restored). Polled by diagnostics terminals; safe to call every
+     * frame.
+     */
+    getComponentProgress: () => Array<{ index: number; progress: number }>
+  }
 }
 
 /**
@@ -128,6 +200,47 @@ export function createStationProp(kind: string): StationPropInstance {
         setStatus: (status) => model.setScreenEmissive(TERMINAL_STATUS_COLOR[status]),
         showMap: (canvas) => model.showMapTexture(canvas),
         hideMap: () => model.hideMapTexture(),
+      }
+    }
+    case 'box': {
+      const model = new FurniturePackProp('box', { targetLongest: BOX_TARGET_LONGEST })
+      return {
+        group: model.group,
+        dispose: () => model.dispose(),
+        localFootprint: { halfX: BOX_HALF_X, halfZ: BOX_HALF_Z },
+      }
+    }
+    case 'table': {
+      const model = new FurniturePackProp('table', { targetLongest: TABLE_TARGET_LONGEST })
+      return {
+        group: model.group,
+        dispose: () => model.dispose(),
+        localFootprint: { halfX: TABLE_HALF_X, halfZ: TABLE_HALF_Z },
+      }
+    }
+    case 'powergen': {
+      const model = new StationPowerGenModel()
+      // Wire the multitool Science Upgrade through as per-shot
+      // "inverse damage" — each SCI bolt deducts more from the cell's
+      // hit budget, so investing in SCI literally charges the
+      // generator faster. Uses the doubled "healing equipment" curve
+      // so the repair gameplay feels much punchier than the raw
+      // mission-CR multiplier would imply.
+      model.setScienceHitMultiplier(getScienceHealingMultiplier())
+      return {
+        group: model.group,
+        dispose: () => model.dispose(),
+        localFootprint: {
+          halfX: STATION_POWERGEN_BASE_HALF_X,
+          halfZ: STATION_POWERGEN_BASE_HALF_Z,
+        },
+        scienceRepair: {
+          target: model,
+          onAllRepaired: (cb) => {
+            model.onPowerRestored = cb
+          },
+          getComponentProgress: () => model.getCellProgress(),
+        },
       }
     }
     case 'chest': {
@@ -162,8 +275,14 @@ export function defaultPropScale(kind: string): number {
   switch (kind) {
     case 'terminal':
       return TERMINAL_INTERIOR_SCALE
+    case 'box':
+      return 1
+    case 'table':
+      return 1
     case 'chest':
       return CHEST_INTERIOR_SCALE
+    case 'powergen':
+      return POWERGEN_INTERIOR_SCALE
     default:
       return 1
   }

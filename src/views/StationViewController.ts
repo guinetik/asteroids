@@ -41,6 +41,7 @@ import { StationCollider, type StationRect } from '@/lib/station/StationCollider
 import { buildStation, type BuiltStation, type PropInteractor } from '@/three/StationBuilder'
 import { computeDeathPresentationState, stepDamageFlash } from '@/lib/fps/fpsPresentation'
 import { drawMazeCanvas } from '@/views/stationMazeCanvas'
+import { drawPowerGenStatusCanvas } from '@/views/stationPowerGenCanvas'
 import { getCurrentUpgradeValue } from '@/lib/upgrades'
 import {
   syncTronHologramTimeSeconds,
@@ -85,6 +86,37 @@ const FLOOR_Y = 0.25
  */
 const STATION_CEILING_Y = 3.2
 
+/**
+ * Magic string that flags an authored entrance as gated on station
+ * power being restored. Any locked entrance whose `lockedPrompt` matches
+ * this gets unlocked by {@link StationViewController.handleStationPowerRestored}
+ * once a powergen prop fires its `onPowerRestored` callback. Authors
+ * opt in by setting this exact prompt in the layout JSON.
+ */
+const POWER_GATE_LOCKED_PROMPT = 'POWER OFFLINE  ·  RESTORE GENERATOR'
+
+/** Event id of the diagnostics terminal that mirrors the powergen status. */
+const POWER_DIAGNOSTICS_TERMINAL_EVENT = 'terminal:use:r-power'
+
+/**
+ * Seconds between diagnostics terminal repaints. The canvas paint is
+ * cheap (a few rects + text) but updating the `CanvasTexture` every
+ * frame is wasted GPU bandwidth — quarter-second cadence is well below
+ * perceptible latency and keeps the texture upload pipeline quiet.
+ */
+const POWER_DIAGNOSTICS_REPAINT_INTERVAL = 0.25
+
+/**
+ * Multitool bolt-length multiplier inside the station. The default
+ * outdoor bolt is 6 world units long — fine across an asteroid surface
+ * but it spans an entire room here, blurring the player's sense of
+ * which prop they're shooting. ~35% reads as a short crisp pulse
+ * without losing the glow trail.
+ */
+const STATION_BOLT_LENGTH_SCALE = 0.35
+/** Multitool bolt-width multiplier inside the station — tighter beam. */
+const STATION_BOLT_WIDTH_SCALE = 0.7
+
 /** Per-mode hex tints applied to wall-impact decals (matches bolt color). */
 const WALL_DECAL_COLOR: Readonly<Record<MultiToolMode, number>> = {
   drill: 0x3b82f6,
@@ -100,10 +132,14 @@ const ENTRANCE_INTERACT_DISTANCE = 2.5
 // Lighting constants.
 // ---------------------------------------------------------------------------
 
-/** Ambient light intensity. */
+/** Ambient light intensity while the station is dormant (no power). */
 const AMBIENT_LIGHT_INTENSITY = 0.5
-/** Directional fill light intensity. */
+/** Directional fill light intensity while the station is dormant. */
 const DIR_LIGHT_INTENSITY = 0.8
+/** Ambient intensity bumped to once station power is restored. */
+const AMBIENT_LIGHT_INTENSITY_POWERED = 1.0
+/** Directional intensity bumped to once station power is restored. */
+const DIR_LIGHT_INTENSITY_POWERED = 1.4
 /** Directional fill light height. */
 const DIR_LIGHT_HEIGHT = 20
 /** Directional fill light colour. */
@@ -232,6 +268,27 @@ export class StationViewController implements Tickable {
   private impactEmitter: ParticleEmitter | null = null
   /** Wall-aligned glow decals stamped at each projectile impact. */
   private wallImpactDecals: WallImpactDecalPool | null = null
+  /** Ambient fill — brightens once station power is restored. */
+  private ambientLight: AmbientLight | null = null
+  /** Directional fill — brightens once station power is restored. */
+  private directionalLight: DirectionalLight | null = null
+  /** True once a powergen prop has fired its `onPowerRestored` callback. */
+  private stationPowerRestored = false
+  /**
+   * Scratch state for the generator diagnostics terminal — paints a
+   * live status panel onto the r-power terminal's screen. Null when
+   * the layout doesn't include a powergen prop.
+   */
+  private powerDiagnostics: {
+    /** Source of truth for cell progress. */
+    source: { getComponentProgress: () => Array<{ index: number; progress: number }> }
+    /** Live canvas mapped onto the terminal screen. */
+    canvas: HTMLCanvasElement
+    /** Event id of the terminal showing the canvas. */
+    terminalEvent: string
+    /** Seconds since the last repaint, accumulated by the tick loop. */
+    sinceRepaint: number
+  } | null = null
   /** Reused upward velocity scratch for impact-emitter spawns. */
   private readonly _impactUp = new Vector3(0, 1, 0)
   /** Reused emit-velocity scratch for impact-emitter spawns. */
@@ -342,18 +399,21 @@ export class StationViewController implements Tickable {
 
     // Whole station from the authored layout fetched by id.
     const layout = await this.fetchLayout(stationId)
-    this.station = await buildStation(layout)
+    this.station = await buildStation(layout, stationId)
     this.sceneManager.addToScene(this.station.group)
 
     // Spawn at the hub corridor's origin (Yamada places it at world XZ = 0).
     this.spawnPos.set(0, FLOOR_Y, 0)
 
-    // Lighting.
+    // Lighting. Refs are kept so the powergen-repair flow can brighten
+    // the room once every fuel cell is restored.
     const ambient = new AmbientLight(new Color(DIR_LIGHT_COLOR), AMBIENT_LIGHT_INTENSITY)
     const dir = new DirectionalLight(DIR_LIGHT_COLOR, DIR_LIGHT_INTENSITY)
     dir.position.set(0, DIR_LIGHT_HEIGHT, 0)
     this.sceneManager.addToScene(ambient)
     this.sceneManager.addToScene(dir)
+    this.ambientLight = ambient
+    this.directionalLight = dir
 
     // Dense starfield — stations view the sky through small window cutouts,
     // so we pack the sphere ~10× denser than the open-shuttle default. Radius
@@ -422,6 +482,13 @@ export class StationViewController implements Tickable {
     this.multiToolState = new MultiToolState(buildMultiToolConfig())
     this.projectileSystem = new ProjectileSystem(this.sceneManager.scene, null)
     this.projectileSystem.setStationCollider(this.stationCollider, FLOOR_Y, STATION_CEILING_Y)
+    // Smaller indoor bolt — the default 6-unit length spans an entire
+    // station room and made the SCI repair feel like it grazed multiple
+    // fuel cells per shot. Visual only; collision is a moving point.
+    this.projectileSystem.setBoltVisualScale(
+      STATION_BOLT_LENGTH_SCALE,
+      STATION_BOLT_WIDTH_SCALE,
+    )
     this.projectileSystem.prewarmPool()
     this.impactEmitter = new ParticleEmitter({
       poolSize: 64,
@@ -445,6 +512,17 @@ export class StationViewController implements Tickable {
       }
     }
     this.multiTool.setProjectileSystem(this.projectileSystem)
+
+    // Wire every prop participating in the SCI repair flow into the
+    // projectile system. Today the only client is the power generator,
+    // which when fully repaired brightens the room lights and unlocks
+    // the gated entrance into the rest of the station.
+    for (const prop of this.station.props) {
+      if (!prop.scienceRepair) continue
+      this.projectileSystem.setEvaSatelliteServicingScience(prop.scienceRepair.target)
+      prop.scienceRepair.onAllRepaired(() => this.handleStationPowerRestored())
+      this.bindPowerDiagnosticsTerminal(prop.scienceRepair)
+    }
 
     // Tick order.
     this.tickHandler.register(this.playerController, TICK_PRIORITY_PHYSICS)
@@ -493,6 +571,7 @@ export class StationViewController implements Tickable {
     this.tickDamageFlash(dt)
     this.tickDeathPresentation(dt)
     this.tickMultiTool()
+    this.tickPowerDiagnostics(dt)
     this.emitFpsTelemetry()
 
     // Realised speed = actual displacement / dt. Using this instead of
@@ -707,6 +786,91 @@ export class StationViewController implements Tickable {
       this.onPrompt?.(null)
     }
     return true
+  }
+
+  /**
+   * Fires once when a power-generator prop reports every fuel cell
+   * repaired: brightens the room lights and unlocks every entrance
+   * authored with a `power-gate` lock prompt (today: the r-hub south
+   * door so the player can advance into the rest of the station).
+   * Idempotent — safe if multiple powergen props end up in one layout.
+   */
+  private handleStationPowerRestored(): void {
+    if (this.stationPowerRestored) return
+    this.stationPowerRestored = true
+    if (this.ambientLight) this.ambientLight.intensity = AMBIENT_LIGHT_INTENSITY_POWERED
+    if (this.directionalLight) this.directionalLight.intensity = DIR_LIGHT_INTENSITY_POWERED
+    if (this.station) {
+      for (const entrance of this.station.entrances) {
+        if (!entrance.locked) continue
+        if (entrance.lockedPrompt !== POWER_GATE_LOCKED_PROMPT) continue
+        entrance.locked = false
+      }
+      this.updateDoorBlockers()
+    }
+    // Flip the diagnostics terminal screen to its "online" tint and
+    // force one final repaint so the player sees "POWER ONLINE" the
+    // moment the last cell lands.
+    const diag = this.powerDiagnostics
+    if (diag) {
+      const interactor = this.findInteractorByEvent(diag.terminalEvent)
+      interactor?.prop.setStatus?.('success')
+      this.repaintPowerDiagnostics()
+    }
+  }
+
+  /**
+   * Wire a powergen prop's repair source to the r-power terminal so its
+   * screen mirrors the generator state. No-op if the terminal isn't in
+   * the layout — the diagnostics overlay is optional cosmetic UI.
+   *
+   * @param scienceRepair - The prop's exposed repair handle (target +
+   *   per-cell progress accessor).
+   */
+  private bindPowerDiagnosticsTerminal(scienceRepair: {
+    getComponentProgress: () => Array<{ index: number; progress: number }>
+  }): void {
+    if (!this.station) return
+    const interactor = this.findInteractorByEvent(POWER_DIAGNOSTICS_TERMINAL_EVENT)
+    if (!interactor?.prop.showMap) return
+    const canvas = document.createElement('canvas')
+    this.powerDiagnostics = {
+      source: scienceRepair,
+      canvas,
+      terminalEvent: POWER_DIAGNOSTICS_TERMINAL_EVENT,
+      sinceRepaint: 0,
+    }
+    this.repaintPowerDiagnostics()
+  }
+
+  /**
+   * Redraw the diagnostics canvas and re-push it onto the terminal so
+   * the underlying `CanvasTexture` re-uploads. Safe to call before the
+   * canvas is bound (no-op).
+   */
+  private repaintPowerDiagnostics(): void {
+    const diag = this.powerDiagnostics
+    if (!diag) return
+    const cells = diag.source.getComponentProgress()
+    drawPowerGenStatusCanvas(diag.canvas, cells, this.stationPowerRestored)
+    const interactor = this.findInteractorByEvent(diag.terminalEvent)
+    interactor?.prop.showMap?.(diag.canvas)
+  }
+
+  /**
+   * Per-frame poll: redraw the diagnostics canvas a few times a second
+   * while power is still offline so the player sees the per-cell bars
+   * tick up as they shoot. Stops once power is restored — the final
+   * "ONLINE" frame was painted by {@link handleStationPowerRestored}.
+   *
+   * @param dt - Frame delta in seconds.
+   */
+  private tickPowerDiagnostics(dt: number): void {
+    if (!this.powerDiagnostics || this.stationPowerRestored) return
+    this.powerDiagnostics.sinceRepaint += dt
+    if (this.powerDiagnostics.sinceRepaint < POWER_DIAGNOSTICS_REPAINT_INTERVAL) return
+    this.powerDiagnostics.sinceRepaint = 0
+    this.repaintPowerDiagnostics()
   }
 
   /**

@@ -54,6 +54,13 @@ import {
   type StationPropInstance,
 } from '@/three/stationProps'
 import type { RoomPropSpec } from '@/lib/station/StationLayout'
+import { autoFurnishRoom, type AuthoredPropSummary } from '@/lib/station/autoFurnish'
+
+/** Per-station gate for the procedural auto-furnish pass. */
+const AUTO_FURNISH_ENABLED = true
+
+/** Room ids that opt into the auto-furnish pass. Wider rollout follows visual tuning. */
+const AUTO_FURNISH_ROOMS: ReadonlySet<string> = new Set(['r-terminal'])
 import {
   applyDerelictWallOverlay,
   applyMetalDoorOverlay,
@@ -825,9 +832,14 @@ function synthesizeRewardChests(
  * Build a complete station interior scene graph from a validated station layout.
  *
  * @param layout - Authored station layout data loaded from `public/data/stations`.
+ * @param stationId - Stable id used to seed the auto-furnish RNG so each
+ *   station+room combination produces the same filler layout across reloads.
  * @returns The assembled station and runtime metadata used by the station view.
  */
-export async function buildStation(layout: StationLayout): Promise<BuiltStation> {
+export async function buildStation(
+  layout: StationLayout,
+  stationId: string = 'unknown',
+): Promise<BuiltStation> {
   const group = new Group()
   group.name = 'Station'
   const entrances: StationEntrance[] = []
@@ -943,6 +955,57 @@ export async function buildStation(layout: StationLayout): Promise<BuiltStation>
           disabled: false,
           meta,
         })
+      }
+    }
+
+    // Auto-furnish pass: deterministically scatter filler props (boxes
+    // for now) around the room's leftover budget. Treats the JSON-
+    // authored gameplay props as immovable seeds so collision and
+    // attachment honour them. Hazard rooms opt out — lava tiles aren't
+    // valid floor for filler.
+    if (
+      AUTO_FURNISH_ENABLED &&
+      !room.hazard &&
+      AUTO_FURNISH_ROOMS.has(room.id) &&
+      propSpecs.every((s) => s.pos)
+    ) {
+      const authored: AuthoredPropSummary[] = propSpecs
+        .filter((s) => s.pos)
+        .map((s) => ({
+          kind: s.kind,
+          localX: s.pos![0],
+          localZ: s.pos![1],
+          yaw: s.yaw ?? 0,
+        }))
+      const fillPlacements = autoFurnishRoom({
+        stationId,
+        roomId: room.id,
+        widthMeters: room.width * ROOM_TILE_SIZE,
+        depthMeters: room.depth * ROOM_TILE_SIZE,
+        authored,
+      })
+      const roomYaw = (room.yaw ?? 0) as YawTurns
+      for (const fill of fillPlacements) {
+        const fillProp = createStationProp(fill.kind)
+        const scale = defaultPropScale(fill.kind)
+        fillProp.group.position.set(fill.x, STATION_FLOOR_Y, fill.z)
+        fillProp.group.rotation.y = fill.facingYaw
+        fillProp.group.scale.setScalar(scale)
+        wrapper.add(fillProp.group)
+        props.push(fillProp)
+
+        const worldCenter = rotateVec2({ x: fill.x, z: fill.z }, roomYaw)
+        const worldX = room.anchor.x + worldCenter.x
+        const worldZ = room.anchor.z + worldCenter.z
+        const footprint = fillProp.localFootprint
+        if (footprint) {
+          propBlockers.push({
+            minX: worldX - footprint.halfX * scale,
+            maxX: worldX + footprint.halfX * scale,
+            minZ: worldZ - footprint.halfZ * scale,
+            maxZ: worldZ + footprint.halfZ * scale,
+          })
+        }
       }
     }
 
