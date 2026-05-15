@@ -63,6 +63,14 @@ const ALMOST_REPAIRED_COLOR = 0x84cc16
 /** Wireframe colour during the green celebration hold before removal. */
 const REPAIR_COMPLETE_COLOR = 0x4ade80
 
+/**
+ * Hit-flash duration. Short pulse so the player reads "shot landed" but
+ * the wireframe quickly settles back to the progress colour.
+ */
+const HIT_FLASH_DURATION = 0.18
+/** Target colour the wireframe lerps toward on each landed hit. */
+const HIT_FLASH_COLOR = 0x4ade80
+
 /** Wireframe overlay opacity. Matches `SatelliteRepairController`. */
 const WIREFRAME_OPACITY = 0.9
 
@@ -166,6 +174,12 @@ interface FuelCell {
    * numbers row uses `slot + 1`, letters row uses `'ABC'[slot]`.
    */
   slot: number
+  /**
+   * Seconds left on the hit-flash pulse. Decayed each tick; while > 0
+   * the wireframe colour lerps from its progress colour toward
+   * {@link HIT_FLASH_COLOR}, matching the turret hit-flash pattern.
+   */
+  hitFlashRemaining: number
 }
 
 /** Symbols rendered on the letters row of the puzzle UI, by slot index. */
@@ -286,6 +300,12 @@ export class StationPowerGenModel {
   private readonly _towardHit = new THREE.Vector3()
   /** Reused scratch — AABB size for tie-breaking on equal `t`. */
   private readonly _boundsSize = new THREE.Vector3()
+  /** Reused scratch — wireframe base colour (pre-flash). */
+  private readonly _flashBase = new THREE.Color()
+  /** Reused scratch — blended wireframe colour during the hit-flash. */
+  private readonly _flashOut = new THREE.Color()
+  /** Constant green tint the wireframe lerps toward on each landed hit. */
+  private readonly _flashTarget = new THREE.Color(HIT_FLASH_COLOR)
 
   /** Build an empty wrapper. {@link load} is kicked off automatically. */
   constructor() {
@@ -627,6 +647,7 @@ export class StationPowerGenModel {
       // Filled by {@link assignCellSides} on the first {@link startMinigame}.
       side: 'numbers',
       slot: 0,
+      hitFlashRemaining: 0,
     }
   }
 
@@ -867,6 +888,7 @@ export class StationPowerGenModel {
     cell.hitsRemaining = FUEL_CELL_REPAIR_HITS
     cell.fading = false
     cell.restored = false
+    cell.hitFlashRemaining = 0
   }
 
   /**
@@ -939,6 +961,10 @@ export class StationPowerGenModel {
     cell.hitsRemaining = Math.max(0, cell.hitsRemaining - this.scienceHitMultiplier)
     if (cell.hitsRemaining > 0) {
       this.setWireframeColor(cell.wireframe, this.progressColor(cell.hitsRemaining))
+      // Kick the per-cell flash so {@link tickHitFlashes} pulses the
+      // wireframe green for a beat before settling back to the new
+      // progress colour.
+      cell.hitFlashRemaining = HIT_FLASH_DURATION
       return
     }
     cell.fading = true
@@ -1025,6 +1051,7 @@ export class StationPowerGenModel {
    * @param dt - Frame delta in seconds.
    */
   tick(dt: number): void {
+    this.tickHitFlashes(dt)
     if (this.shakeRemaining <= 0 || !this.inner) return
     this.shakeRemaining = Math.max(0, this.shakeRemaining - dt)
     const lifeFrac = this.shakeRemaining / POWER_ON_SHAKE_DURATION
@@ -1036,6 +1063,27 @@ export class StationPowerGenModel {
     const oz = Math.cos(phase * 2.4 + 0.7) * POWER_ON_SHAKE_AMPLITUDE_XZ * decay
     this.inner.position.set(ox, oy, oz)
     if (this.shakeRemaining <= 0) this.inner.position.set(0, 0, 0)
+  }
+
+  /**
+   * Decay every cell's hit-flash timer and repaint its wireframe as a
+   * lerp from the cell's current progress colour toward
+   * {@link HIT_FLASH_COLOR}. Mirrors {@link TurretModel}'s flash pattern
+   * so on-hit feedback reads consistently across station props.
+   */
+  private tickHitFlashes(dt: number): void {
+    for (const cell of this.fuelCells.values()) {
+      if (cell.hitFlashRemaining <= 0) continue
+      if (cell.fading || cell.restored) {
+        cell.hitFlashRemaining = 0
+        continue
+      }
+      cell.hitFlashRemaining = Math.max(0, cell.hitFlashRemaining - dt)
+      const t = cell.hitFlashRemaining / HIT_FLASH_DURATION
+      this._flashBase.setHex(this.progressColor(cell.hitsRemaining))
+      this._flashOut.copy(this._flashBase).lerp(this._flashTarget, t)
+      this.setWireframeColor(cell.wireframe, this._flashOut.getHex())
+    }
   }
 
   /** Dispose geometry + material on every mesh under `obj`. */
