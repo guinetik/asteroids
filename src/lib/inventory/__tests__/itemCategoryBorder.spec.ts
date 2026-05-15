@@ -7,11 +7,11 @@ import {
 
 describe('getInventoryCategoryBorderUrl', () => {
   it('maps each catalog category to a published border WebP basename', () => {
-    expect(getInventoryCategoryBorderUrl('mineral')).toBe('/images/items/border_yellow.webp')
-    expect(getInventoryCategoryBorderUrl('consumable')).toBe('/images/items/border_green.webp')
-    expect(getInventoryCategoryBorderUrl('equipment')).toBe('/images/items/border_cyan.webp')
-    expect(getInventoryCategoryBorderUrl('trade-good')).toBe('/images/items/border_orange.webp')
-    expect(getInventoryCategoryBorderUrl('mission-material')).toBe('/images/items/border_purple.webp')
+    expect(getInventoryCategoryBorderUrl('mineral')).toBe('/items/border_yellow.webp')
+    expect(getInventoryCategoryBorderUrl('consumable')).toBe('/items/border_green.webp')
+    expect(getInventoryCategoryBorderUrl('equipment')).toBe('/items/border_cyan.webp')
+    expect(getInventoryCategoryBorderUrl('trade-good')).toBe('/items/border_orange.webp')
+    expect(getInventoryCategoryBorderUrl('mission-material')).toBe('/items/border_purple.webp')
   })
 })
 

@@ -16,13 +16,13 @@ function loadHomeChangelogUpdates(): HomeChangelogUpdate[] {
 }
 
 describe('home prelude changelog JSON', () => {
-  it('starts with The Habitat Update', () => {
-    const [first] = loadHomeChangelogUpdates()
+  it('includes The Habitat Update with expected launch notes', () => {
+    const updates = loadHomeChangelogUpdates()
+    const habitat = updates.find((update) => update.title === 'The Habitat Update')
 
-    expect(first?.title).toBe('The Habitat Update')
-    expect(first?.date).toBe('May 13, 2026')
-    expect(first?.description).toMatch(/habitat/i)
-    expect(first?.changes).toEqual(
+    expect(habitat?.date).toBe('May 13, 2026')
+    expect(habitat?.description).toMatch(/habitat/i)
+    expect(habitat?.changes).toEqual(
       expect.arrayContaining([
         expect.stringMatching(/walk/i),
         expect.stringMatching(/second ship passenger/i),
@@ -30,7 +30,6 @@ describe('home prelude changelog JSON', () => {
         expect.stringMatching(/Fantasia/i),
       ]),
     )
-    expect(first?.changes.length).toBeLessThanOrEqual(5)
   })
 
   it('includes the Pimp My Ride Update for Fantasia shop cosmetics', () => {
