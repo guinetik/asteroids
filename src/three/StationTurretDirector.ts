@@ -50,9 +50,12 @@ const TURRET_CEILING_INSET = 0.02
 const TURRET_DART_POOL_SIZE = 24
 
 /** Number of orange spark particles spawned per turret kill. */
-const TURRET_KILL_SPARK_COUNT = 18
+const TURRET_KILL_SPARK_COUNT = 48
+/** Number of bright white-hot flash particles spawned at the centre. */
+const TURRET_KILL_FLASH_COUNT = 12
 /** Number of grey smoke particles spawned per turret kill. */
-const TURRET_KILL_SMOKE_COUNT = 14
+const TURRET_KILL_SMOKE_COUNT = 28
+
 
 /**
  * Default safe-zone radius (world metres) around the player's spawn
@@ -84,6 +87,8 @@ export class StationTurretDirector {
     | null
   /** Shared station collider; turrets use it for line-of-sight checks. */
   private collider: StationCollider | null = null
+  /** Hot white-yellow core flash spawned on turret death. */
+  private readonly flashEmitter: ParticleEmitter
   /** Orange spark burst spawned on turret death. */
   private readonly sparkEmitter: ParticleEmitter
   /** Grey smoke drift spawned on turret death. */
@@ -116,29 +121,40 @@ export class StationTurretDirector {
     this.dartPool.prewarm(TURRET_DART_POOL_SIZE)
     this.projectiles.onProjectileMove = this.dartPool.acquire
     this.projectiles.onProjectileRemoved = this.dartPool.release
-    // Death VFX: a bright orange spark burst + a slower grey smoke
-    // drift, both pool-based so killing several turrets back-to-back
-    // doesn't allocate per shot.
-    this.sparkEmitter = new ParticleEmitter({
-      poolSize: 64,
-      color: new THREE.Color(0xffa55a),
-      size: 6,
-      lifetime: 0.7,
-      spread: 8,
+    // Death VFX: a hot white core flash + a wide orange spark burst +
+    // a slower grey smoke drift, all pool-based so killing several
+    // turrets back-to-back doesn't allocate per shot.
+    this.flashEmitter = new ParticleEmitter({
+      poolSize: 32,
+      color: new THREE.Color(0xfff4c2),
+      size: 22,
+      lifetime: 0.35,
+      spread: 12,
       opacity: 1,
       soft: true,
-      sizeGrowth: 1.3,
+      sizeGrowth: 2.2,
+    })
+    this.sparkEmitter = new ParticleEmitter({
+      poolSize: 128,
+      color: new THREE.Color(0xffaa44),
+      size: 10,
+      lifetime: 1.1,
+      spread: 14,
+      opacity: 1,
+      soft: true,
+      sizeGrowth: 1.6,
     })
     this.smokeEmitter = new ParticleEmitter({
-      poolSize: 48,
-      color: new THREE.Color(0x555555),
-      size: 14,
-      lifetime: 1.6,
-      spread: 3,
-      opacity: 0.55,
+      poolSize: 96,
+      color: new THREE.Color(0x4a4a4a),
+      size: 22,
+      lifetime: 2.4,
+      spread: 4,
+      opacity: 0.7,
       soft: true,
-      sizeGrowth: 2.4,
+      sizeGrowth: 3.0,
     })
+    scene.add(this.flashEmitter.points)
     scene.add(this.sparkEmitter.points)
     scene.add(this.smokeEmitter.points)
   }
@@ -189,6 +205,9 @@ export class StationTurretDirector {
       safeRadius?: number
       /** Random source. Defaults to `Math.random`. */
       rng?: () => number
+      /** Per-corner spawn probability override (0–1). Defaults to
+       * {@link TURRET_CORNER_SPAWN_PROBABILITY}. */
+      spawnProbability?: number
     },
   ): void {
     const mountY = ceilingY - TURRET_CEILING_INSET
@@ -196,6 +215,7 @@ export class StationTurretDirector {
     const spawnX = options?.spawnXZ?.x ?? 0
     const spawnZ = options?.spawnXZ?.z ?? 0
     const safeRadius = options?.safeRadius ?? TURRET_SPAWN_SAFE_RADIUS
+    const spawnProbability = options?.spawnProbability ?? TURRET_CORNER_SPAWN_PROBABILITY
     const safeRadiusSq = safeRadius * safeRadius
     const anchorScratch = new THREE.Vector3()
     const lateralScratch = new THREE.Vector3()
@@ -227,13 +247,36 @@ export class StationTurretDirector {
       // model's local -Z.
       const yaw = Math.atan2(forwardScratch.x, forwardScratch.z) + Math.PI
 
+      // Half-space side: the entrance's forward axis points OUT of the
+      // owning room into its target (corridor / next-room). Hub rooms
+      // author every door connecting them to corridors, so +forward
+      // consistently means "into the corridor". Pick the patrol side
+      // as +forward and every doorway turret engages only when the
+      // player is on the corridor side — the hub stays safe.
+      //
+      // Spawn position is intentionally unused here: the spawn point
+      // can live inside any room (including the spawn corridor, not
+      // the hub), and a spawn-vs-anchor sign flip would pick the
+      // wrong side whenever the layout authored the entrance from a
+      // non-hub room.
+      void spawnX
+      void spawnZ
+      const patrolSide = 1
+
       for (const side of [-1, 1] as const) {
-        if (rng() >= TURRET_CORNER_SPAWN_PROBABILITY) continue
+        if (rng() >= spawnProbability) continue
         cornerScratch
           .copy(lateralScratch)
           .multiplyScalar(side * TURRET_CORNER_LATERAL_OFFSET)
           .add(anchorScratch)
         const turret = this.spawnAt(cornerScratch.x, mountY, cornerScratch.z, yaw)
+        turret.setPatrolHalfSpace(
+          anchorScratch.x,
+          anchorScratch.z,
+          forwardScratch.x,
+          forwardScratch.z,
+          patrolSide,
+        )
         this.turrets.push(turret)
       }
     }
@@ -255,6 +298,7 @@ export class StationTurretDirector {
     const snapshot = this.turrets.slice()
     for (const turret of snapshot) turret.tick(dt, playerX, playerY, playerZ)
     this.projectiles.tick(dt)
+    this.flashEmitter.tick(dt)
     this.sparkEmitter.tick(dt)
     this.smokeEmitter.tick(dt)
   }
@@ -265,6 +309,7 @@ export class StationTurretDirector {
     this.turrets.length = 0
     this.projectiles.dispose()
     this.dartPool.disposeAll()
+    this.flashEmitter.dispose()
     this.sparkEmitter.dispose()
     this.smokeEmitter.dispose()
   }
@@ -290,19 +335,31 @@ export class StationTurretDirector {
    */
   private disposeTurret(turret: TurretController, x: number, y: number, z: number): void {
     this._vfxPosScratch.set(x, y - 0.6, z)
+    // White-hot core flash — short-lived, expands fast.
+    for (let i = 0; i < TURRET_KILL_FLASH_COUNT; i++) {
+      this._vfxVelScratch.set(
+        (Math.random() - 0.5) * 4,
+        (Math.random() - 0.5) * 4,
+        (Math.random() - 0.5) * 4,
+      )
+      this.flashEmitter.emit(this._vfxPosScratch, this._vfxVelScratch)
+    }
+    // Orange sparks — radial-omni burst, slight upward bias so the
+    // crown reads against the ceiling.
     for (let i = 0; i < TURRET_KILL_SPARK_COUNT; i++) {
       this._vfxVelScratch.set(
-        (Math.random() - 0.5) * 12,
-        Math.random() * 8 + 2,
-        (Math.random() - 0.5) * 12,
+        (Math.random() - 0.5) * 24,
+        Math.random() * 14 + 4,
+        (Math.random() - 0.5) * 24,
       )
       this.sparkEmitter.emit(this._vfxPosScratch, this._vfxVelScratch)
     }
+    // Smoke — slower, drifts up, lingers.
     for (let i = 0; i < TURRET_KILL_SMOKE_COUNT; i++) {
       this._vfxVelScratch.set(
-        (Math.random() - 0.5) * 2,
-        Math.random() * 1.2 + 0.4,
-        (Math.random() - 0.5) * 2,
+        (Math.random() - 0.5) * 3,
+        Math.random() * 2.2 + 0.6,
+        (Math.random() - 0.5) * 3,
       )
       this.smokeEmitter.emit(this._vfxPosScratch, this._vfxVelScratch)
     }

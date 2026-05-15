@@ -550,9 +550,13 @@ export class StationViewController implements Tickable {
       this.damageFlashTimer = DAMAGE_FLASH_DURATION
     })
     this.turretDirector.setCollider(this.stationCollider)
-    this.turretDirector.populateFromEntrances(this.station.entrances, STATION_CEILING_Y, {
-      spawnXZ: { x: this.spawnPos.x, z: this.spawnPos.z },
-    })
+    const turretsCfg = layout.turrets
+    if (turretsCfg?.enabled !== false) {
+      this.turretDirector.populateFromEntrances(this.station.entrances, STATION_CEILING_Y, {
+        spawnXZ: { x: this.spawnPos.x, z: this.spawnPos.z },
+        spawnProbability: turretsCfg?.spawnProbability,
+      })
+    }
 
     // Tick order.
     this.tickHandler.register(this.playerController, TICK_PRIORITY_PHYSICS)

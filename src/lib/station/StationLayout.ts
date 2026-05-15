@@ -573,6 +573,27 @@ export interface ExteriorSunSpec {
  */
 export type StationTheme = 'station' | 'derelict'
 
+/**
+ * Per-level config for the ceiling-turret spawn system. Authors flip
+ * `enabled: false` to opt a layout out of turrets entirely, or tune
+ * `spawnProbability` to control how dense the patrol gets.
+ */
+export interface TurretsSpec {
+  /**
+   * Master switch. When `false`, no turrets are spawned regardless of
+   * the entrances in the layout. Defaults to `true` so existing
+   * layouts keep their turrets without an edit.
+   */
+  enabled?: boolean
+  /**
+   * Independent per-corner spawn probability in `[0, 1]`. Each
+   * doorway has two corners (L/R); the director rolls this once per
+   * corner. Defaults to the director's compile-time default
+   * (currently 0.5).
+   */
+  spawnProbability?: number
+}
+
 /** Full station layout — rooms plus a corridor graph with port targets. */
 export interface StationLayout {
   /** Visual theme for this station. Defaults to `'station'` when omitted. */
@@ -586,6 +607,8 @@ export interface StationLayout {
   corridors: Array<CorridorNode & { ports: Partial<Record<EntranceSide, PortTarget>> }>
   /** Optional exterior sun (rendered in scene, no interior lighting effect). */
   exteriorSun?: ExteriorSunSpec
+  /** Optional security-turret spawn config. Omit to keep defaults. */
+  turrets?: TurretsSpec
 }
 
 /** Final concrete instruction the Three.js builder consumes for a piece. */

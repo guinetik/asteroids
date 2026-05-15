@@ -6,6 +6,7 @@
     "pos": [200, 5, 14.048],
     "scale": 0.5
   },
+  "turrets": { "enabled": true },
   "rooms": [
     {
       "id": "r-hub",

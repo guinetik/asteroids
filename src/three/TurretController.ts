@@ -128,6 +128,27 @@ export class TurretController {
   private readonly projectiles: EnemyProjectileSystem
   /** Optional station collider used for line-of-sight checks. */
   private collider: StationCollider | null = null
+  /**
+   * Patrol half-space defined by the turret's doorway. The plane
+   * passes through `(anchorX, anchorZ)` with XZ normal
+   * `(normalX, normalZ)`; `side` is +1 or -1 and selects which side of
+   * the plane the patrol covers. The player must satisfy
+   * `(player - anchor) · normal * side > 0` for the turret to engage.
+   * `null` disables half-space gating.
+   *
+   * This is robust against floor-rect ordering / overlap issues that
+   * trip up a containment check at doorway edges, and it doesn't need
+   * the floor data to be flawlessly tiled — only that the spawn point
+   * lives on the "safe" side of every doorway, which is true by
+   * construction in microwave-test (player spawns in the hub).
+   */
+  private patrol: {
+    anchorX: number
+    anchorZ: number
+    normalX: number
+    normalZ: number
+    side: number
+  } | null = null
   private state: TurretState = 'stowed'
   private secondsInState = 0
   private burstShotsRemaining = 0
@@ -177,6 +198,28 @@ export class TurretController {
   }
 
   /**
+   * Bind this turret to a doorway half-space. The FSM only engages
+   * when the player satisfies `(player - anchor) · normal * side > 0`.
+   * Used so a corridor turret stops sniping the hub on the other side
+   * of its doorway.
+   *
+   * @param anchorX - World X of the doorway anchor.
+   * @param anchorZ - World Z of the doorway anchor.
+   * @param normalX - Unit X of the doorway's outward normal.
+   * @param normalZ - Unit Z of the doorway's outward normal.
+   * @param side - `+1` or `-1`. Picks which side of the plane patrols.
+   */
+  setPatrolHalfSpace(
+    anchorX: number,
+    anchorZ: number,
+    normalX: number,
+    normalZ: number,
+    side: number,
+  ): void {
+    this.patrol = { anchorX, anchorZ, normalX, normalZ, side }
+  }
+
+  /**
    * Place the turret at a ceiling corner. The `Enemy` position is set to
    * the muzzle so player bolts intersect the body, not the ceiling.
    *
@@ -212,10 +255,12 @@ export class TurretController {
     const dz = playerZ - this.model.position.z
     const distance = Math.hypot(dx, dz)
     const hasLOS = this.hasLineOfSightTo(playerX, playerZ)
+    const inPatrol = this.isPlayerInPatrolRect(playerX, playerZ)
+    const engageable = inPatrol && hasLOS
 
     switch (this.state) {
       case 'stowed':
-        if (hasLOS && distance <= TURRET_DETECT_RANGE) this.enterDeploying()
+        if (engageable && distance <= TURRET_DETECT_RANGE) this.enterDeploying()
         break
       case 'deploying':
         // Track the player even while deploying so the moment the visual
@@ -224,7 +269,7 @@ export class TurretController {
         break
       case 'armed':
         this.model.faceWorldXZ(playerX, playerZ)
-        if (!hasLOS || distance > TURRET_DETECT_RANGE_HYSTERESIS) {
+        if (!engageable || distance > TURRET_DETECT_RANGE_HYSTERESIS) {
           this.enterRetracting()
         } else if (distance <= TURRET_FIRE_RANGE) {
           this.enterFiring()
@@ -232,7 +277,7 @@ export class TurretController {
         break
       case 'firing':
         this.model.faceWorldXZ(playerX, playerZ)
-        if (!hasLOS || distance > TURRET_DETECT_RANGE_HYSTERESIS) {
+        if (!engageable || distance > TURRET_DETECT_RANGE_HYSTERESIS) {
           this.enterRetracting()
         } else if (distance > TURRET_FIRE_RANGE_HYSTERESIS) {
           this.enterArmed()
@@ -256,6 +301,19 @@ export class TurretController {
   /** Release GPU + scene resources. */
   dispose(): void {
     this.model.dispose()
+  }
+
+  /**
+   * Whether the player lies on this turret's patrol side of its
+   * doorway. A missing half-space returns `true` so unit tests + early
+   * init frames don't suppress firing.
+   */
+  private isPlayerInPatrolRect(playerX: number, playerZ: number): boolean {
+    const p = this.patrol
+    if (!p) return true
+    const dx = playerX - p.anchorX
+    const dz = playerZ - p.anchorZ
+    return (dx * p.normalX + dz * p.normalZ) * p.side > 0
   }
 
   /**
