@@ -735,6 +735,26 @@ export class StationViewController implements Tickable {
    * @param event - Event id used to find the interactor.
    * @param status - Visual status to apply to the prop. Defaults to `'idle'`.
    */
+  /**
+   * Refill the player's suit oxygen (fuel reservoir + all thruster
+   * charges) to full. Wired through the corridor wall-mounted oxygen
+   * station — the diegetic equivalent of plugging the suit into a
+   * recharge port.
+   */
+  refillPlayerOxygen(): void {
+    this.playerController?.thrusterSystem.refuel()
+  }
+
+  /**
+   * Restore the player to full HP. Wired through the corridor wall-
+   * mounted heal station.
+   */
+  refillPlayerHealth(): void {
+    const pc = this.playerController
+    if (!pc) return
+    pc.heal(pc.maxHp)
+  }
+
   resetInteractor(event: string, status: PropStatus = 'idle'): void {
     if (!this.station) return
     for (const interactor of this.station.interactors) {

@@ -84,6 +84,18 @@ const FUEL_CELL_AABB_SLACK = 0.02
 
 /** Treat segment-entry `t` values within this epsilon as ties. */
 const SEGMENT_ENTRY_T_EPSILON = 1e-5
+
+/**
+ * Total duration in seconds of the power-on shake. Short enough to read
+ * as a startup kick rather than an ongoing rumble.
+ */
+const POWER_ON_SHAKE_DURATION = 0.55
+/** Peak lateral shake amplitude (metres) at t=0 of the shake. */
+const POWER_ON_SHAKE_AMPLITUDE_XZ = 0.035
+/** Peak vertical shake amplitude (metres). Lower than lateral. */
+const POWER_ON_SHAKE_AMPLITUDE_Y = 0.005
+/** Shake oscillation frequency (Hz) — fast enough to read as a jolt. */
+const POWER_ON_SHAKE_FREQUENCY = 32
 /** Bolt segments shorter than this (squared) are skipped. */
 const MIN_BOLT_SEGMENT_LENGTH_SQ = 1e-14
 
@@ -152,6 +164,11 @@ export class StationPowerGenModel {
    * curve reads as a smooth speed-up rather than threshold jumps.
    */
   private scienceHitMultiplier = 1
+
+  /** Seconds remaining in the power-on shake. Zero when idle. */
+  private shakeRemaining = 0
+  /** Phase accumulator (radians) for the shake oscillators. */
+  private shakePhase = 0
 
   /** Reused scratch — bolt segment delta. */
   private readonly _segDelta = new THREE.Vector3()
@@ -541,7 +558,30 @@ export class StationPowerGenModel {
       if (!cell.restored) return
     }
     this.powerRestoredFired = true
+    this.shakeRemaining = POWER_ON_SHAKE_DURATION
+    this.shakePhase = 0
     this.onPowerRestored?.()
+  }
+
+  /**
+   * Per-frame update. Drives the brief decaying shake of the inner mesh
+   * group after power restoration. No-op while idle or before the GLB
+   * has loaded.
+   *
+   * @param dt - Frame delta in seconds.
+   */
+  tick(dt: number): void {
+    if (this.shakeRemaining <= 0 || !this.inner) return
+    this.shakeRemaining = Math.max(0, this.shakeRemaining - dt)
+    const lifeFrac = this.shakeRemaining / POWER_ON_SHAKE_DURATION
+    const decay = lifeFrac * lifeFrac
+    this.shakePhase += dt * POWER_ON_SHAKE_FREQUENCY
+    const phase = this.shakePhase
+    const ox = Math.sin(phase * 2.0) * POWER_ON_SHAKE_AMPLITUDE_XZ * decay
+    const oy = Math.sin(phase * 3.1 + 1.3) * POWER_ON_SHAKE_AMPLITUDE_Y * decay
+    const oz = Math.cos(phase * 2.4 + 0.7) * POWER_ON_SHAKE_AMPLITUDE_XZ * decay
+    this.inner.position.set(ox, oy, oz)
+    if (this.shakeRemaining <= 0) this.inner.position.set(0, 0, 0)
   }
 
   /** Dispose geometry + material on every mesh under `obj`. */

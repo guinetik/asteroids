@@ -26,6 +26,7 @@ import {
   STATION_POWERGEN_BASE_HALF_Z,
 } from '@/three/StationPowerGenModel'
 import { FurniturePackProp } from '@/three/FurniturePackProp'
+import { WallStationModel, type WallStationVariant } from '@/three/WallStationModel'
 import { BunkerChestModel } from '@/three/bunker/BunkerChestModel'
 import { ITEM_CATALOG } from '@/lib/inventory/catalog'
 import { getScienceHealingMultiplier } from '@/lib/fps/scienceHealing'
@@ -229,6 +230,7 @@ export function createStationProp(kind: string): StationPropInstance {
       model.setScienceHitMultiplier(getScienceHealingMultiplier())
       return {
         group: model.group,
+        tick: (dt) => model.tick(dt),
         dispose: () => model.dispose(),
         localFootprint: {
           halfX: STATION_POWERGEN_BASE_HALF_X,
@@ -241,6 +243,18 @@ export function createStationProp(kind: string): StationPropInstance {
           },
           getComponentProgress: () => model.getCellProgress(),
         },
+      }
+    }
+    case 'wall_oxygen':
+    case 'wall_heal': {
+      const variant: WallStationVariant = kind === 'wall_oxygen' ? 'oxygen' : 'heal'
+      const model = new WallStationModel(variant)
+      return {
+        group: model.group,
+        dispose: () => model.dispose(),
+        // 'success' = freshly used (cooldown, lights off);
+        // 'idle' = ready again. Other statuses are no-ops for now.
+        setStatus: (status) => model.setLightActive(status !== 'success'),
       }
     }
     case 'chest': {
@@ -283,6 +297,9 @@ export function defaultPropScale(kind: string): number {
       return CHEST_INTERIOR_SCALE
     case 'powergen':
       return POWERGEN_INTERIOR_SCALE
+    case 'wall_oxygen':
+    case 'wall_heal':
+      return 1
     default:
       return 1
   }

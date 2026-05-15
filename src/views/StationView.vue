@@ -319,6 +319,14 @@ function dropBuff(itemId: string): void {
 /** Seconds the peek terminal in r-terminal keeps the hazard map on-screen. */
 const MAZE_PEEK_DURATION_S = 20
 
+/**
+ * Cooldown (seconds) between successive uses of a corridor wall-station
+ * (oxygen / heal). While the timer runs the prop's interactor is
+ * disabled and its emissive + PointLight are forced off so the player
+ * gets a clear "depleted" read.
+ */
+const WALL_STATION_COOLDOWN_S = 60
+
 controller.onInteract = (event) => {
   if (event === 'station:exit') {
     void router.push('/')
@@ -353,6 +361,18 @@ controller.onInteract = (event) => {
   }
   if (event.startsWith('chest:open:')) {
     handleChestOpen(event)
+    return
+  }
+  if (event.startsWith('wallstation:oxygen:')) {
+    controller.refillPlayerOxygen()
+    controller.consumeInteractor(event, 'success')
+    Timer.after(WALL_STATION_COOLDOWN_S, () => controller.resetInteractor(event, 'idle'))
+    return
+  }
+  if (event.startsWith('wallstation:heal:')) {
+    controller.refillPlayerHealth()
+    controller.consumeInteractor(event, 'success')
+    Timer.after(WALL_STATION_COOLDOWN_S, () => controller.resetInteractor(event, 'idle'))
     return
   }
 }

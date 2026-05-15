@@ -56,7 +56,12 @@
     "models:heavy-runtime:build": "run-s models:bootstrap-heavy-sources models:bed:build models:table:build models:city:build models:asteroid:build models:hubble:build models:voyager:build models:satellite:build models:virus:build models:arcade-machine:build models:cat-tower:build models:coffee-machine:build models:lounge-chair:build models:record-player:build models:refractor-telescope:build models:lamp:build",
     "models:virus:build": "node scripts/optimize-virus-glb.mjs",
     "models:virus:center": "node scripts/center-virus-glb.mjs",
-    "models:table:center": "node scripts/center-table-glb.mjs"
+    "models:table:center": "node scripts/center-table-glb.mjs",
+    "models:walls:build": "run-s models:walls:optimize models:walls:center",
+    "models:walls:optimize": "run-s models:wall-oxygen:optimize models:wall-heal:optimize",
+    "models:wall-oxygen:optimize": "gltf-transform optimize \"3d/wall_oxygen.glb\" \"public/models/wall_oxygen.glb\" --join false --flatten false --simplify false --texture-compress webp --texture-size 1024 --meshopt-level high",
+    "models:wall-heal:optimize": "gltf-transform optimize \"3d/wall_heal.glb\" \"public/models/wall_heal.glb\" --join false --flatten false --simplify false --texture-compress webp --texture-size 1024 --meshopt-level high",
+    "models:walls:center": "node scripts/optimize-wall-glbs.mjs"
   },
   "dependencies": {
     "aladin-lite": "^3.8.2",

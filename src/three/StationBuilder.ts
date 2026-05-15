@@ -164,6 +164,100 @@ const CORRIDOR_PORT_WALL_YAW: Readonly<Record<EntranceSide, number>> = {
 }
 
 /**
+ * Probability that any single eligible corridor wall spawns nothing
+ * (decorative-only wall). The remaining probability mass is split
+ * evenly between the two wall-station variants.
+ */
+const WALL_PROP_PROB_NONE = 0.5
+/** Probability that an eligible wall hosts the oxygen station. */
+const WALL_PROP_PROB_OXYGEN = (1 - WALL_PROP_PROB_NONE) / 2
+/**
+ * Native sides per corridor kind that ship with a window pane instead of
+ * a flat wall surface. These are excluded from the wall-station roll —
+ * mounting a glowing utility on top of the exterior window reads wrong
+ * and would clip into the glass.
+ */
+const CORRIDOR_WINDOW_NATIVE_SIDES: Readonly<Record<CorridorKind, ReadonlySet<EntranceSide>>> = {
+  cross: new Set(),
+  corner: new Set(['N']),
+  window: new Set(['N']),
+  straight: new Set(),
+}
+/**
+ * Vertical anchor for wall-mounted props — exactly the midline of the
+ * wall span (`Y ∈ [0, WALL_HEIGHT]`). Wall props are baked with their
+ * pivot at bbox-Y centre so this places them centred top-to-bottom on
+ * the wall surface.
+ */
+const WALL_PROP_MID_Y = WALL_HEIGHT / 2
+/**
+ * Small inward push (metres) along the wall's inward normal so a wall
+ * prop with its back exactly at the wall plane doesn't z-fight the
+ * corridor wall mesh.
+ */
+const WALL_PROP_INWARD_PUSH = 0.02
+/**
+ * Yaw (radians) applied to a wall-station prop so its baked local +Z
+ * (forward face) points into the corridor interior, keyed by the wall's
+ * *world* side. Wall props ship with the back face at Z=0 and the body
+ * extending in +Z, so a wall on world side N (corridor +Z exterior)
+ * needs π to flip the prop forward toward -Z, and so on.
+ */
+const WALL_PROP_YAW_BY_WORLD_SIDE: Readonly<Record<EntranceSide, number>> = {
+  N: Math.PI,
+  E: -Math.PI / 2,
+  S: 0,
+  W: Math.PI / 2,
+}
+/**
+ * Unit inward normal at each corridor world-side. Pointing from the
+ * wall surface toward the corridor's centre, used to push the prop
+ * slightly off the wall plane (see {@link WALL_PROP_INWARD_PUSH}).
+ */
+const WALL_INWARD_UNIT: Readonly<Record<EntranceSide, { x: number; z: number }>> = {
+  N: { x: 0, z: -1 },
+  E: { x: -1, z: 0 },
+  S: { x: 0, z: 1 },
+  W: { x: 1, z: 0 },
+}
+/** Wall-station prop kinds, used by the corridor placement pass. */
+type WallStationKind = 'wall_oxygen' | 'wall_heal'
+
+/**
+ * Per-corridor-kind outward offset (metres) applied when computing the
+ * wall-station mount anchor. The layout {@link CORRIDOR_HALF_EXTENTS}
+ * describe the *walkable interior* half-extents used by collision; the
+ * visible wall surfaces of some GLBs (notably `corridor.glb` for the
+ * straight piece) sit further outward, so anchoring purely on the
+ * collider half-extent leaves the prop hovering in mid-corridor. This
+ * table nudges the anchor outward to the asset's actual wall plane.
+ */
+const CORRIDOR_WALL_OUTWARD_OFFSET: Readonly<Record<CorridorKind, number>> = {
+  cross: 0,
+  corner: 0,
+  window: 0,
+  straight: 0.85,
+}
+
+/**
+ * F-prompt anchor offset from the wall plane, in metres. Pushes the
+ * interactor's proximity centre into the corridor far enough that the
+ * player can stand directly under the prop and still register as
+ * "in range" — the wall plane itself is unreachable.
+ */
+const WALL_PROP_INTERACTOR_INWARD_PUSH = 0.5
+/** F-prompt prefix per variant. Combined with a stable index per slot. */
+const WALL_PROP_EVENT_PREFIX: Readonly<Record<WallStationKind, string>> = {
+  wall_oxygen: 'wallstation:oxygen',
+  wall_heal: 'wallstation:heal',
+}
+/** Prompt text shown when the player walks into range. */
+const WALL_PROP_PROMPT: Readonly<Record<WallStationKind, string>> = {
+  wall_oxygen: 'F  Refill Oxygen',
+  wall_heal: 'F  Restore Health',
+}
+
+/**
  * Result of {@link buildStation}: scene group, runtime entrances, and
  * the collider rectangles that make every piece's footprint walkable.
  */
@@ -829,6 +923,225 @@ function synthesizeRewardChests(
 }
 
 /**
+ * Eligible wall slot on a placed corridor that the wall-station roll
+ * considers. A slot is eligible if the side is either (a) a built-in
+ * non-window wall of the GLB, or (b) a native port that the layout
+ * leaves unused (so it gets capped with a wall.glb). Ports connected
+ * to another piece are holes, not walls, and are skipped.
+ */
+interface CorridorWallSlot {
+  /** Source corridor whose wall hosts the slot. */
+  corridor: CorridorNode
+  /** Wall side in *world* coordinates (post-yaw). */
+  worldSide: EntranceSide
+  /** Wall side in the corridor's *native* (pre-yaw) frame. */
+  nativeSide: EntranceSide
+}
+
+/**
+ * Enumerate the eligible wall slots for a placed corridor. Skips world
+ * sides that connect to another piece (ports = holes) and native sides
+ * authored as windows.
+ *
+ * @param corridor - Placed corridor with its layout ports map populated.
+ * @returns Slots, one per eligible wall side.
+ */
+function corridorWallSlots(
+  corridor: CorridorNode & { ports: Partial<Record<EntranceSide, PortTarget>> },
+): CorridorWallSlot[] {
+  const yaw = (corridor.yaw ?? 0) as YawTurns
+  const nativePorts = new Set<EntranceSide>(CORRIDOR_NATIVE_PORTS[corridor.kind])
+  const windowed = CORRIDOR_WINDOW_NATIVE_SIDES[corridor.kind]
+  const usedWorldSides = new Set(Object.keys(corridor.ports ?? {}))
+  const out: CorridorWallSlot[] = []
+  for (const native of ['N', 'E', 'S', 'W'] as const) {
+    const world = rotateSide(native, yaw)
+    if (nativePorts.has(native)) {
+      if (usedWorldSides.has(world)) continue
+    } else if (windowed.has(native)) {
+      continue
+    }
+    out.push({ corridor, worldSide: world, nativeSide: native })
+  }
+  return out
+}
+
+/**
+ * World-space XZ anchor of a corridor's wall midpoint on the given
+ * native side. Mirrors {@link nativePortAnchor} but works for *every*
+ * side, not just authored ports.
+ *
+ * @param corridor - Placed corridor.
+ * @param nativeSide - Wall side in the corridor's native frame.
+ * @returns World-space XZ point on the wall's interior surface.
+ */
+function corridorWallWorldAnchor(
+  corridor: CorridorNode,
+  nativeSide: EntranceSide,
+): { x: number; z: number } {
+  const half = CORRIDOR_HALF_EXTENTS[corridor.kind]
+  const outward = CORRIDOR_WALL_OUTWARD_OFFSET[corridor.kind]
+  let local: { x: number; z: number }
+  switch (nativeSide) {
+    case 'N':
+      local = { x: 0, z: half.z + outward }
+      break
+    case 'S':
+      local = { x: 0, z: -(half.z + outward) }
+      break
+    case 'E':
+      local = { x: half.x + outward, z: 0 }
+      break
+    case 'W':
+      local = { x: -(half.x + outward), z: 0 }
+      break
+  }
+  const rotated = rotateVec2(local, (corridor.yaw ?? 0) as YawTurns)
+  return { x: corridor.anchor.x + rotated.x, z: corridor.anchor.z + rotated.z }
+}
+
+/**
+ * Roll one wall-station outcome: either nothing or one of the two
+ * variants, weighted by {@link WALL_PROP_PROB_NONE} and split evenly
+ * across the variants.
+ *
+ * @returns Selected wall-station kind, or `null` for an empty wall.
+ */
+function rollWallStationKind(): WallStationKind | null {
+  const r = Math.random()
+  if (r < WALL_PROP_PROB_NONE) return null
+  if (r < WALL_PROP_PROB_NONE + WALL_PROP_PROB_OXYGEN) return 'wall_oxygen'
+  return 'wall_heal'
+}
+
+/**
+ * Force at least one wall slot in the layout to host the requested
+ * variant. Prefers to upgrade an empty slot; if every slot is already
+ * spoken for and another variant has at least two copies, demote one
+ * of those to the missing variant. No-op when nothing needs forcing.
+ *
+ * @param picks - Wall slot kind picks (mutated in-place).
+ * @param required - Variant that must appear at least once.
+ */
+/**
+ * Walk the rolled wall-station kinds and drop any duplicate within the
+ * same corridor. The first occurrence per corridor wins; later same-
+ * kind picks flip to the other variant when it's still free, otherwise
+ * to `null`. Keeps any single corridor from doubling up on oxygen or
+ * heal — the player should always need to walk a stretch to top off
+ * the other resource.
+ *
+ * @param slots - Wall slots in the order their picks were rolled.
+ * @param picks - Rolled kinds (mutated in place).
+ */
+function dedupeKindsPerCorridor(
+  slots: ReadonlyArray<CorridorWallSlot>,
+  picks: Array<WallStationKind | null>,
+): void {
+  const seenByCorridor = new Map<string, Set<WallStationKind>>()
+  for (let i = 0; i < slots.length; i++) {
+    const kind = picks[i]
+    if (!kind) continue
+    const corridorId = slots[i]!.corridor.id
+    let seen = seenByCorridor.get(corridorId)
+    if (!seen) {
+      seen = new Set<WallStationKind>()
+      seenByCorridor.set(corridorId, seen)
+    }
+    if (!seen.has(kind)) {
+      seen.add(kind)
+      continue
+    }
+    const other: WallStationKind = kind === 'wall_oxygen' ? 'wall_heal' : 'wall_oxygen'
+    if (!seen.has(other)) {
+      picks[i] = other
+      seen.add(other)
+    } else {
+      picks[i] = null
+    }
+  }
+}
+
+function ensureAtLeastOneWallStation(
+  picks: Array<WallStationKind | null>,
+  required: WallStationKind,
+): void {
+  if (picks.some((k) => k === required)) return
+  const emptyIdx = picks.findIndex((k) => k === null)
+  if (emptyIdx >= 0) {
+    picks[emptyIdx] = required
+    return
+  }
+  const other: WallStationKind = required === 'wall_oxygen' ? 'wall_heal' : 'wall_oxygen'
+  const otherCount = picks.filter((k) => k === other).length
+  if (otherCount > 1) {
+    const idx = picks.findIndex((k) => k === other)
+    if (idx >= 0) picks[idx] = required
+  }
+}
+
+/**
+ * Spawn the corridor wall-mounted utility stations across the whole
+ * station. Each corridor's eligible walls get one independent
+ * none/oxygen/heal roll; a final post-pass guarantees at least one of
+ * each variant station-wide.
+ *
+ * @param layout - Validated station layout (corridor graph).
+ * @param root - Root scene group the wall props are parented to.
+ * @param props - Mutable list of prop instances the controller ticks
+ *   + disposes; the function pushes every spawned wall-station onto it.
+ */
+function placeCorridorWallStations(
+  layout: StationLayout,
+  root: Group,
+  props: StationPropInstance[],
+  interactors: PropInteractor[],
+): void {
+  const slots: CorridorWallSlot[] = []
+  for (const corridor of layout.corridors) {
+    slots.push(...corridorWallSlots(corridor))
+  }
+  if (slots.length === 0) return
+
+  const picks: Array<WallStationKind | null> = slots.map(() => rollWallStationKind())
+  dedupeKindsPerCorridor(slots, picks)
+  ensureAtLeastOneWallStation(picks, 'wall_oxygen')
+  ensureAtLeastOneWallStation(picks, 'wall_heal')
+
+  let stableIndex = 0
+  for (let i = 0; i < slots.length; i++) {
+    const kind = picks[i]
+    if (!kind) continue
+    const slot = slots[i]!
+    const prop = createStationProp(kind)
+    const anchor = corridorWallWorldAnchor(slot.corridor, slot.nativeSide)
+    const inward = WALL_INWARD_UNIT[slot.worldSide]
+    prop.group.position.set(
+      anchor.x + inward.x * WALL_PROP_INWARD_PUSH,
+      WALL_PROP_MID_Y,
+      anchor.z + inward.z * WALL_PROP_INWARD_PUSH,
+    )
+    prop.group.rotation.y = WALL_PROP_YAW_BY_WORLD_SIDE[slot.worldSide]
+    root.add(prop.group)
+    props.push(prop)
+
+    const eventIndex = stableIndex++
+    interactors.push({
+      anchor: new Vector3(
+        anchor.x + inward.x * WALL_PROP_INTERACTOR_INWARD_PUSH,
+        STATION_FLOOR_Y,
+        anchor.z + inward.z * WALL_PROP_INTERACTOR_INWARD_PUSH,
+      ),
+      prompt: WALL_PROP_PROMPT[kind],
+      event: `${WALL_PROP_EVENT_PREFIX[kind]}:${slot.corridor.id}:${slot.worldSide}:${eventIndex}`,
+      prop,
+      disabled: false,
+      meta: null,
+    })
+  }
+}
+
+/**
  * Build a complete station interior scene graph from a validated station layout.
  *
  * @param layout - Authored station layout data loaded from `public/data/stations`.
@@ -1108,6 +1421,8 @@ export async function buildStation(
       entrances.push(cap.entrance)
     }
   }
+
+  placeCorridorWallStations(layout, group, props, interactors)
 
   patchGlassTransparency(group)
   return {
