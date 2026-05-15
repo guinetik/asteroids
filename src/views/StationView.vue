@@ -256,6 +256,7 @@ function handleRestart(): void {
   deathMessageVisible.value = false
   deathFade.value = 0
   damageFlash.value = 0
+  controller.resetInteractor('terminal:use:r-microwave')
   controller.restart()
 }
 

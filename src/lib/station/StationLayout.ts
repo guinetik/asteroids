@@ -567,8 +567,16 @@ export interface ExteriorSunSpec {
   scale: number
 }
 
+/**
+ * High-level visual theme for a station layout. Drives post-processing
+ * grades and leaves room for future theme-specific prop/material choices.
+ */
+export type StationTheme = 'station' | 'derelict'
+
 /** Full station layout — rooms plus a corridor graph with port targets. */
 export interface StationLayout {
+  /** Visual theme for this station. Defaults to `'station'` when omitted. */
+  theme?: StationTheme
   /** Rooms placed in world coordinates. */
   rooms: RoomSpec[]
   /**
@@ -621,6 +629,10 @@ function entranceIndexRange(room: RoomSpec, side: EntranceSide): number {
  * @throws An `Error` describing the first inconsistency found.
  */
 export function validateLayout(layout: StationLayout): void {
+  if (layout.theme && layout.theme !== 'station' && layout.theme !== 'derelict') {
+    throw new Error(`Station layout theme "${layout.theme}" is not supported`)
+  }
+
   const roomsById = new Map(layout.rooms.map((r) => [r.id, r]))
   const corridorsById = new Map(layout.corridors.map((c) => [c.id, c]))
 

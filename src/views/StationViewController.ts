@@ -43,9 +43,10 @@ import type { PropInteractorMeta, PropStatus } from '@/three/stationProps'
 import type { FpsTelemetry } from '@/lib/ui/fpsHudTypes'
 import type { StationEntrance } from '@/three/StationEntrance'
 import { loadStationLayout } from '@/lib/station/loadStationLayout'
-import type { ExteriorSunSpec, StationLayout } from '@/lib/station/StationLayout'
+import type { ExteriorSunSpec, StationLayout, StationTheme } from '@/lib/station/StationLayout'
 import { createSunMesh, type SunMeshResult } from '@/three/meshes/createSunMesh'
 import { SUN } from '@/lib/planets/catalog'
+import { StationPostProcessing } from '@/three/atmosphere/StationPostProcessing'
 
 /**
  * URL prefix where station-interior layouts are served as static JSON.
@@ -53,6 +54,14 @@ import { SUN } from '@/lib/planets/catalog'
  * at runtime by {@link StationViewController.fetchLayout}.
  */
 const STATION_LAYOUT_URL_PREFIX = '/data/stations'
+
+/** Default visual theme when a station layout omits `theme`. */
+const DEFAULT_STATION_THEME: StationTheme = 'station'
+/** Theme-specific LUTs served from `public/`. */
+const STATION_THEME_LUT_URLS: Readonly<Record<StationTheme, string>> = {
+  station: '/station.CUBE',
+  derelict: '/derelict.CUBE',
+}
 
 // ---------------------------------------------------------------------------
 // Room layout constants.
@@ -191,6 +200,7 @@ export class StationViewController implements Tickable {
   private playerController: FpsPlayerController | null = null
   private station: BuiltStation | null = null
   private stationCollider: StationCollider | null = null
+  private postProcessing: StationPostProcessing | null = null
   private spawnPos: Vector3 = new Vector3()
   private starfield: StarFieldController | null = null
   private exteriorSun: SunMeshResult | null = null
@@ -357,6 +367,15 @@ export class StationViewController implements Tickable {
     this.sceneManager.addToScene(this.playerController.group)
     this.fpsCamera.setTarget(this.playerController.group)
     this.sceneManager.setActiveCamera(this.fpsCamera.camera)
+    this.postProcessing = new StationPostProcessing(
+      this.sceneManager.renderer,
+      this.sceneManager.scene,
+      this.fpsCamera.camera,
+      { lutUrl: this.getStationLutUrl(layout) },
+    )
+    this.sceneManager.renderOverride = () => this.postProcessing?.render()
+    this.sceneManager.onResizeCallback = (width, height) =>
+      this.postProcessing?.resize(width, height)
 
     // Tick order.
     this.tickHandler.register(this.playerController, TICK_PRIORITY_PHYSICS)
@@ -554,6 +573,24 @@ export class StationViewController implements Tickable {
   }
 
   /**
+   * Re-enable a previously consumed prop interactor and restore its
+   * visual status. Used by death-restart flows where a one-shot pickup
+   * is rolled back, so the station prop must become usable again in the
+   * same scene instance.
+   *
+   * @param event - Event id used to find the interactor.
+   * @param status - Visual status to apply to the prop. Defaults to `'idle'`.
+   */
+  resetInteractor(event: string, status: PropStatus = 'idle'): void {
+    if (!this.station) return
+    for (const interactor of this.station.interactors) {
+      if (interactor.event !== event) continue
+      interactor.disabled = false
+      interactor.prop.setStatus?.(status)
+    }
+  }
+
+  /**
    * Find the entrance owning the given event id. Used by the UI layer
    * to toggle locked state or swap prompts when an inventory condition
    * changes (e.g. the player picks up a keycard).
@@ -687,6 +724,16 @@ export class StationViewController implements Tickable {
     }
     const raw: unknown = await res.json()
     return loadStationLayout(raw)
+  }
+
+  /**
+   * Resolve the LUT URL for the loaded station layout's visual theme.
+   *
+   * @param layout - Loaded station layout.
+   * @returns Public URL for the theme grade.
+   */
+  private getStationLutUrl(layout: StationLayout): string {
+    return STATION_THEME_LUT_URLS[layout.theme ?? DEFAULT_STATION_THEME]
   }
 
   /**
@@ -946,6 +993,7 @@ export class StationViewController implements Tickable {
     this.fpsCamera?.dispose()
     this.pointerLock.releaseLock()
     this.pointerLock.detach()
+    this.postProcessing?.dispose()
     this.sceneManager?.dispose()
     this.inputManager?.dispose()
     this.fpsAudio.dispose()

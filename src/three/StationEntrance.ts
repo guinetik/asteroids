@@ -71,14 +71,13 @@ const DOOR_SIDE_EPSILON = 1e-4
  */
 type DoorPhase = 'idle' | 'opening' | 'open' | 'closing' | 'done'
 
-/**
- * Runtime instance of an entrance: the assembled scene group + cached
- * world-space anchor used for proximity tests + a simple open animation
- * driven by {@link tick}.
- */
 /** Fallback prompt for a locked entrance whose spec did not provide one. */
 const DEFAULT_LOCKED_PROMPT = 'LOCKED'
 
+/**
+ * Runtime station entrance with scene meshes, proximity anchor, lock state,
+ * and the short open/close animation driven by {@link tick}.
+ */
 export class StationEntrance {
   /** Root group containing the entrance frame + fitted door. */
   readonly group: Group

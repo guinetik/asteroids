@@ -1,6 +1,7 @@
 {
   "id": "microwave-test",
   "name": "Microwave Minigame Test Station",
+  "theme": "derelict",
   "exteriorSun": {
     "pos": [200, 5, 14.048],
     "scale": 0.5
@@ -11,7 +12,7 @@
       "width": 1,
       "depth": 3,
       "height": 2,
-      "anchor": { "x": 0, "z": 14.048 },
+      "anchor": { "x": 0, "z": 15.305 },
       "yaw": 0,
       "entrances": [
         {
@@ -61,7 +62,7 @@
       "width": 2,
       "depth": 3,
       "height": 2,
-      "anchor": { "x": -13.397, "z": 14.048 },
+      "anchor": { "x": -13.397, "z": 15.305 },
       "yaw": 0,
       "entrances": [
         {
@@ -91,15 +92,15 @@
     {
       "id": "r-microwave",
       "width": 5,
-      "depth": 3,
+      "depth": 5,
       "height": 2,
-      "anchor": { "x": 19.172, "z": 14.048 },
+      "anchor": { "x": 19.172, "z": 15.305 },
       "yaw": 0,
       "hazard": "lava",
       "entrances": [
         {
           "side": "W",
-          "index": 1,
+          "index": 2,
           "storey": 0,
           "prompt": "F  Enter Microwave Room",
           "returnPrompt": "F  Return to Hub",
@@ -126,7 +127,7 @@
       "width": 3,
       "depth": 2,
       "height": 2,
-      "anchor": { "x": 0, "z": 31.295 },
+      "anchor": { "x": 0, "z": 32.552 },
       "yaw": 0,
       "entrances": [
         {
@@ -152,9 +153,9 @@
   "corridors": [
     {
       "id": "c-entrance-bot",
-      "kind": "straight",
+      "kind": "window",
       "anchor": { "x": 0, "z": 0 },
-      "yaw": 0,
+      "yaw": 1,
       "ports": {
         "S": { "kind": "exit", "prompt": "F  Leave Station", "event": "station:exit" },
         "N": { "kind": "corridor", "nodeId": "c-entrance-top", "worldSide": "S" }
@@ -162,9 +163,9 @@
     },
     {
       "id": "c-entrance-top",
-      "kind": "straight",
-      "anchor": { "x": 0, "z": 4.462 },
-      "yaw": 0,
+      "kind": "window",
+      "anchor": { "x": 0, "z": 5.3 },
+      "yaw": 1,
       "ports": {
         "S": { "kind": "corridor", "nodeId": "c-entrance-bot", "worldSide": "N" },
         "N": { "kind": "room", "roomId": "r-hub", "entranceIndex": 0 }
@@ -173,7 +174,7 @@
     {
       "id": "c-vault",
       "kind": "straight",
-      "anchor": { "x": 0, "z": 23.634 },
+      "anchor": { "x": 0, "z": 24.891 },
       "yaw": 0,
       "ports": {
         "S": { "kind": "room", "roomId": "r-hub", "entranceIndex": 1 },
@@ -183,7 +184,7 @@
     {
       "id": "c-terminal",
       "kind": "straight",
-      "anchor": { "x": -5.736, "z": 14.048 },
+      "anchor": { "x": -5.736, "z": 15.305 },
       "yaw": 1,
       "ports": {
         "E": { "kind": "room", "roomId": "r-hub", "entranceIndex": 3 },
@@ -193,7 +194,7 @@
     {
       "id": "c-microwave",
       "kind": "straight",
-      "anchor": { "x": 5.736, "z": 14.048 },
+      "anchor": { "x": 5.736, "z": 15.305 },
       "yaw": 1,
       "ports": {
         "W": { "kind": "room", "roomId": "r-hub", "entranceIndex": 2 },

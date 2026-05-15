@@ -18,8 +18,17 @@
  * @date 2026-05-13
  */
 import { Group } from 'three'
+import type { StationTheme } from '@/lib/station/StationLayout'
 import { loadGLB } from '@/three/loadGLB'
 import { StationEntrance, type EntranceSpec } from '@/three/StationEntrance'
+import {
+  applyDamagedTileOverlay,
+  applyDerelictWallOverlay,
+  applyMetalDoorOverlay,
+  loadDamagedTileOverlayTextures,
+  loadDerelictWallOverlayTextures,
+  loadMetalDoorOverlayTextures,
+} from '@/three/stationDerelictWallOverlay'
 
 /** Path to the wall piece GLB. */
 const WALL_URL = '/models/station/pieces/wall.glb'
@@ -147,6 +156,8 @@ export interface StationRoomLayout {
   height?: number
   /** Entrance slots that replace plain walls with `entrance.glb` + door. */
   entrances?: EntranceSpec[]
+  /** Visual theme inherited from the station layout. Defaults to `'station'`. */
+  theme?: StationTheme
 }
 
 /** Result of {@link buildStationRoom}. */
@@ -183,14 +194,41 @@ export interface StationRoom {
 export async function buildStationRoom(layout: StationRoomLayout): Promise<StationRoom> {
   const entranceSpecs = layout.entrances ?? []
   const needsEntrance = entranceSpecs.length > 0
+  const isDerelict = layout.theme === 'derelict'
 
-  const [wallSrc, tileSrc, cornerSrc, entranceSrc, doorSrc] = await Promise.all([
+  const [
+    wallSrc,
+    tileSrc,
+    cornerSrc,
+    entranceSrc,
+    doorSrc,
+    derelictWallOverlay,
+    damagedTileOverlay,
+    metalDoorOverlay,
+  ] = await Promise.all([
     loadGLB(WALL_URL),
     loadGLB(TILE_URL),
     loadGLB(CORNER_URL),
     needsEntrance ? loadGLB(ENTRANCE_URL) : Promise.resolve(null),
     needsEntrance ? loadGLB(DOOR_URL) : Promise.resolve(null),
+    isDerelict ? loadDerelictWallOverlayTextures() : Promise.resolve(null),
+    isDerelict ? loadDamagedTileOverlayTextures() : Promise.resolve(null),
+    isDerelict && needsEntrance ? loadMetalDoorOverlayTextures() : Promise.resolve(null),
   ])
+
+  if (derelictWallOverlay) {
+    applyDerelictWallOverlay(wallSrc, derelictWallOverlay)
+    applyDerelictWallOverlay(cornerSrc, derelictWallOverlay)
+    if (entranceSrc) {
+      applyDerelictWallOverlay(entranceSrc, derelictWallOverlay)
+    }
+  }
+  if (damagedTileOverlay) {
+    applyDamagedTileOverlay(tileSrc, damagedTileOverlay)
+  }
+  if (metalDoorOverlay && doorSrc) {
+    applyMetalDoorOverlay(doorSrc, metalDoorOverlay)
+  }
 
   const { width, depth } = layout
   const stackHeight = Math.max(1, layout.height ?? 1)
