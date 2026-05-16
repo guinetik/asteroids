@@ -125,17 +125,35 @@ const DRONE_DESTRUCTION_FLASH_INTENSITY = 12
 /** Seconds the body keeps glowing after the killing shot. */
 const DRONE_DESTRUCTION_FLASH_DURATION = 0.3
 
-/** Seconds the procedural death tumble runs before `onDone` fires. */
-const DRONE_DEATH_SECONDS = 0.4
-
 /** Spin speed (radians/second) applied during the death tumble. */
-const DRONE_DEATH_SPIN_SPEED = 12
+const DRONE_DEATH_SPIN_SPEED = 9
 
 /**
- * Vertical drop (world metres) over the death tumble. The drone sags
- * out of its hover and then is disposed by the director.
+ * Downward acceleration (m/s²) applied during the death fall. Scaled
+ * well below real Earth gravity so the drop reads as a heavy hunk of
+ * metal sagging out of hover rather than freefalling.
  */
-const DRONE_DEATH_DROP_DISTANCE = 0.45
+const DRONE_DEATH_GRAVITY = 6
+
+/** Initial downward velocity (m/s) at the moment the tumble starts. */
+const DRONE_DEATH_INITIAL_VELOCITY = 0.4
+
+/**
+ * Seconds the wrecked drone lies on the floor (still glowing) before
+ * `onDone` fires and the director disposes it. Gives the player a
+ * moment to register the kill before the corpse vanishes.
+ */
+const DRONE_DEATH_REST_SECONDS = 0.9
+
+/** Y offset (world metres) above the floor where the body settles. */
+const DRONE_DEATH_FLOOR_CLEARANCE = 0.05
+
+/**
+ * Hard ceiling on the falling segment of the death sequence. Even if
+ * the model never receives a floor Y (e.g. tests), the tumble caps
+ * here so it can't fall forever.
+ */
+const DRONE_DEATH_FALL_MAX_SECONDS = 3
 
 /** Captured material baseline so flash decays restore the original tint. */
 interface DroneBodyMaterialEntry {
@@ -209,17 +227,31 @@ export class DroneModel {
   /** True once the death tumble started. */
   private dying = false
 
-  /** Seconds remaining on the death tumble. */
-  private deathRemaining = 0
+  /** Whether the falling phase finished and the body is at rest. */
+  private deathLanded = false
+
+  /** Seconds remaining on the post-impact rest phase. Counted down once landed. */
+  private deathRestRemaining = 0
+
+  /** Seconds the falling phase has been running (capped by max). */
+  private deathFallElapsed = 0
+
+  /** Current downward velocity (m/s) during the fall. */
+  private deathFallVelocity = 0
 
   /** Per-instance random axis used by the tumble spin. */
   private readonly deathAxis = new THREE.Vector3(1, 0, 0)
 
-  /** Callback fired once when the death tumble completes. */
+  /** Callback fired once when the entire death sequence completes. */
   private deathDoneCallback: (() => void) | null = null
 
-  /** Outer wrapper Y at the moment the death tumble started. */
-  private deathStartY = 0
+  /**
+   * World Y the wrapper should settle on once the body hits the floor.
+   * Defaults to the launch Y minus a small drop so tests / fallback
+   * paths can't fall forever; the controller overrides this with the
+   * actual room floor Y via {@link playDeathSequence}.
+   */
+  private deathFloorY = 0
 
   /**
    * Build an empty wrapper group. {@link load} is kicked off automatically;
@@ -380,18 +412,28 @@ export class DroneModel {
   }
 
   /**
-   * Start the procedural death tumble. The wrapper spins around a
-   * random axis and drops vertically over {@link DRONE_DEATH_SECONDS};
-   * `onDone` fires exactly once when the tumble completes.
+   * Start the procedural death sequence: a gravity-driven fall + tumble
+   * down to `floorY`, then a brief rest beat where the wrecked body
+   * lies still glowing, then `onDone` fires so the director can
+   * dispose. Pass the room's floor Y so the body lands flush with the
+   * surface instead of dropping through it.
    *
-   * @param onDone - Callback fired when the tumble finishes.
+   * @param onDone - Callback fired once the full sequence (fall + rest)
+   *   completes.
+   * @param floorY - World Y the body should settle on. Optional — when
+   *   omitted, the model uses a small drop relative to its current
+   *   hover Y so the test path still terminates.
    */
-  playDeathSequence(onDone: () => void): void {
+  playDeathSequence(onDone: () => void, floorY?: number): void {
     this.dying = true
-    this.deathRemaining = DRONE_DEATH_SECONDS
+    this.deathLanded = false
+    this.deathFallElapsed = 0
+    this.deathFallVelocity = DRONE_DEATH_INITIAL_VELOCITY
+    this.deathRestRemaining = DRONE_DEATH_REST_SECONDS
     this.deathDoneCallback = onDone
     this.clearAim()
-    this.deathStartY = this.group.position.y
+    this.deathFloorY =
+      floorY !== undefined ? floorY + DRONE_DEATH_FLOOR_CLEARANCE : this.group.position.y - 0.5
     // Pick a random unit axis for the tumble spin. Y bias slightly so
     // the drone reads as cartwheeling rather than purely flipping.
     this.deathAxis
@@ -595,17 +637,28 @@ export class DroneModel {
    * @param dt - Frame delta in seconds.
    */
   private tickDeath(dt: number): void {
-    this.deathRemaining = Math.max(0, this.deathRemaining - dt)
-    const elapsed = DRONE_DEATH_SECONDS - this.deathRemaining
-    // Spin via quaternion so the tumble axis isn't decomposed into
-    // Euler ordering quirks.
-    const angle = DRONE_DEATH_SPIN_SPEED * dt
-    const q = new THREE.Quaternion().setFromAxisAngle(this.deathAxis, angle)
-    this.group.quaternion.multiplyQuaternions(q, this.group.quaternion)
-    // Linear vertical drop.
-    const t = elapsed / DRONE_DEATH_SECONDS
-    this.group.position.y = this.deathStartY - DRONE_DEATH_DROP_DISTANCE * t
-    if (this.deathRemaining <= 0 && this.deathDoneCallback) {
+    if (!this.deathLanded) {
+      // Falling phase: spin + accelerate downward under DRONE_DEATH_GRAVITY
+      // until the wrapper reaches the floor Y. The cap on
+      // DRONE_DEATH_FALL_MAX_SECONDS guards the no-floor test path.
+      this.deathFallElapsed += dt
+      const angle = DRONE_DEATH_SPIN_SPEED * dt
+      const q = new THREE.Quaternion().setFromAxisAngle(this.deathAxis, angle)
+      this.group.quaternion.multiplyQuaternions(q, this.group.quaternion)
+      this.deathFallVelocity += DRONE_DEATH_GRAVITY * dt
+      this.group.position.y -= this.deathFallVelocity * dt
+      const hitFloor = this.group.position.y <= this.deathFloorY
+      const timedOut = this.deathFallElapsed >= DRONE_DEATH_FALL_MAX_SECONDS
+      if (hitFloor || timedOut) {
+        this.group.position.y = this.deathFloorY
+        this.deathLanded = true
+        this.deathFallVelocity = 0
+      }
+      return
+    }
+    // Rest phase: body is settled, just count down toward dispose.
+    this.deathRestRemaining = Math.max(0, this.deathRestRemaining - dt)
+    if (this.deathRestRemaining <= 0 && this.deathDoneCallback) {
       const cb = this.deathDoneCallback
       this.deathDoneCallback = null
       cb()

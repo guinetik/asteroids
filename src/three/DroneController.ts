@@ -64,7 +64,7 @@ const DRONE_FIRST_SHOT_DELAY = 0.35
  * animation starting. Lets the destruction VFX + boom read on the
  * killing-shot frame before the model sags toward the floor.
  */
-const DRONE_DEATH_FOLD_DELAY = 0.18
+const DRONE_DEATH_FOLD_DELAY = 0.28
 
 /**
  * Y offset (world metres) from the drone's hover anchor down to the
@@ -480,9 +480,10 @@ export class DroneController {
       this.deathFoldDelay -= dt
       if (this.deathFoldDelay <= 0) {
         this.foldStarted = true
+        const floorY = this.rect?.floorY
         this.model.playDeathSequence(() => {
           this.onKilled?.(this.model.position.x, this.model.position.y, this.model.position.z)
-        })
+        }, floorY)
       }
     }
     this.model.tick(dt)
