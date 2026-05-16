@@ -102,7 +102,13 @@ const WINDOW_CORRIDOR_ROOF_DROP = 0.01
 /** Small roof drop for corner (L) corridors so roof seams do not expose space. */
 const CORNER_CORRIDOR_ROOF_DROP = 0.3
 /** Floor surface Y (shared with the room builder). */
-const STATION_FLOOR_Y = 0.25
+export const STATION_FLOOR_Y = 0.25
+/**
+ * Ceiling Y for projectile / hover-prop placement. Matches `WALL_HEIGHT`
+ * plus a small margin so bolts grazing the actual geometry still
+ * register as ceiling hits and ceiling-mounted props sit flush.
+ */
+export const STATION_CEILING_Y = 3.2
 /**
  * Local-space nudge for the L corridor asset. Its visible port markers
  * are slightly off the logical bbox centerline; shifting the clone keeps

@@ -19,6 +19,7 @@ import { ProjectileSystem } from '@/lib/fps/projectileSystem'
 import { buildMultiToolConfig } from '@/lib/fps/buildMultiToolConfig'
 import { ParticleEmitter } from '@/three/ParticleEmitter'
 import { WallImpactDecalPool } from '@/three/WallImpactDecalPool'
+import { StationDroneDirector } from '@/three/StationDroneDirector'
 import { StationTurretDirector } from '@/three/StationTurretDirector'
 import type { MultiToolMode } from '@/lib/fps/multiToolState'
 import { DevConsole } from '@/lib/devConsole'
@@ -40,7 +41,12 @@ import { StationAudioDirector } from '@/audio/StationAudioDirector'
 import { FpsPointerLockSession } from '@/lib/fps/FpsPointerLockSession'
 import { buildFpsPlayerConfig } from '@/lib/fps/buildFpsPlayerConfig'
 import { StationCollider, type StationRect } from '@/lib/station/StationCollider'
-import { buildStation, type BuiltStation, type PropInteractor } from '@/three/StationBuilder'
+import {
+  buildStation,
+  STATION_CEILING_Y,
+  type BuiltStation,
+  type PropInteractor,
+} from '@/three/StationBuilder'
 import {
   computeDeathPresentationState,
   computeHypoxiaFadeOpacity,
@@ -102,13 +108,6 @@ const STATION_THEME_LUT_URLS: Readonly<Record<StationTheme, string>> = {
 /** Floor surface Y, used by the player collider. Matches the visible
  * top of the raised floor tiles in the room builder. */
 const FLOOR_Y = 0.25
-/**
- * Ceiling Y for projectile collision. Matches `WALL_HEIGHT` in
- * `StationBuilder.ts` plus a small margin so bolts grazing the actual
- * geometry still register as ceiling hits. Used to stop multitool bolts
- * that would otherwise fly out the open top of a half-cylinder room.
- */
-const STATION_CEILING_Y = 3.2
 
 /**
  * Magic string that flags an authored entrance as gated on station
@@ -313,6 +312,10 @@ export class StationViewController implements Tickable {
   private wallImpactDecals: WallImpactDecalPool | null = null
   /** Coordinates ceiling turrets + enemy projectiles + alarm SFX. */
   private turretDirector: StationTurretDirector | null = null
+  /** Coordinates patrol drones inside opted-in rooms. Shares the turret
+   * director's projectile sim and dart visual pool so we don't duplicate
+   * either. */
+  private droneDirector: StationDroneDirector | null = null
   /** Ambient fill — brightens once station power is restored. */
   private ambientLight: AmbientLight | null = null
   /** Directional fill — brightens once station power is restored. */
@@ -643,6 +646,25 @@ export class StationViewController implements Tickable {
       this.turretDirector.populateFromEntrances(this.station.entrances, STATION_CEILING_Y, {
         spawnXZ: { x: this.spawnPos.x, z: this.spawnPos.z },
         spawnProbability: turretsCfg?.spawnProbability,
+      })
+    }
+
+    // Patrol drones: in-room floaters that share the turret director's
+    // enemy-projectile sim + dart visual pool so we never duplicate
+    // either. Drone darts hit the player via the same `onPlayerHit`
+    // handler the turret director wired above — no extra plumbing.
+    this.droneDirector = new StationDroneDirector(
+      this.sceneManager.scene,
+      this.turretDirector.projectiles,
+      (enemy) => this.projectileSystem!.addEnemy(enemy),
+      (enemy) => this.projectileSystem!.removeEnemy(enemy),
+    )
+    this.droneDirector.setCollider(this.stationCollider)
+    const dronesCfg = layout.drones
+    if (dronesCfg?.enabled !== false) {
+      this.droneDirector.populateDronesInRooms(layout.rooms, {
+        spawnXZ: { x: this.spawnPos.x, z: this.spawnPos.z },
+        spawnProbability: dronesCfg?.spawnProbability,
       })
     }
 
@@ -1348,10 +1370,10 @@ export class StationViewController implements Tickable {
    * @param dt - Frame delta in seconds.
    */
   private tickTurrets(dt: number): void {
-    if (!this.turretDirector || !this.playerController) return
-    if (this.playerController.isDead) return
+    if (!this.playerController || this.playerController.isDead) return
     const pos = this.playerController.group.position
-    this.turretDirector.tick(dt, pos.x, pos.y, pos.z)
+    this.turretDirector?.tick(dt, pos.x, pos.y, pos.z)
+    this.droneDirector?.tick(dt, pos.x, pos.y, pos.z)
   }
 
   private tickPowerDiagnostics(_dt: number): void {
@@ -1806,6 +1828,7 @@ export class StationViewController implements Tickable {
     this.projectileSystem?.dispose()
     this.impactEmitter?.dispose()
     this.wallImpactDecals?.dispose()
+    this.droneDirector?.dispose()
     this.turretDirector?.dispose()
     this.multiTool?.dispose()
     this.playerController?.dispose()

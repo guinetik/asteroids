@@ -212,6 +212,15 @@ export interface RoomSpec {
    * deadly tick damage paired with the grunt SFX + red vignette.
    */
   hazard?: 'lava'
+  /**
+   * Whether the patrol-drone director should populate this room.
+   * When `true`, the director rolls between `0` and `maxDronesForRoom`
+   * floaters and scatters them inside the room footprint. When
+   * `false` or omitted, the room stays drone-free. The top-level
+   * {@link StationLayout.drones} master switch can still override
+   * everything to off.
+   */
+  drones?: boolean
 }
 
 /** XZ plane vector — anchors, port positions, etc. */
@@ -609,6 +618,28 @@ export interface TurretsSpec {
   spawnProbability?: number
 }
 
+/**
+ * Per-level config for the patrol-drone spawn system. Mirrors
+ * {@link TurretsSpec}. Authors flip `enabled: false` to opt a layout
+ * out of drones entirely, or tune `spawnProbability` to control how
+ * densely each room's drone slots fill.
+ */
+export interface DronesSpec {
+  /**
+   * Master switch. When `false`, no drones spawn regardless of
+   * per-room opt-ins. Defaults to `true` so existing layouts only
+   * need to flip per-room `drones: true` to start populating.
+   */
+  enabled?: boolean
+  /**
+   * Independent per-slot spawn probability in `[0, 1]`. Each room
+   * has up to N drone slots (sized by room footprint); the director
+   * rolls this once per slot. Defaults to the director's
+   * compile-time default (currently 0.7).
+   */
+  spawnProbability?: number
+}
+
 /** Full station layout — rooms plus a corridor graph with port targets. */
 export interface StationLayout {
   /** Optional startup briefing and non-interactive arrival intro copy. */
@@ -626,6 +657,8 @@ export interface StationLayout {
   exteriorSun?: ExteriorSunSpec
   /** Optional security-turret spawn config. Omit to keep defaults. */
   turrets?: TurretsSpec
+  /** Optional patrol-drone spawn config. Omit to keep defaults. */
+  drones?: DronesSpec
 }
 
 /** Final concrete instruction the Three.js builder consumes for a piece. */

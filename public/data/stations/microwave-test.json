@@ -16,6 +16,7 @@
     "scale": 0.5
   },
   "turrets": { "enabled": true },
+  "drones": { "enabled": true },
   "rooms": [
     {
       "id": "r-hub",
@@ -76,6 +77,7 @@
       "height": 2,
       "anchor": { "x": -13.397, "z": 15.305 },
       "yaw": 0,
+      "drones": true,
       "entrances": [
         {
           "side": "E",
@@ -178,6 +180,7 @@
       "height": 2,
       "anchor": { "x": 0, "z": 32.552 },
       "yaw": 0,
+      "drones": true,
       "entrances": [
         {
           "side": "S",

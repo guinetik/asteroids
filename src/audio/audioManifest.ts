@@ -99,6 +99,8 @@ export const AUDIO_SOUND_IDS = [
   'sfx.station.alarm',
   'sfx.turret.destroyed',
   'sfx.turret.laser',
+  'sfx.drone.laser',
+  'sfx.drone.destroyed',
   // SFX — footsteps
   'sfx.step.habitat.1',
   'sfx.step.habitat.2',
@@ -940,6 +942,36 @@ const manifestById: ManifestById = {
     load: 'lazy',
     playback: 'overlap',
     volume: 0.45,
+    effect: 'none',
+  },
+  /**
+   * Per-shot laser pulse played each time a patrol drone fires a dart.
+   * Currently shares the turret's recording — different id so we can
+   * swap it for a softer/higher-pitched variant later without touching
+   * the controller. `overlap` matches the turret's policy so a room
+   * full of drones doesn't drop shots.
+   */
+  'sfx.drone.laser': {
+    id: 'sfx.drone.laser',
+    src: '/sound/sfx.turret.laser.mp3',
+    category: 'sfx',
+    load: 'lazy',
+    playback: 'overlap',
+    volume: 0.35,
+    effect: 'none',
+  },
+  /**
+   * Kill explosion played when the player drops a patrol drone.
+   * Currently shares the turret recording; separate id so a future
+   * drone-specific stinger can land without touching the controller.
+   */
+  'sfx.drone.destroyed': {
+    id: 'sfx.drone.destroyed',
+    src: '/sound/sfx.turret.destroyed.mp3',
+    category: 'sfx',
+    load: 'lazy',
+    playback: 'overlap',
+    volume: 0.6,
     effect: 'none',
   },
 
