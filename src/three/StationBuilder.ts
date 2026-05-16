@@ -88,6 +88,13 @@ const CORRIDOR_FLOOR_CENTER_Y = WALL_HEIGHT / 2
 const CORRIDOR_ROOF_CENTER_Y = WALL_HEIGHT
 /** Visual scale applied along straight corridors' long local axis to hide seams. */
 const STRAIGHT_CORRIDOR_LENGTH_SCALE = 1.025
+/**
+ * Visual scale applied along window/T corridors' long local axis (X) to
+ * hide the hairline seam between two T-pieces meeting at a port. The
+ * validator measures against the logical {@link CORRIDOR_HALF_EXTENTS}, so
+ * this purely-visual inflation does not affect layout no-overlap checks.
+ */
+const WINDOW_CORRIDOR_LENGTH_SCALE = 1.025
 /** Small roof drop for straight corridors so ceiling seams do not expose space. */
 const STRAIGHT_CORRIDOR_ROOF_DROP = 0.18
 /** Small roof drop for window/T corridors so roof seams do not expose space. */
@@ -391,6 +398,7 @@ async function placeCorridor(
   }
   if (node.kind === 'window') {
     floor.position.z = -WINDOW_VISUAL_ALIGNMENT_OFFSET
+    floor.scale.x = WINDOW_CORRIDOR_LENGTH_SCALE
   }
   group.add(floor)
 
@@ -408,6 +416,7 @@ async function placeCorridor(
   if (node.kind === 'window') {
     roof.position.y -= WINDOW_CORRIDOR_ROOF_DROP
     roof.position.z = -WINDOW_VISUAL_ALIGNMENT_OFFSET
+    roof.scale.x = WINDOW_CORRIDOR_LENGTH_SCALE
   }
   group.add(roof)
 
