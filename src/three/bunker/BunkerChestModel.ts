@@ -22,6 +22,23 @@ const CHEST_MODEL_URL = '/models/chest.glb'
 const LOOTED_EMISSIVE_COLOR = 0x5ce7ff
 
 /**
+ * envMapIntensity bump applied to the chest's authored materials. The
+ * GLB ships at default 1.0, but the bunker's procedural surroundings
+ * dim their IBL contribution heavily — bumping the chest here keeps it
+ * readable under the scene's spotty point lights.
+ */
+const CHEST_ENV_MAP_INTENSITY = 4
+
+/** Upper bound on authored roughness so the chest still picks up rim highlights. */
+const CHEST_MAX_ROUGHNESS = 0.5
+
+/** Multiplier applied to authored base colour to lift the albedo. */
+const CHEST_COLOR_BOOST = 1.6
+
+/** Self-illumination floor so the chest reads even in unlit corners. */
+const CHEST_EMISSIVE_FLOOR = 0x202020
+
+/**
  * Yaw applied to the loaded GLB so the chest's lock face aligns with the
  * group's local -Z axis (Three.js default "forward"). This lets call
  * sites reason about chest facing in the usual way without knowing the
@@ -100,7 +117,11 @@ export class BunkerChestModel {
     this.group.add(inner)
     this.captureLidHinges(inner)
     this.centerAndGround(inner)
+    // Collect trim materials FIRST — brightenMaterials applies an
+    // emissive floor to non-trim slots which would otherwise sweep
+    // every material into the looted-recolour set.
     this.collectEmissiveMaterials(inner)
+    this.brightenMaterials(inner)
 
     this.loaded = true
   }
@@ -195,6 +216,32 @@ export class BunkerChestModel {
     inner.position.x -= center.x
     inner.position.z -= center.z
     inner.position.y -= box.min.y
+  }
+
+  /**
+   * Boost IBL response and clamp roughness on every standard material
+   * so the chest reads clearly under the scene's point-light rig
+   * instead of falling into the same dim band as procedural props.
+   */
+  private brightenMaterials(inner: THREE.Group): void {
+    inner.traverse((child) => {
+      if (!(child instanceof THREE.Mesh) || !child.material) return
+      const mats = Array.isArray(child.material) ? child.material : [child.material]
+      for (const m of mats) {
+        if (m instanceof THREE.MeshStandardMaterial) {
+          m.envMapIntensity = CHEST_ENV_MAP_INTENSITY
+          m.roughness = Math.min(m.roughness, CHEST_MAX_ROUGHNESS)
+          m.color.multiplyScalar(CHEST_COLOR_BOOST)
+          // Lift only un-emissive trim slots; leave the looted-state
+          // emissive (collected below) untouched.
+          if (!m.emissive || m.emissive.getHex() === 0) {
+            m.emissive.setHex(CHEST_EMISSIVE_FLOOR)
+            m.emissiveIntensity = 1
+          }
+          m.needsUpdate = true
+        }
+      }
+    })
   }
 
   /**
