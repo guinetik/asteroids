@@ -93,9 +93,12 @@ export const AUDIO_SOUND_IDS = [
   'sfx.station.door',
   'sfx.station.door.close',
   'sfx.terminal.interact',
+  'sfx.station.reboot',
   'sfx.burn',
   'sfx.station.trigger',
   'sfx.station.alarm',
+  'sfx.turret.destroyed',
+  'sfx.turret.laser',
   // SFX — footsteps
   'sfx.step.habitat.1',
   'sfx.step.habitat.2',
@@ -862,6 +865,16 @@ const manifestById: ManifestById = {
     volume: 0.6,
     effect: 'none',
   },
+  /** One-shot station reboot swell fired when generator power comes online. */
+  'sfx.station.reboot': {
+    id: 'sfx.station.reboot',
+    src: '/sound/sfx.station.reboot.mp3',
+    category: 'sfx',
+    load: 'lazy',
+    playback: 'single-instance',
+    volume: 0.85,
+    effect: 'none',
+  },
   /**
    * Sustained sizzle loop played while the player stands in a lava
    * hazard. `single-instance` so back-to-back hazard ticks can't stack
@@ -900,6 +913,33 @@ const manifestById: ManifestById = {
     load: 'lazy',
     playback: 'single-instance',
     volume: 0.6,
+    effect: 'none',
+  },
+  /**
+   * One-shot explosion/crunch played when a ceiling turret is destroyed.
+   * `overlap` so back-to-back kills layer rather than swallow each other.
+   */
+  'sfx.turret.destroyed': {
+    id: 'sfx.turret.destroyed',
+    src: '/sound/sfx.turret.destroyed.mp3',
+    category: 'sfx',
+    load: 'lazy',
+    playback: 'overlap',
+    volume: 0.75,
+    effect: 'none',
+  },
+  /**
+   * Per-shot laser pulse played each time a ceiling turret fires a dart.
+   * `overlap` so a tight burst from one turret + simultaneous fire from
+   * a second turret across the room layer cleanly instead of cutting off.
+   */
+  'sfx.turret.laser': {
+    id: 'sfx.turret.laser',
+    src: '/sound/sfx.turret.laser.mp3',
+    category: 'sfx',
+    load: 'lazy',
+    playback: 'overlap',
+    volume: 0.45,
     effect: 'none',
   },
 

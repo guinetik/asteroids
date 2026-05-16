@@ -424,6 +424,52 @@ const SURVEY_SCALE_HZ = [
 const SURVEY_NOTE_VOLUME = 0.65
 
 /**
+ * Power-cell activation scale, in Hz. Shares the same ascending-feedback
+ * role as the survey melody but sits lower and more industrial.
+ */
+const POWER_CELL_SCALE_HZ = [
+  220.0, // A3
+  261.63, // C4
+  293.66, // D4
+  329.63, // E4
+  392.0, // G4
+  440.0, // A4
+  523.25, // C5
+  587.33, // D5
+] as const
+
+/** Main gain for one power-cell activation note. */
+const POWER_CELL_NOTE_VOLUME = 0.42
+/** Duration of a non-final power-cell activation note, in seconds. */
+const POWER_CELL_NOTE_DURATION = 0.7
+/** Duration of the final resolved power-cell power-up drone, in seconds. */
+const POWER_CELL_FINAL_DURATION = 2.4
+/** Detuned support oscillator offset, in cents (fat unison detune). */
+const POWER_CELL_DETUNE_CENTS = -9
+/** Resonant Q on the lowpass while the saws sweep — modest bite, not whistle. */
+const POWER_CELL_FILTER_Q = 4
+/** Filter cutoff at the start of a per-cell sweep (Hz). */
+const POWER_CELL_FILTER_START_HZ = 280
+/** Filter cutoff at the peak of a per-cell sweep (Hz). */
+const POWER_CELL_FILTER_END_HZ = 2400
+/** Filter cutoff at the start of the final-cell power-up drone (Hz). */
+const POWER_CELL_FINAL_FILTER_START_HZ = 180
+/** Filter cutoff at the peak of the final-cell power-up drone (Hz). */
+const POWER_CELL_FINAL_FILTER_END_HZ = 3600
+/** Pitch bend (semitones up) applied across the final-cell drone for a "spool-up" feel. */
+const POWER_CELL_FINAL_PITCH_BEND_SEMITONES = 7
+/** Extra scheduled tail after oscillator envelope reaches silence, in seconds. */
+const POWER_CELL_SOURCE_TAIL_S = 0.05
+/** Milliseconds after nominal melodic cue duration before disconnect cleanup. */
+const MELODY_CLEANUP_DELAY_MS = 100
+/** Sub oscillator pitch ratio for power-cell activation tones. */
+const POWER_CELL_SUPPORT_RATIO = 0.5
+/** Relative duration of the detuned support tone. */
+const POWER_CELL_SUPPORT_DURATION_RATIO = 0.95
+/** Relative gain of the detuned support tone. */
+const POWER_CELL_SUPPORT_GAIN_RATIO = 0.42
+
+/**
  * Play a melodic note for a gravitometric survey probe collection event.
  *
  * Non-final probes play a single ascending bell tone through a pentatonic major scale.
@@ -519,8 +565,190 @@ export function playSurveyProbeNote(collected: number, total: number): void {
         /* ignore disconnect races */
       }
     },
-    duration * 1000 + 100,
+    duration * 1000 + MELODY_CLEANUP_DELAY_MS,
   )
+}
+
+/**
+ * Play an ascending melodic cue when a station power-generator fuel cell
+ * activates. Non-final cells advance through a low pentatonic sequence;
+ * the final cell resolves with a brief arpeggiated power-online chord.
+ *
+ * @param activated - Cells activated so far, 1-based after this activation.
+ * @param total - Total cells needed for the reboot.
+ */
+export function playPowerCellActivationNote(activated: number, total: number): void {
+  if (Howler.noAudio) return
+  const ctx = Howler.ctx
+  const masterGain = (Howler as unknown as { masterGain?: AudioNode }).masterGain
+  if (!ctx || !masterGain) return
+
+  const output = ctx.createGain()
+  const filter = ctx.createBiquadFilter()
+  filter.type = 'lowpass'
+  filter.Q.setValueAtTime(POWER_CELL_FILTER_Q, ctx.currentTime)
+  output.connect(filter)
+  filter.connect(masterGain)
+  output.gain.setValueAtTime(1, ctx.currentTime)
+
+  const now = ctx.currentTime
+  const sources: StoppableNode[] = []
+  let duration: number
+
+  if (activated >= total) {
+    duration = POWER_CELL_FINAL_DURATION
+    // Final cell — a sustained "power booting" saw drone. Root + fifth +
+    // octave-up layered saws sweep a resonant lowpass from a low rumble
+    // up to a bright sheen, with a gentle pitch-bend so it reads as the
+    // station spooling back to life rather than a polite chord stab.
+    filter.frequency.setValueAtTime(POWER_CELL_FINAL_FILTER_START_HZ, now)
+    filter.frequency.exponentialRampToValueAtTime(
+      POWER_CELL_FINAL_FILTER_END_HZ,
+      now + duration * 0.7,
+    )
+    filter.frequency.exponentialRampToValueAtTime(
+      POWER_CELL_FINAL_FILTER_END_HZ * 0.5,
+      now + duration,
+    )
+    const root = POWER_CELL_SCALE_HZ[1]! // C4 — sits below the per-cell range
+    const fifth = POWER_CELL_SCALE_HZ[4]! // G4
+    const octave = POWER_CELL_SCALE_HZ[6]! // C5
+    schedulePowerUpDrone(ctx, output, now, root, duration, POWER_CELL_NOTE_VOLUME * 1.1, sources)
+    schedulePowerUpDrone(ctx, output, now, fifth, duration, POWER_CELL_NOTE_VOLUME * 0.7, sources)
+    schedulePowerUpDrone(ctx, output, now, octave, duration, POWER_CELL_NOTE_VOLUME * 0.5, sources)
+  } else {
+    duration = POWER_CELL_NOTE_DURATION
+    // Per-cell sweep: each cell snaps the filter back down and lets it
+    // climb again so every note feels like another generator coming
+    // online, not a melody.
+    filter.frequency.setValueAtTime(POWER_CELL_FILTER_START_HZ, now)
+    filter.frequency.exponentialRampToValueAtTime(
+      POWER_CELL_FILTER_END_HZ,
+      now + duration * 0.55,
+    )
+    filter.frequency.exponentialRampToValueAtTime(
+      POWER_CELL_FILTER_END_HZ * 0.4,
+      now + duration,
+    )
+    const noteIndex = Math.min(Math.max(0, activated - 1), POWER_CELL_SCALE_HZ.length - 1)
+    schedulePowerCellTone(
+      ctx,
+      output,
+      now,
+      POWER_CELL_SCALE_HZ[noteIndex]!,
+      duration,
+      POWER_CELL_NOTE_VOLUME,
+      sources,
+    )
+  }
+
+  globalThis.setTimeout(
+    () => {
+      for (const source of sources) {
+        try {
+          source.disconnect()
+        } catch {
+          /* ignore disconnect races */
+        }
+      }
+      try {
+        output.disconnect()
+        filter.disconnect()
+      } catch {
+        /* ignore disconnect races */
+      }
+    },
+    duration * 1000 + MELODY_CLEANUP_DELAY_MS,
+  )
+}
+
+/**
+ * Schedule one per-cell saw tone: a unison pair of detuned sawtooths
+ * (the source of the "saw drone" buzz) plus a sub-sine for body. The
+ * shared filter on the bus does the sweep — this function only owns
+ * the oscillators + envelopes.
+ */
+function schedulePowerCellTone(
+  ctx: AudioContext,
+  output: GainNode,
+  startTime: number,
+  frequencyHz: number,
+  duration: number,
+  volume: number,
+  sources: StoppableNode[],
+): void {
+  // Two detuned saws in unison — the classic "fat synth swell" texture.
+  for (const detune of [+POWER_CELL_DETUNE_CENTS, -POWER_CELL_DETUNE_CENTS]) {
+    const saw = ctx.createOscillator()
+    const sawGain = ctx.createGain()
+    saw.type = 'sawtooth'
+    saw.frequency.setValueAtTime(frequencyHz, startTime)
+    saw.detune.setValueAtTime(detune, startTime)
+    applyHeldEnvelope(sawGain.gain, startTime, duration, volume * 0.55)
+    saw.connect(sawGain)
+    sawGain.connect(output)
+    scheduleSource(saw, startTime, duration + POWER_CELL_SOURCE_TAIL_S, sources)
+  }
+
+  // Sub-octave sine for body — keeps the buzz from feeling thin.
+  const sub = ctx.createOscillator()
+  const subGain = ctx.createGain()
+  sub.type = 'sine'
+  sub.frequency.setValueAtTime(frequencyHz * POWER_CELL_SUPPORT_RATIO, startTime)
+  applyHeldEnvelope(
+    subGain.gain,
+    startTime,
+    duration * POWER_CELL_SUPPORT_DURATION_RATIO,
+    volume * POWER_CELL_SUPPORT_GAIN_RATIO,
+  )
+  sub.connect(subGain)
+  subGain.connect(output)
+  scheduleSource(
+    sub,
+    startTime,
+    duration * POWER_CELL_SUPPORT_DURATION_RATIO + POWER_CELL_SOURCE_TAIL_S,
+    sources,
+  )
+}
+
+/**
+ * Schedule one sustained saw drone layer used by the final-cell
+ * "station booting" cue. Wider unison (3 detuned saws) than the
+ * per-cell tone and a slow upward pitch bend across the duration so
+ * the layer reads as spooling up. The shared bus filter does the
+ * cutoff sweep; this function only owns the oscillators.
+ */
+function schedulePowerUpDrone(
+  ctx: AudioContext,
+  output: GainNode,
+  startTime: number,
+  frequencyHz: number,
+  duration: number,
+  volume: number,
+  sources: StoppableNode[],
+): void {
+  const targetHz = frequencyHz * Math.pow(2, POWER_CELL_FINAL_PITCH_BEND_SEMITONES / 12)
+  for (const detune of [-POWER_CELL_DETUNE_CENTS * 1.6, 0, +POWER_CELL_DETUNE_CENTS * 1.6]) {
+    const saw = ctx.createOscillator()
+    const sawGain = ctx.createGain()
+    saw.type = 'sawtooth'
+    saw.frequency.setValueAtTime(frequencyHz, startTime)
+    saw.frequency.exponentialRampToValueAtTime(targetHz, startTime + duration * 0.6)
+    saw.detune.setValueAtTime(detune, startTime)
+    applyHeldEnvelope(sawGain.gain, startTime, duration, volume * 0.42)
+    saw.connect(sawGain)
+    sawGain.connect(output)
+    scheduleSource(saw, startTime, duration + POWER_CELL_SOURCE_TAIL_S, sources)
+  }
+  // Sub octave sine — gives the drone weight under the saws.
+  const sub = ctx.createOscillator()
+  const subGain = ctx.createGain()
+  sub.type = 'sine'
+  sub.frequency.setValueAtTime(frequencyHz * 0.5, startTime)
+  applyHeldEnvelope(subGain.gain, startTime, duration, volume * 0.55)
+  sub.connect(subGain)
+  subGain.connect(output)
+  scheduleSource(sub, startTime, duration + POWER_CELL_SOURCE_TAIL_S, sources)
 }
 
 /** Finite-length white or brown noise buffer for one-shot layers. */

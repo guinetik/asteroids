@@ -102,6 +102,30 @@ const HIT_FLASH_COLOR = new THREE.Color(0xff00ff)
 const HIT_FLASH_INTENSITY = 8
 /** Seconds for the magenta flash to decay back to base. */
 const HIT_FLASH_DURATION = 0.3
+
+/**
+ * White-hot orange the body flares to on the killing-shot frame. Combined
+ * with a strong emissive boost in {@link tickDestructionFlash} so the
+ * whole turret reads as glowing-from-within, not just tinted.
+ */
+const DESTRUCTION_FLASH_COLOR = new THREE.Color(0xffd060)
+/** Peak emissive intensity at the moment of destruction. */
+const DESTRUCTION_FLASH_INTENSITY = 14
+/**
+ * Seconds the body keeps glowing after the killing shot. Sized to
+ * match the controller's 0.2 s pre-fold beat plus a little tail so the
+ * glow is still decaying as the model starts folding back.
+ */
+const DESTRUCTION_FLASH_DURATION = 0.35
+/**
+ * Peak jitter amplitude (GLB native units, pre-scale) applied to the
+ * inner mesh during the destruction beat. The mesh shakes around its
+ * baseline position; amplitude decays linearly to zero across
+ * {@link DESTRUCTION_SHAKE_DURATION}.
+ */
+const DESTRUCTION_SHAKE_AMPLITUDE = 0.18
+/** Seconds the position jitter runs for. */
+const DESTRUCTION_SHAKE_DURATION = 0.2
 /**
  * Y offset (in *native* GLB units, pre-scale) used to align the model
  * relative to its wrapper origin. The GLB is authored with its
@@ -178,6 +202,12 @@ export class TurretModel {
   }> = []
   /** Seconds left on the current hit flash. Zero = fully decayed. */
   private hitFlashRemaining = 0
+  /** Seconds left on the destruction body-glow. Zero = fully decayed. */
+  private destructionFlashRemaining = 0
+  /** Seconds left on the destruction position-jitter. Zero = no shake. */
+  private destructionShakeRemaining = 0
+  /** Baseline `inner.position.y` so the jitter can offset from it cleanly. */
+  private innerBaseY = 0
   /** True once the turret entered its death-fall animation. */
   private dying = false
   /** Fired once when the death animation reaches the end of the clip. */
@@ -217,6 +247,7 @@ export class TurretModel {
     // Offset the inner so the top of the bbox sits at the wrapper origin.
     inner.position.set(0, TURRET_GLB_TOP_TO_ORIGIN, 0)
     inner.scale.setScalar(1)
+    this.innerBaseY = TURRET_GLB_TOP_TO_ORIGIN
     this.inner = inner
     this.group.add(inner)
     this.group.scale.setScalar(TURRET_SCALE)
@@ -336,6 +367,21 @@ export class TurretModel {
    */
   flashHitTaken(): void {
     this.hitFlashRemaining = HIT_FLASH_DURATION
+  }
+
+  /**
+   * Kick off the destruction-beat visuals: body flares white-hot orange
+   * and the inner mesh jitters violently around its baseline position.
+   * The controller calls this on the killing-shot frame, in parallel
+   * with the brief pre-fold delay, so the model itself reads as
+   * "popping" before it starts folding back into the ceiling.
+   */
+  flashDestruction(): void {
+    this.destructionFlashRemaining = DESTRUCTION_FLASH_DURATION
+    this.destructionShakeRemaining = DESTRUCTION_SHAKE_DURATION
+    // Cancel any in-flight hit flash so the magenta tint doesn't fight
+    // the destruction glow; the destruction colour wins this frame.
+    this.hitFlashRemaining = 0
   }
 
   /**
@@ -499,6 +545,8 @@ export class TurretModel {
   tick(dt: number): void {
     this.tickMuzzleFlash(dt)
     this.tickHitFlash(dt)
+    this.tickDestructionFlash(dt)
+    this.tickDestructionShake(dt)
     if (!this.mixer || !this.action) return
     if (this.dying) {
       // Death sequence: let the mixer advance naturally to the end of
@@ -684,6 +732,45 @@ export class TurretModel {
       mat.emissive.copy(entry.baseEmissive).lerp(HIT_FLASH_COLOR, t)
       mat.emissiveIntensity = entry.baseEmissiveIntensity + HIT_FLASH_INTENSITY * t
     }
+  }
+
+  /**
+   * Per-frame body white-hot glow during the destruction beat. Mirrors
+   * the hit-flash decay but uses a hotter colour + bigger emissive
+   * boost, and ignores hit-flash state — destruction wins.
+   */
+  private tickDestructionFlash(dt: number): void {
+    if (this.destructionFlashRemaining <= 0 || this.bodyMaterials.length === 0) return
+    this.destructionFlashRemaining = Math.max(0, this.destructionFlashRemaining - dt)
+    const t = this.destructionFlashRemaining / DESTRUCTION_FLASH_DURATION
+    for (const entry of this.bodyMaterials) {
+      const mat = entry.material
+      mat.color.copy(entry.baseColor).lerp(DESTRUCTION_FLASH_COLOR, t)
+      mat.emissive.copy(entry.baseEmissive).lerp(DESTRUCTION_FLASH_COLOR, t)
+      mat.emissiveIntensity = entry.baseEmissiveIntensity + DESTRUCTION_FLASH_INTENSITY * t
+    }
+  }
+
+  /**
+   * Per-frame jitter applied to the inner mesh's local position during
+   * the destruction beat. Amplitude decays linearly to zero. When the
+   * timer finishes, the position snaps back to its baseline so the
+   * fold-back animation starts from a clean pose.
+   */
+  private tickDestructionShake(dt: number): void {
+    if (!this.inner || this.destructionShakeRemaining <= 0) return
+    this.destructionShakeRemaining = Math.max(0, this.destructionShakeRemaining - dt)
+    const t = this.destructionShakeRemaining / DESTRUCTION_SHAKE_DURATION
+    const amp = DESTRUCTION_SHAKE_AMPLITUDE * t
+    if (amp <= 0) {
+      this.inner.position.set(0, this.innerBaseY, 0)
+      return
+    }
+    this.inner.position.set(
+      (Math.random() - 0.5) * 2 * amp,
+      this.innerBaseY + (Math.random() - 0.5) * 2 * amp,
+      (Math.random() - 0.5) * 2 * amp,
+    )
   }
 
   private tickMuzzleFlash(dt: number): void {

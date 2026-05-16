@@ -22,6 +22,7 @@
 import * as THREE from 'three'
 import type { WorldCollider } from '@/lib/physics/worldCollision'
 import { loadGLB } from '@/three/loadGLB'
+import { ParticleEmitter } from '@/three/ParticleEmitter'
 import { segmentIntersectsAabb3 } from '@/lib/physics/segmentAabb3'
 import { Timer } from '@/lib/Timer'
 
@@ -107,6 +108,39 @@ const POWER_ON_SHAKE_FREQUENCY = 32
 /** Bolt segments shorter than this (squared) are skipped. */
 const MIN_BOLT_SEGMENT_LENGTH_SQ = 1e-14
 
+// ── Per-cell activation VFX (electrical discharge) ─────────────────────
+
+/**
+ * Total duration of the per-cell shake kicked off on activation. Longer
+ * than the green hit-flash so the body keeps trembling while the
+ * lightning fades.
+ */
+const CELL_ACTIVATION_SHAKE_DURATION = 0.45
+/** Peak per-axis jitter (cell-local metres) applied during the shake. */
+const CELL_ACTIVATION_SHAKE_AMPLITUDE = 0.02
+/** Shake oscillation frequency (Hz) — high enough to read as electrical. */
+const CELL_ACTIVATION_SHAKE_FREQUENCY = 55
+/** Number of jagged lightning arcs spawned per cell activation. */
+const CELL_ACTIVATION_ARC_COUNT = 8
+/** Pool size for the shared lightning-arc objects (capacity ceiling). */
+const LIGHTNING_ARC_POOL_SIZE = 64
+/** Number of vertices per jagged arc polyline (more = more jitter). */
+const LIGHTNING_ARC_SEGMENTS = 14
+/** Arc length range (cell-local metres) — picked uniformly per spawn. */
+const LIGHTNING_ARC_LENGTH_MIN = 0.18
+/** Arc length range (cell-local metres) — picked uniformly per spawn. */
+const LIGHTNING_ARC_LENGTH_MAX = 0.42
+/** Peak perpendicular jitter on the polyline mid-vertices. */
+const LIGHTNING_ARC_JITTER = 0.07
+/** Seconds an arc lives before fully fading. */
+const LIGHTNING_ARC_LIFETIME = 0.22
+/** Bright cyan-white tint for the discharge arcs + sparks. */
+const LIGHTNING_COLOR = 0x9be4ff
+/** Number of cyan spark particles spawned per cell activation. */
+const CELL_ACTIVATION_SPARK_COUNT = 80
+/** Number of bright white core flash particles spawned per activation. */
+const CELL_ACTIVATION_FLASH_COUNT = 18
+
 /**
  * Captured author-time state for a glow material so the model can flip
  * a single fuel cell between "broken" (dark inert) and "restored" (PBR
@@ -180,6 +214,25 @@ interface FuelCell {
    * {@link HIT_FLASH_COLOR}, matching the turret hit-flash pattern.
    */
   hitFlashRemaining: number
+  /**
+   * Captured baseline local position of {@link source}, snapped at load
+   * time. The per-cell activation shake jitters around this point and
+   * restores to it cleanly when the timer expires.
+   */
+  baseX: number
+  /** See {@link baseX}. */
+  baseY: number
+  /** See {@link baseX}. */
+  baseZ: number
+  /**
+   * Seconds remaining in the per-cell activation shake. While > 0 the
+   * cell's local position is jittered around its baseline so the
+   * canister itself reads as "buzzing with current" during the
+   * electrical discharge.
+   */
+  shakeRemaining: number
+  /** Phase accumulator (radians) for the per-cell shake oscillators. */
+  shakePhase: number
 }
 
 /** Symbols rendered on the letters row of the puzzle UI, by slot index. */
@@ -221,6 +274,8 @@ export class StationPowerGenModel {
 
   /** Fires once when a fuel cell finishes its green hold. */
   onFuelCellRepaired: ((index: number) => void) | null = null
+  /** Fires when a fuel cell reaches full charge and begins its activation hold. */
+  onFuelCellActivated: ((index: number) => void) | null = null
   /** Fires once when every fuel cell is repaired. */
   onPowerRestored: (() => void) | null = null
   /**
@@ -292,6 +347,17 @@ export class StationPowerGenModel {
   /** Phase accumulator (radians) for the shake oscillators. */
   private shakePhase = 0
 
+  /** Pool of jagged THREE.Line arcs reused for cell-activation discharges. */
+  private arcPool: LightningArcPool | null = null
+  /** Cyan-white spark burst spawned on each cell activation. */
+  private sparkEmitter: ParticleEmitter | null = null
+  /** Bright white core flash spawned on each cell activation. */
+  private flashEmitter: ParticleEmitter | null = null
+  /** Reused scratch — cell world position for VFX spawn. */
+  private readonly _cellWorldPos = new THREE.Vector3()
+  /** Reused scratch — particle velocity on emit. */
+  private readonly _vfxVel = new THREE.Vector3()
+
   /** Reused scratch — bolt segment delta. */
   private readonly _segDelta = new THREE.Vector3()
   /** Reused scratch — hit point in world space. */
@@ -331,6 +397,35 @@ export class StationPowerGenModel {
     const inner = await loadGLB(POWERGEN_MODEL_URL)
     this.inner = inner
     this.group.add(inner)
+
+    // Discharge VFX shared across all six cells. Parented to the prop
+    // group so positions are emitted in world space (ParticleEmitter
+    // works in world coords) and the arc pool inherits the group's
+    // transform — arcs draw in local space anchored to the cell.
+    this.arcPool = new LightningArcPool(LIGHTNING_ARC_POOL_SIZE)
+    this.group.add(this.arcPool.group)
+    this.flashEmitter = new ParticleEmitter({
+      poolSize: 48,
+      color: new THREE.Color(0xffffff),
+      size: 14,
+      lifetime: 0.2,
+      spread: 6,
+      opacity: 1,
+      soft: true,
+      sizeGrowth: 2.6,
+    })
+    this.sparkEmitter = new ParticleEmitter({
+      poolSize: 192,
+      color: new THREE.Color(LIGHTNING_COLOR),
+      size: 6,
+      lifetime: 0.55,
+      spread: 10,
+      opacity: 1,
+      soft: true,
+      sizeGrowth: 0.9,
+    })
+    this.group.add(this.flashEmitter.points)
+    this.group.add(this.sparkEmitter.points)
 
     inner.traverse((child) => {
       if (!child.name.startsWith(FUEL_NODE_PREFIX)) return
@@ -648,6 +743,11 @@ export class StationPowerGenModel {
       side: 'numbers',
       slot: 0,
       hitFlashRemaining: 0,
+      baseX: source.position.x,
+      baseY: source.position.y,
+      baseZ: source.position.z,
+      shakeRemaining: 0,
+      shakePhase: 0,
     }
   }
 
@@ -790,11 +890,13 @@ export class StationPowerGenModel {
       entry.cell.side = 'letters'
       entry.cell.slot = i
     }
+    // The opposite face must mirror the sort so 1 stays analogous to A
+    // after the generator is rotated toward the player.
     for (let i = 0; i < backGroup.length; i++) {
       const entry = backGroup[i]
       if (!entry) continue
       entry.cell.side = 'numbers'
-      entry.cell.slot = i
+      entry.cell.slot = backGroup.length - 1 - i
     }
     this.sidesAssigned = true
   }
@@ -970,7 +1072,9 @@ export class StationPowerGenModel {
     cell.fading = true
     if (cell.side === 'numbers') this.numbersCharged += 1
     else this.lettersCharged += 1
+    this.triggerCellActivationVfx(cell)
     this.onPuzzleStateChanged?.()
+    this.onFuelCellActivated?.(cell.index)
     this.setWireframeColor(cell.wireframe, REPAIR_COMPLETE_COLOR)
     // Restore the glow now so the underlying cell already reads as
     // "powered" while the green wireframe celebrates above it.
@@ -1052,6 +1156,10 @@ export class StationPowerGenModel {
    */
   tick(dt: number): void {
     this.tickHitFlashes(dt)
+    this.tickCellShakes(dt)
+    this.arcPool?.tick(dt)
+    this.flashEmitter?.tick(dt)
+    this.sparkEmitter?.tick(dt)
     if (this.shakeRemaining <= 0 || !this.inner) return
     this.shakeRemaining = Math.max(0, this.shakeRemaining - dt)
     const lifeFrac = this.shakeRemaining / POWER_ON_SHAKE_DURATION
@@ -1063,6 +1171,83 @@ export class StationPowerGenModel {
     const oz = Math.cos(phase * 2.4 + 0.7) * POWER_ON_SHAKE_AMPLITUDE_XZ * decay
     this.inner.position.set(ox, oy, oz)
     if (this.shakeRemaining <= 0) this.inner.position.set(0, 0, 0)
+  }
+
+  /**
+   * Fire the electrical discharge VFX on a freshly-activated cell:
+   * jagged cyan arcs radiate outward from the canister, a bright white
+   * flash pops at the centre, cyan sparks burst, and the cell itself
+   * starts a brief decaying shake so it reads as electrified rather
+   * than gently completed.
+   */
+  private triggerCellActivationVfx(cell: FuelCell): void {
+    cell.shakeRemaining = CELL_ACTIVATION_SHAKE_DURATION
+    cell.shakePhase = Math.random() * Math.PI * 2
+    cell.source.updateWorldMatrix(true, false)
+    cell.source.getWorldPosition(this._cellWorldPos)
+    if (this.flashEmitter) {
+      for (let i = 0; i < CELL_ACTIVATION_FLASH_COUNT; i++) {
+        this._vfxVel.set(
+          (Math.random() - 0.5) * 3,
+          (Math.random() - 0.5) * 3,
+          (Math.random() - 0.5) * 3,
+        )
+        this.flashEmitter.emit(this._cellWorldPos, this._vfxVel)
+      }
+    }
+    if (this.sparkEmitter) {
+      for (let i = 0; i < CELL_ACTIVATION_SPARK_COUNT; i++) {
+        // Radial-omni burst with an upward bias — sparks should leap
+        // off the canister rather than collapse into the model.
+        const theta = Math.random() * Math.PI * 2
+        const phi = Math.random() * Math.PI
+        const speed = 4 + Math.random() * 8
+        this._vfxVel.set(
+          Math.sin(phi) * Math.cos(theta) * speed,
+          Math.abs(Math.cos(phi)) * speed * 0.8 + 1.5,
+          Math.sin(phi) * Math.sin(theta) * speed,
+        )
+        this.sparkEmitter.emit(this._cellWorldPos, this._vfxVel)
+      }
+    }
+    if (this.arcPool) {
+      // Arc pool draws in the model-group's local frame, so convert the
+      // cell origin into group-local coordinates once and reuse it.
+      const localOrigin = this._cellWorldPos.clone()
+      this.group.worldToLocal(localOrigin)
+      for (let i = 0; i < CELL_ACTIVATION_ARC_COUNT; i++) {
+        const length =
+          LIGHTNING_ARC_LENGTH_MIN +
+          Math.random() * (LIGHTNING_ARC_LENGTH_MAX - LIGHTNING_ARC_LENGTH_MIN)
+        this.arcPool.spawn(localOrigin, length)
+      }
+    }
+  }
+
+  /**
+   * Per-frame per-cell shake update. Decays each active cell's local
+   * jitter back to its captured baseline; when the timer hits zero,
+   * snaps cleanly so the cell never drifts.
+   */
+  private tickCellShakes(dt: number): void {
+    for (const cell of this.fuelCells.values()) {
+      if (cell.shakeRemaining <= 0) continue
+      cell.shakeRemaining = Math.max(0, cell.shakeRemaining - dt)
+      const lifeFrac = cell.shakeRemaining / CELL_ACTIVATION_SHAKE_DURATION
+      const decay = lifeFrac * lifeFrac
+      cell.shakePhase += dt * CELL_ACTIVATION_SHAKE_FREQUENCY
+      if (cell.shakeRemaining <= 0) {
+        cell.source.position.set(cell.baseX, cell.baseY, cell.baseZ)
+        continue
+      }
+      const phase = cell.shakePhase
+      const amp = CELL_ACTIVATION_SHAKE_AMPLITUDE * decay
+      cell.source.position.set(
+        cell.baseX + Math.sin(phase * 2.1) * amp,
+        cell.baseY + Math.sin(phase * 3.3 + 0.9) * amp,
+        cell.baseZ + Math.cos(phase * 2.7 + 1.7) * amp,
+      )
+    }
   }
 
   /**
@@ -1093,5 +1278,143 @@ export class StationPowerGenModel {
       const mats = Array.isArray(child.material) ? child.material : [child.material]
       for (const m of mats) if (m instanceof THREE.Material) m.dispose()
     })
+  }
+}
+
+/**
+ * Per-arc slot state inside {@link LightningArcPool}. `remaining > 0`
+ * means the arc is alive and drawing; `<= 0` means free and reusable.
+ */
+interface LightningArcSlot {
+  /** The Three.js Line object whose vertices we rewrite on spawn. */
+  line: THREE.Line
+  /** Material reference — we drive `opacity` to fade. */
+  material: THREE.LineBasicMaterial
+  /** Seconds left before the arc fully fades. */
+  remaining: number
+}
+
+/**
+ * Tiny pool of jagged additive-blended polylines that read as
+ * electrical arcs. Each arc is built once with a Float32 position
+ * buffer of {@link LIGHTNING_ARC_SEGMENTS} vertices; {@link spawn}
+ * rewrites them as a randomly-jittered polyline radiating from an
+ * origin in a random direction. {@link tick} decays opacity linearly
+ * to zero so the arc reads as a brief flash, then the slot is reusable.
+ *
+ * The pool's {@link group} should be parented somewhere with the same
+ * transform as the origin coordinates passed to {@link spawn}.
+ */
+class LightningArcPool {
+  /** Public scene-graph node — host parents this into the prop group. */
+  readonly group: THREE.Group
+  private readonly arcs: LightningArcSlot[] = []
+  /** Reused scratch — perpendicular basis vector for polyline jitter. */
+  private readonly _perpA = new THREE.Vector3()
+  /** Reused scratch — second perpendicular basis vector. */
+  private readonly _perpB = new THREE.Vector3()
+  /** Reused scratch — outward direction picked per spawn. */
+  private readonly _dir = new THREE.Vector3()
+  /** Reused scratch — world-up reference for perpendicular construction. */
+  private static readonly _UP = new THREE.Vector3(0, 1, 0)
+  /** Reused scratch — fallback axis when dir is parallel to up. */
+  private static readonly _RIGHT = new THREE.Vector3(1, 0, 0)
+
+  /**
+   * @param poolSize - Maximum simultaneous arcs. The constructor
+   *   allocates one Line + material per slot up front; spawns over the
+   *   cap silently drop.
+   */
+  constructor(poolSize: number) {
+    this.group = new THREE.Group()
+    this.group.name = 'lightningArcPool'
+    for (let i = 0; i < poolSize; i++) {
+      const geom = new THREE.BufferGeometry()
+      const positions = new Float32Array(LIGHTNING_ARC_SEGMENTS * 3)
+      geom.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+      const material = new THREE.LineBasicMaterial({
+        color: LIGHTNING_COLOR,
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      })
+      const line = new THREE.Line(geom, material)
+      line.frustumCulled = false
+      line.visible = false
+      this.group.add(line)
+      this.arcs.push({ line, material, remaining: 0 })
+    }
+  }
+
+  /**
+   * Claim a free slot and build a jagged polyline radiating from
+   * `origin` in a random outward direction of length `length`. Silently
+   * drops when every slot is alive.
+   *
+   * @param origin - Start point in the same local frame as {@link group}.
+   * @param length - Polyline tip distance from origin.
+   */
+  spawn(origin: THREE.Vector3, length: number): void {
+    const slot = this.arcs.find((a) => a.remaining <= 0)
+    if (!slot) return
+    // Random outward direction on the unit sphere with a slight upward
+    // bias — arcs rooted in the canister read better when they flare up
+    // and out rather than sinking straight down.
+    const theta = Math.random() * Math.PI * 2
+    const phi = Math.acos(1 - Math.random() * 1.4)
+    this._dir.set(Math.sin(phi) * Math.cos(theta), Math.cos(phi), Math.sin(phi) * Math.sin(theta))
+    // Build two perpendicular basis vectors to dir for the polyline jitter.
+    const dot = this._dir.dot(LightningArcPool._UP)
+    const reference = Math.abs(dot) > 0.95 ? LightningArcPool._RIGHT : LightningArcPool._UP
+    this._perpA.copy(reference).cross(this._dir).normalize()
+    this._perpB.copy(this._dir).cross(this._perpA).normalize()
+    const positions = slot.line.geometry.attributes.position as THREE.BufferAttribute
+    for (let i = 0; i < LIGHTNING_ARC_SEGMENTS; i++) {
+      const t = i / (LIGHTNING_ARC_SEGMENTS - 1)
+      // Zero jitter at endpoints, peak in the middle — keeps the arc
+      // pinned to the canister and to its tip while wobbling between.
+      const jitterScale = LIGHTNING_ARC_JITTER * Math.sin(t * Math.PI)
+      const jitterA = (Math.random() - 0.5) * 2 * jitterScale
+      const jitterB = (Math.random() - 0.5) * 2 * jitterScale
+      const x =
+        origin.x + this._dir.x * length * t + this._perpA.x * jitterA + this._perpB.x * jitterB
+      const y =
+        origin.y + this._dir.y * length * t + this._perpA.y * jitterA + this._perpB.y * jitterB
+      const z =
+        origin.z + this._dir.z * length * t + this._perpA.z * jitterA + this._perpB.z * jitterB
+      positions.setXYZ(i, x, y, z)
+    }
+    positions.needsUpdate = true
+    slot.line.geometry.computeBoundingSphere()
+    slot.material.opacity = 1
+    slot.line.visible = true
+    slot.remaining = LIGHTNING_ARC_LIFETIME
+  }
+
+  /**
+   * Decay every live arc's opacity to zero across
+   * {@link LIGHTNING_ARC_LIFETIME}. When a slot expires, the Line is
+   * hidden so it doesn't draw a stale frame, and the slot returns to
+   * the free pool.
+   *
+   * @param dt - Frame delta in seconds.
+   */
+  tick(dt: number): void {
+    for (const slot of this.arcs) {
+      if (slot.remaining <= 0) continue
+      slot.remaining = Math.max(0, slot.remaining - dt)
+      slot.material.opacity = slot.remaining / LIGHTNING_ARC_LIFETIME
+      if (slot.remaining <= 0) slot.line.visible = false
+    }
+  }
+
+  /** Release the GPU resources owned by every slot. */
+  dispose(): void {
+    for (const slot of this.arcs) {
+      slot.line.geometry.dispose()
+      slot.material.dispose()
+    }
+    this.arcs.length = 0
   }
 }

@@ -50,11 +50,15 @@ const TURRET_CEILING_INSET = 0.02
 const TURRET_DART_POOL_SIZE = 24
 
 /** Number of orange spark particles spawned per turret kill. */
-const TURRET_KILL_SPARK_COUNT = 48
+const TURRET_KILL_SPARK_COUNT = 140
 /** Number of bright white-hot flash particles spawned at the centre. */
-const TURRET_KILL_FLASH_COUNT = 12
+const TURRET_KILL_FLASH_COUNT = 36
 /** Number of grey smoke particles spawned per turret kill. */
-const TURRET_KILL_SMOKE_COUNT = 28
+const TURRET_KILL_SMOKE_COUNT = 72
+/** Number of chunky orange-red debris particles spawned per turret kill. */
+const TURRET_KILL_DEBRIS_COUNT = 24
+/** Number of fine-points "shockwave" spark particles ejected horizontally. */
+const TURRET_KILL_SHOCKWAVE_COUNT = 64
 
 
 /**
@@ -93,6 +97,10 @@ export class StationTurretDirector {
   private readonly sparkEmitter: ParticleEmitter
   /** Grey smoke drift spawned on turret death. */
   private readonly smokeEmitter: ParticleEmitter
+  /** Chunky red-orange debris fragments spawned on turret death. */
+  private readonly debrisEmitter: ParticleEmitter
+  /** Thin radial shockwave ejected horizontally on turret death. */
+  private readonly shockwaveEmitter: ParticleEmitter
   /** Reused scratch for particle velocity on emit. */
   private readonly _vfxVelScratch = new THREE.Vector3()
   /** Reused scratch for particle position on emit. */
@@ -125,38 +133,60 @@ export class StationTurretDirector {
     // a slower grey smoke drift, all pool-based so killing several
     // turrets back-to-back doesn't allocate per shot.
     this.flashEmitter = new ParticleEmitter({
-      poolSize: 32,
-      color: new THREE.Color(0xfff4c2),
-      size: 22,
-      lifetime: 0.35,
-      spread: 12,
+      poolSize: 64,
+      color: new THREE.Color(0xffffe0),
+      size: 48,
+      lifetime: 0.45,
+      spread: 18,
       opacity: 1,
       soft: true,
-      sizeGrowth: 2.2,
+      sizeGrowth: 3.2,
     })
     this.sparkEmitter = new ParticleEmitter({
-      poolSize: 128,
-      color: new THREE.Color(0xffaa44),
-      size: 10,
-      lifetime: 1.1,
-      spread: 14,
+      poolSize: 256,
+      color: new THREE.Color(0xffb050),
+      size: 12,
+      lifetime: 1.6,
+      spread: 22,
       opacity: 1,
       soft: true,
-      sizeGrowth: 1.6,
+      sizeGrowth: 1.4,
     })
     this.smokeEmitter = new ParticleEmitter({
-      poolSize: 96,
-      color: new THREE.Color(0x4a4a4a),
-      size: 22,
-      lifetime: 2.4,
-      spread: 4,
-      opacity: 0.7,
+      poolSize: 192,
+      color: new THREE.Color(0x2a2a2a),
+      size: 28,
+      lifetime: 3.2,
+      spread: 6,
+      opacity: 0.85,
       soft: true,
-      sizeGrowth: 3.0,
+      sizeGrowth: 4.2,
+    })
+    this.debrisEmitter = new ParticleEmitter({
+      poolSize: 48,
+      color: new THREE.Color(0xc04020),
+      size: 18,
+      lifetime: 2.0,
+      spread: 4,
+      opacity: 1,
+      soft: false,
+      sizeGrowth: 0.6,
+    })
+    this.shockwaveEmitter = new ParticleEmitter({
+      poolSize: 128,
+      color: new THREE.Color(0xfff0c8),
+      size: 8,
+      lifetime: 0.6,
+      spread: 26,
+      opacity: 1,
+      soft: true,
+      sizeGrowth: 0.4,
     })
     scene.add(this.flashEmitter.points)
     scene.add(this.sparkEmitter.points)
     scene.add(this.smokeEmitter.points)
+    scene.add(this.debrisEmitter.points)
+    scene.add(this.shockwaveEmitter.points)
   }
 
   /**
@@ -301,6 +331,8 @@ export class StationTurretDirector {
     this.flashEmitter.tick(dt)
     this.sparkEmitter.tick(dt)
     this.smokeEmitter.tick(dt)
+    this.debrisEmitter.tick(dt)
+    this.shockwaveEmitter.tick(dt)
   }
 
   /** Hard teardown — disposes every turret + the dart pool + the projectile sim. */
@@ -312,6 +344,8 @@ export class StationTurretDirector {
     this.flashEmitter.dispose()
     this.sparkEmitter.dispose()
     this.smokeEmitter.dispose()
+    this.debrisEmitter.dispose()
+    this.shockwaveEmitter.dispose()
   }
 
   private spawnAt(x: number, y: number, z: number, yaw: number): TurretController {
@@ -322,8 +356,70 @@ export class StationTurretDirector {
     if (this.collider) turret.setCollider(this.collider)
     turret.onArmed = () => this.notifyArmed()
     turret.onDisarmed = () => this.notifyDisarmed()
-    turret.onKilled = (kx, ky, kz) => this.disposeTurret(turret, kx, ky, kz)
+    turret.onDestroyed = (kx, ky, kz) => this.spawnDestructionVfx(kx, ky, kz)
+    turret.onKilled = () => this.disposeTurret(turret)
     return turret
+  }
+
+  /**
+   * Spawn the killing-shot VFX + explosion SFX. Fired by
+   * {@link TurretController.onDestroyed} the instant HP hits zero —
+   * runs in parallel with the brief fold-back delay so the visual punch
+   * lands on the kill, not the fold-finish.
+   */
+  private spawnDestructionVfx(x: number, y: number, z: number): void {
+    this.audio.play('sfx.turret.destroyed')
+    this._vfxPosScratch.set(x, y - 0.6, z)
+    // White-hot core flash — short-lived, expands fast.
+    for (let i = 0; i < TURRET_KILL_FLASH_COUNT; i++) {
+      this._vfxVelScratch.set(
+        (Math.random() - 0.5) * 8,
+        (Math.random() - 0.5) * 8,
+        (Math.random() - 0.5) * 8,
+      )
+      this.flashEmitter.emit(this._vfxPosScratch, this._vfxVelScratch)
+    }
+    // Horizontal shockwave — thin ring of bright sparks ejected mostly
+    // sideways so the kill reads from any angle.
+    for (let i = 0; i < TURRET_KILL_SHOCKWAVE_COUNT; i++) {
+      const angle = (i / TURRET_KILL_SHOCKWAVE_COUNT) * Math.PI * 2 + Math.random() * 0.1
+      const speed = 18 + Math.random() * 12
+      this._vfxVelScratch.set(
+        Math.cos(angle) * speed,
+        (Math.random() - 0.5) * 4,
+        Math.sin(angle) * speed,
+      )
+      this.shockwaveEmitter.emit(this._vfxPosScratch, this._vfxVelScratch)
+    }
+    // Orange sparks — radial-omni burst, slight upward bias so the
+    // crown reads against the ceiling.
+    for (let i = 0; i < TURRET_KILL_SPARK_COUNT; i++) {
+      this._vfxVelScratch.set(
+        (Math.random() - 0.5) * 36,
+        Math.random() * 22 + 4,
+        (Math.random() - 0.5) * 36,
+      )
+      this.sparkEmitter.emit(this._vfxPosScratch, this._vfxVelScratch)
+    }
+    // Chunky red-orange debris — slower, gravity-ish arcs from the
+    // particle emitter's natural falloff; reads as physical fragments.
+    for (let i = 0; i < TURRET_KILL_DEBRIS_COUNT; i++) {
+      this._vfxVelScratch.set(
+        (Math.random() - 0.5) * 14,
+        Math.random() * 10 + 2,
+        (Math.random() - 0.5) * 14,
+      )
+      this.debrisEmitter.emit(this._vfxPosScratch, this._vfxVelScratch)
+    }
+    // Smoke — slower, drifts up, lingers.
+    for (let i = 0; i < TURRET_KILL_SMOKE_COUNT; i++) {
+      this._vfxVelScratch.set(
+        (Math.random() - 0.5) * 4,
+        Math.random() * 3 + 0.8,
+        (Math.random() - 0.5) * 4,
+      )
+      this.smokeEmitter.emit(this._vfxPosScratch, this._vfxVelScratch)
+    }
   }
 
   /**
@@ -333,36 +429,11 @@ export class StationTurretDirector {
    * + the player's bolt-system enemy list. The turret stays gone for
    * the rest of the level.
    */
-  private disposeTurret(turret: TurretController, x: number, y: number, z: number): void {
-    this._vfxPosScratch.set(x, y - 0.6, z)
-    // White-hot core flash — short-lived, expands fast.
-    for (let i = 0; i < TURRET_KILL_FLASH_COUNT; i++) {
-      this._vfxVelScratch.set(
-        (Math.random() - 0.5) * 4,
-        (Math.random() - 0.5) * 4,
-        (Math.random() - 0.5) * 4,
-      )
-      this.flashEmitter.emit(this._vfxPosScratch, this._vfxVelScratch)
-    }
-    // Orange sparks — radial-omni burst, slight upward bias so the
-    // crown reads against the ceiling.
-    for (let i = 0; i < TURRET_KILL_SPARK_COUNT; i++) {
-      this._vfxVelScratch.set(
-        (Math.random() - 0.5) * 24,
-        Math.random() * 14 + 4,
-        (Math.random() - 0.5) * 24,
-      )
-      this.sparkEmitter.emit(this._vfxPosScratch, this._vfxVelScratch)
-    }
-    // Smoke — slower, drifts up, lingers.
-    for (let i = 0; i < TURRET_KILL_SMOKE_COUNT; i++) {
-      this._vfxVelScratch.set(
-        (Math.random() - 0.5) * 3,
-        Math.random() * 2.2 + 0.6,
-        (Math.random() - 0.5) * 3,
-      )
-      this.smokeEmitter.emit(this._vfxPosScratch, this._vfxVelScratch)
-    }
+  /**
+   * Final silent teardown — runs after the fold-back animation
+   * finishes. VFX + SFX already fired from {@link spawnDestructionVfx}.
+   */
+  private disposeTurret(turret: TurretController): void {
     this.playerProjectileRemoveEnemy?.(turret.enemy)
     this.scene.remove(turret.model.group)
     turret.dispose()

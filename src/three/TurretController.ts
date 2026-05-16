@@ -30,6 +30,7 @@
  * @spec docs/space-station-update-gdd.md
  */
 import * as THREE from 'three'
+import { useAudio } from '@/audio/useAudio'
 import { Enemy } from '@/lib/fps/enemy'
 import type { EnemyProjectileSystem } from '@/lib/fps/enemyProjectileSystem'
 import type { StationCollider } from '@/lib/station/StationCollider'
@@ -76,6 +77,14 @@ const TURRET_BURST_REST_SECONDS = 4
 /** Initial delay between transitioning to fire state and first shot. */
 const TURRET_FIRST_SHOT_DELAY = 0.4
 
+/**
+ * Beat (seconds) between HP hitting zero and the fold-back animation
+ * starting. Lets the destruction VFX + boom sell the kill before the
+ * model starts retracting — without this, the fold begins on the same
+ * frame as the explosion and reads as a polite retraction.
+ */
+const TURRET_DEATH_FOLD_DELAY = 0.2
+
 /** Laser dart projectile speed (units/s). Tuned slow enough that the
  * player can side-step a shot at typical engagement range (~5–7 m,
  * ~0.5 s travel time) given the station's reduced movement scale. */
@@ -118,10 +127,18 @@ export class TurretController {
   /** Fires when the turret stops being armed (retracted or destroyed). */
   onDisarmed: (() => void) | null = null
   /**
+   * Fires the instant HP hits zero, before the fold-back animation
+   * starts. The director listens to this to spawn the destruction VFX
+   * + the explosion SFX at the moment of death so the visual punch
+   * lands on the killing shot, not at the end of the fold. Position
+   * passed is the mount position in world space.
+   */
+  onDestroyed: ((x: number, y: number, z: number) => void) | null = null
+  /**
    * Fires exactly once after the death animation finishes folding the
    * turret back into the ceiling. The director listens to this to
-   * spawn explosion VFX + dispose the turret. Position passed is the
-   * mount position in world space.
+   * dispose the turret. Position passed is the mount position in world
+   * space.
    */
   onKilled: ((x: number, y: number, z: number) => void) | null = null
 
@@ -160,6 +177,17 @@ export class TurretController {
   private readonly _muzzle = new THREE.Vector3()
   /** True once the controller fired `onArmed` for the current arm cycle. */
   private armedNotified = false
+  /**
+   * Seconds remaining before the post-death fold animation starts.
+   * `> 0` means we're in the brief "stunned / sparking" beat right after
+   * HP hit zero. Reaches zero → {@link TurretModel.playDeathSequence} is
+   * kicked off. Negative-or-zero with `foldStarted === true` means the
+   * fold is already running.
+   */
+  private deathFoldDelay = 0
+  /** Whether {@link TurretModel.playDeathSequence} has been kicked off. */
+  private foldStarted = false
+  private readonly audio = useAudio()
 
   /**
    * @param projectiles - Shared enemy-projectile system for laser dart spawns.
@@ -247,6 +275,19 @@ export class TurretController {
   tick(dt: number, playerX: number, playerY: number, playerZ: number): void {
     this.secondsInState += dt
     if (this.state === 'dead') {
+      if (!this.foldStarted) {
+        this.deathFoldDelay -= dt
+        if (this.deathFoldDelay <= 0) {
+          this.foldStarted = true
+          this.model.playDeathSequence(() => {
+            this.onKilled?.(
+              this.model.position.x,
+              this.model.position.y,
+              this.model.position.z,
+            )
+          })
+        }
+      }
       this.model.tick(dt)
       return
     }
@@ -402,16 +443,20 @@ export class TurretController {
     this.state = 'dead'
     this.burstShotsRemaining = 0
     this.interBurstRemaining = 0
+    this.deathFoldDelay = TURRET_DEATH_FOLD_DELAY
+    this.foldStarted = false
     if (this.armedNotified) {
       this.armedNotified = false
       this.onDisarmed?.()
     }
-    // Play the authored animation forward from wherever we were
-    // parked. The clip's tail (5–6 s) is the retract motion — the
-    // turret tilts up and folds back into the ceiling.
-    this.model.playDeathSequence(() => {
-      this.onKilled?.(this.model.position.x, this.model.position.y, this.model.position.z)
-    })
+    // Fire the destruction hook IMMEDIATELY so the director can spawn
+    // explosion VFX + boom on the killing-shot frame. The fold-back
+    // animation is deferred by {@link TURRET_DEATH_FOLD_DELAY} in
+    // {@link tick} so the explosion has a beat to read before the
+    // model starts retracting. The model also flares + jitters during
+    // that beat so the silhouette itself reads as "popping".
+    this.model.flashDestruction()
+    this.onDestroyed?.(this.model.position.x, this.model.position.y, this.model.position.z)
   }
 
   // ── Firing logic ─────────────────────────────────────────────────────
@@ -465,5 +510,6 @@ export class TurretController {
       TURRET_DART_DAMAGE,
     )
     this.model.flashMuzzle()
+    this.audio.play('sfx.turret.laser')
   }
 }
