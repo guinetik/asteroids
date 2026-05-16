@@ -295,6 +295,7 @@ export function createStationProp(kind: string): StationPropInstance {
       return {
         group: model.group,
         dispose: () => model.dispose(),
+        tick: (dt) => model.tick(dt),
         localFootprint: {
           halfX: CHEST_NATIVE_HALF_WIDTH,
           halfZ: CHEST_NATIVE_HALF_DEPTH,

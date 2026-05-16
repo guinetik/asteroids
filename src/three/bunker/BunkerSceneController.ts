@@ -500,6 +500,9 @@ export class BunkerSceneController {
     for (const door of this.enemyDoors) {
       door.tick(dt)
     }
+    for (const chest of this.chests) {
+      chest.tick(dt)
+    }
     if (this.pendingWaveRoster.length > 0) {
       this.pendingWaveSpawnTimer = Math.max(0, this.pendingWaveSpawnTimer - dt)
       if (this.pendingWaveSpawnTimer <= 0) {
