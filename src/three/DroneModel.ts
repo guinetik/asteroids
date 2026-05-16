@@ -68,10 +68,10 @@ const DRONE_ALERT_EMISSIVE_BOOST = 0.8
  * the inner GLB scene. The model is authored with the face pointing
  * along local -Z after the standard Sketchfab orientation. If the drone
  * visually fires from the back of its head, flip this to
- * `new THREE.Vector3(0, 0, 1)` and the muzzle/orientation logic will
+ * `new THREE.Vector3(0, 0, -1)` and the muzzle/orientation logic will
  * follow automatically.
  */
-const DRONE_FACE_FORWARD = new THREE.Vector3(0, 0, -1)
+const DRONE_FACE_FORWARD = new THREE.Vector3(0, 0, 1)
 
 /**
  * Offset (world metres) from the wrapper origin along

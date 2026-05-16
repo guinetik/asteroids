@@ -254,9 +254,26 @@ export class StationDroneDirector {
       const rect = this.buildPatrolRect(room, floorY)
       const max = maxDronesForRoom(room.width, room.depth)
       const count = rollDroneCount(max, rng, spawnProbability)
+      // Stratify initial placement: split the room's longer axis into
+      // `count` equal slabs and drop one drone inside each slab. This
+      // prevents the cluster you get from N uniform-random samples
+      // across a small rect — drones still wander freely across the
+      // full rect once ticking starts; the partition only affects t=0.
+      const widthMeters = rect.maxX - rect.minX
+      const depthMeters = rect.maxZ - rect.minZ
+      const splitAlongX = widthMeters >= depthMeters
       for (let i = 0; i < count; i++) {
-        const x = rect.minX + (rect.maxX - rect.minX) * rng()
-        const z = rect.minZ + (rect.maxZ - rect.minZ) * rng()
+        const t0 = i / count
+        const t1 = (i + 1) / count
+        const slabRng = rng()
+        const along = t0 + (t1 - t0) * slabRng
+        const across = rng()
+        const x = splitAlongX
+          ? rect.minX + widthMeters * along
+          : rect.minX + widthMeters * across
+        const z = splitAlongX
+          ? rect.minZ + depthMeters * across
+          : rect.minZ + depthMeters * along
         const yaw = rng() * Math.PI * 2
         const drone = this.spawnAt(x, hoverY, z, yaw, rect, rng)
         this.drones.push(drone)
