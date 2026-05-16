@@ -6,8 +6,8 @@
     "title": "Abandoned Security Outpost",
     "subtitle": "Blackbox Salvage Brief",
     "body": [
-      "Auxiliary power is dead, but the vault still answers to its old access rules.",
-      "Recover the vault keycard. The protected floor grid is lethal; find the floor plan before crossing."
+      "Station power is dead. Restore the generator to bring the terminals and interior systems back online.",
+      "Somewhere in the station, a security terminal still holds the floor plan. Find the program before crossing to the vault keycard."
     ],
     "status": ["DERELICT", "AUX POWER OFFLINE", "VAULT SEALED"]
   },

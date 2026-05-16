@@ -61,7 +61,7 @@ describe('Microwave test station layout', () => {
 
     expect(layout.intro?.title).toBe('Abandoned Security Outpost')
     expect(layout.intro?.body).toContain(
-      'Recover the vault keycard. The protected floor grid is lethal; find the floor plan before crossing.',
+      'Somewhere in the station, a security terminal still holds the floor plan. Find the program before crossing to the vault keycard.',
     )
     expect(layout.intro?.status).toEqual(['DERELICT', 'AUX POWER OFFLINE', 'VAULT SEALED'])
   })
@@ -69,6 +69,7 @@ describe('Microwave test station layout', () => {
   it('stores heist briefing copy in the public microwave-test station data', () => {
     expect(microwaveRaw.intro.title).toBe('Abandoned Security Outpost')
     expect(microwaveRaw.intro.body.join(' ')).toContain('vault keycard')
+    expect(microwaveRaw.intro.body.join(' ')).toContain('Restore the generator')
     expect(microwaveRaw.intro.body.join(' ')).not.toMatch(/microwave/i)
   })
 })
