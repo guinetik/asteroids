@@ -17,13 +17,25 @@
  */
 import * as THREE from 'three'
 import type { WorldCollider } from '@/lib/physics/worldCollision'
-import { loadGLB } from '@/three/loadGLB'
+import { loadAnimatedGLB } from '@/three/loadGLB'
 
 /** Asset URL for the optimized station terminal GLB. */
 const STATION_TERMINAL_MODEL_URL = '/models/station_terminal.glb'
 
 /** Authored node name of the screen sub-mesh inside the GLB. */
 const SCREEN_NODE_NAME = 'terminal_screen'
+
+/** Keyboard-folded pose time on the terminal GLB timeline, in seconds. */
+const TERMINAL_KEYBOARD_FOLDED_TIME = 2
+
+/** First frame of the keyboard fold-back authored range, in seconds. */
+const TERMINAL_KEYBOARD_FOLD_BACK_START_TIME = 0
+
+/** Fully-open terminal timeline time after player interaction, in seconds. */
+const TERMINAL_KEYBOARD_OPEN_TIME = 5
+
+/** Playback speed multiplier for the terminal keyboard timeline. */
+const TERMINAL_KEYBOARD_ANIMATION_SPEED = 3
 
 /** Native model height in world units (post-optimization, see GLB bbox). */
 const STATION_TERMINAL_NATIVE_HEIGHT = 1.84
@@ -83,6 +95,11 @@ export class StationTerminalModel {
   private glyphIndex = 0
   private loadStarted = false
   private loaded = false
+  private animationMixer: THREE.AnimationMixer | null = null
+  private animationAction: THREE.AnimationAction | null = null
+  private animationTime = TERMINAL_KEYBOARD_FOLDED_TIME
+  private animationTargetTime = TERMINAL_KEYBOARD_FOLDED_TIME
+  private animationPlaying = false
 
   /** Build an empty wrapper. {@link load} must be called before use. */
   constructor() {
@@ -104,9 +121,10 @@ export class StationTerminalModel {
     if (this.loadStarted) return
     this.loadStarted = true
 
-    const inner = await loadGLB(STATION_TERMINAL_MODEL_URL)
+    const { scene: inner, animations } = await loadAnimatedGLB(STATION_TERMINAL_MODEL_URL)
     this.inner = inner
     this.group.add(inner)
+    this.bindKeyboardAnimation(inner, animations)
 
     const screen = inner.getObjectByName(SCREEN_NODE_NAME)
     if (screen instanceof THREE.Mesh) {
@@ -144,6 +162,7 @@ export class StationTerminalModel {
    * @param dt - Frame delta in seconds.
    */
   tick(dt: number): void {
+    this.tickKeyboardAnimation(dt)
     if (this.mapActive || !this.idleContext || !this.idleTexture) return
     this.glyphElapsed += dt
     while (this.glyphElapsed >= GLYPH_CYCLE_SECONDS) {
@@ -152,6 +171,20 @@ export class StationTerminalModel {
       this.drawIdleGlyph(this.glyphIndex)
       this.idleTexture.needsUpdate = true
     }
+  }
+
+  /**
+   * Play the keyboard reveal authored after the folded idle pose.
+   */
+  playInteractAnimation(): void {
+    this.playKeyboardSegment(TERMINAL_KEYBOARD_FOLDED_TIME, TERMINAL_KEYBOARD_OPEN_TIME)
+  }
+
+  /**
+   * Play the fold-back authored at the start of the GLB timeline.
+   */
+  playLeaveAnimation(): void {
+    this.playKeyboardSegment(TERMINAL_KEYBOARD_FOLD_BACK_START_TIME, TERMINAL_KEYBOARD_FOLDED_TIME)
   }
 
   /**
@@ -227,6 +260,7 @@ export class StationTerminalModel {
 
   /** Release GPU resources. */
   dispose(): void {
+    this.animationMixer?.stopAllAction()
     if (this.inner) {
       this.inner.traverse((child) => {
         if (child instanceof THREE.Mesh) {
@@ -266,6 +300,71 @@ export class StationTerminalModel {
     this.screenMaterial = material
     mesh.material = material
     this.regenerateScreenUVs(mesh)
+  }
+
+  /**
+   * Bind the first authored GLB animation and pin the keyboard at its
+   * folded idle pose. The station terminal asset owns a single timeline.
+   */
+  private bindKeyboardAnimation(
+    root: THREE.Group,
+    animations: ReadonlyArray<THREE.AnimationClip>,
+  ): void {
+    const clip = animations[0]
+    if (!clip) return
+    const mixer = new THREE.AnimationMixer(root)
+    const action = mixer.clipAction(clip)
+    action.loop = THREE.LoopOnce
+    action.clampWhenFinished = true
+    action.enabled = true
+    action.setEffectiveWeight(1)
+    action.play()
+    this.animationMixer = mixer
+    this.animationAction = action
+    this.seekKeyboardAnimation(TERMINAL_KEYBOARD_FOLDED_TIME)
+  }
+
+  /**
+   * Start a timeline segment. The authored terminal animation uses
+   * absolute time ranges rather than separate named clips.
+   */
+  private playKeyboardSegment(fromSeconds: number, toSeconds: number): void {
+    if (!this.animationAction || !this.animationMixer) return
+    this.animationTime = fromSeconds
+    this.animationTargetTime = toSeconds
+    this.animationPlaying = true
+    this.seekKeyboardAnimation(fromSeconds)
+  }
+
+  /**
+   * Step the active keyboard segment and clamp on its final pose.
+   */
+  private tickKeyboardAnimation(dt: number): void {
+    if (!this.animationPlaying) return
+    const direction = Math.sign(this.animationTargetTime - this.animationTime)
+    if (direction === 0) {
+      this.animationPlaying = false
+      return
+    }
+    this.animationTime += dt * TERMINAL_KEYBOARD_ANIMATION_SPEED * direction
+    const reached =
+      direction > 0
+        ? this.animationTime >= this.animationTargetTime
+        : this.animationTime <= this.animationTargetTime
+    if (reached) {
+      this.animationTime = this.animationTargetTime
+      this.animationPlaying = false
+    }
+    this.seekKeyboardAnimation(this.animationTime)
+  }
+
+  /**
+   * Apply an exact time on the terminal's authored timeline.
+   */
+  private seekKeyboardAnimation(timeSeconds: number): void {
+    if (!this.animationAction || !this.animationMixer) return
+    this.animationAction.time = timeSeconds
+    this.animationMixer.update(0)
   }
 
   /**

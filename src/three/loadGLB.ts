@@ -11,6 +11,7 @@
 import * as THREE from 'three'
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
+import type { GLTF } from 'three/addons/loaders/GLTFLoader.js'
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js'
 
 /** Draco decoder path — Google's CDN works in dev and production (no need to ship wasm). */
@@ -22,6 +23,16 @@ dracoLoader.setDecoderPath(DRACO_DECODER_PATH)
 const loader = new GLTFLoader()
 loader.setMeshoptDecoder(MeshoptDecoder)
 loader.setDRACOLoader(dracoLoader)
+
+/**
+ * Loaded GLB scene plus its embedded animation clips.
+ */
+export interface AnimatedGLB {
+  /** Root scene graph from the GLB. */
+  scene: THREE.Group
+  /** Animation clips authored into the GLB. Empty when the asset has no timeline. */
+  animations: THREE.AnimationClip[]
+}
 
 /**
  * Load a GLB file and return its scene graph.
@@ -55,6 +66,29 @@ export function loadGLB(url: string): Promise<THREE.Group> {
           })
         }
         resolve(gltf.scene)
+      },
+      undefined,
+      reject,
+    )
+  })
+}
+
+/**
+ * Load a GLB file and preserve embedded animation clips.
+ *
+ * Use this for models whose authored timeline is controlled at runtime.
+ * Most static props should continue to use {@link loadGLB}, which freezes
+ * clips at frame 0 to avoid accidental deformation.
+ *
+ * @param url - Path to the GLB file.
+ * @returns The loaded scene and embedded animation clips.
+ */
+export function loadAnimatedGLB(url: string): Promise<AnimatedGLB> {
+  return new Promise((resolve, reject) => {
+    loader.load(
+      url,
+      (gltf: GLTF) => {
+        resolve({ scene: gltf.scene, animations: gltf.animations })
       },
       undefined,
       reject,

@@ -147,6 +147,10 @@ export interface StationPropInstance {
   showMap?: (canvas: HTMLCanvasElement) => void
   /** Companion to {@link showMap} — hide / restore the prop's idle screen. */
   hideMap?: () => void
+  /** Optional hook fired when the player activates this prop with the interact key. */
+  playInteractAnimation?: () => void
+  /** Optional hook fired after the player leaves this prop's interaction range. */
+  playLeaveAnimation?: () => void
   /**
    * Optional handle for props that participate in the SCI-bolt repair
    * flow (currently only `'powergen'`). The host view registers
@@ -168,6 +172,8 @@ export interface StationPropInstance {
     }
     /** Register a callback that fires once when every component is repaired. */
     onAllRepaired: (cb: () => void) => void
+    /** Register a callback that fires when one component reaches full charge. */
+    onComponentActivated: (cb: (index: number) => void) => void
     /**
      * Read-only snapshot of per-component repair progress (0 → broken,
      * 1 → restored). Polled by diagnostics terminals; safe to call every
@@ -218,6 +224,8 @@ export function createStationProp(kind: string): StationPropInstance {
         setStatus: (status) => model.setScreenEmissive(TERMINAL_STATUS_COLOR[status]),
         showMap: (canvas) => model.showMapTexture(canvas),
         hideMap: () => model.hideMapTexture(),
+        playInteractAnimation: () => model.playInteractAnimation(),
+        playLeaveAnimation: () => model.playLeaveAnimation(),
       }
     }
     case 'box': {
@@ -257,6 +265,9 @@ export function createStationProp(kind: string): StationPropInstance {
           target: model,
           onAllRepaired: (cb) => {
             model.onPowerRestored = cb
+          },
+          onComponentActivated: (cb) => {
+            model.onFuelCellActivated = cb
           },
           getComponentProgress: () => model.getCellProgress(),
           start: () => model.startMinigame(),

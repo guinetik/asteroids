@@ -1,7 +1,7 @@
 /**
- * Derelict station material overlays.
+ * Station material overlays.
  *
- * Keeps authored station GLB materials intact, then blends derelict/damaged
+ * Keeps authored station GLB materials intact, then blends rusted/damaged
  * PBR texture sets over their UVs so derelict layouts can share geometry
  * while reading as damaged and abandoned.
  *
@@ -11,22 +11,22 @@
  */
 import * as THREE from 'three'
 
-/** Public texture directory for derelict station wall overlays. */
-const DERELICT_TEXTURE_DIR = '/textures/derelict'
+/** Public texture directory for rusted station wall overlays. */
+const RUSTED_TEXTURE_DIR = '/textures/rusted'
 /** Public texture directory for damaged station floor/ceiling overlays. */
 const DAMAGED_TEXTURE_DIR = '/textures/damaged'
 /** Public texture directory for derelict metal door overlays. */
 const METAL_TEXTURE_DIR = '/textures/metal'
 /** Texture repeat over one station piece. */
 const OVERLAY_TEXTURE_REPEAT = 1
-/** Color overlay strength for wall damage. */
-const DERELICT_WALL_COLOR_STRENGTH = 0.9
-/** Roughness blend strength for wall damage. */
-const DERELICT_WALL_ROUGHNESS_STRENGTH = 0.9
-/** Ambient-occlusion blend strength for wall grime. */
-const DERELICT_WALL_AO_STRENGTH = 0.85
-/** Normal-map contribution strength for wall damage. */
-const DERELICT_WALL_NORMAL_SCALE = 1.35
+/** Color overlay strength for rusted wall damage. */
+const RUSTED_WALL_COLOR_STRENGTH = 0.92
+/** Roughness blend strength for rusted wall damage. */
+const RUSTED_WALL_ROUGHNESS_STRENGTH = 0.9
+/** Metalness blend strength for rusted wall damage. */
+const RUSTED_WALL_METALNESS_STRENGTH = 0.35
+/** Normal-map contribution strength for rusted wall damage. */
+const RUSTED_WALL_NORMAL_SCALE = 1.35
 /** Color overlay strength for damaged floor/ceiling tiles. */
 const DAMAGED_TILE_COLOR_STRENGTH = 0.92
 /** Roughness blend strength for damaged floor/ceiling tiles. */
@@ -44,16 +44,16 @@ const METAL_DOOR_METALNESS_STRENGTH = 0.12
 /** Normal-map contribution strength for derelict metal doors. */
 const METAL_DOOR_NORMAL_SCALE = 1.15
 
-/** PBR texture set used by the wall overlay shader. */
-export interface DerelictWallOverlayTextures {
+/** PBR texture set used by the rusted wall overlay shader. */
+export interface RustedWallOverlayTextures {
   /** Color/damage overlay map, sampled in sRGB space. */
   colorMap: THREE.Texture
   /** Tangent-space normal map for damaged panels. */
   normalMap: THREE.Texture
   /** Roughness map for dirty metal/plastic surfaces. */
   roughnessMap: THREE.Texture
-  /** Ambient-occlusion map for grime around panel bands and cracks. */
-  aoMap: THREE.Texture
+  /** Metalness map for exposed rusted metal panels. */
+  metalnessMap: THREE.Texture
 }
 
 /** PBR texture set used by the damaged floor/ceiling overlay shader. */
@@ -104,7 +104,7 @@ interface StationMaterialOverlayRecipe {
   normalScale: number
 }
 
-let derelictWallOverlayTextures: DerelictWallOverlayTextures | null = null
+let rustedWallOverlayTextures: RustedWallOverlayTextures | null = null
 let damagedTileOverlayTextures: DamagedTileOverlayTextures | null = null
 let metalDoorOverlayTextures: MetalDoorOverlayTextures | null = null
 
@@ -123,27 +123,27 @@ function configureOverlayTexture(texture: THREE.Texture, colorSpace: THREE.Color
 }
 
 /**
- * Load and cache the derelict wall overlay PBR texture set.
+ * Load and cache the rusted wall overlay PBR texture set.
  *
- * @returns Cached derelict wall overlay textures.
+ * @returns Cached rusted wall overlay textures.
  */
-export async function loadDerelictWallOverlayTextures(): Promise<DerelictWallOverlayTextures> {
-  if (derelictWallOverlayTextures) return derelictWallOverlayTextures
+export async function loadRustedWallOverlayTextures(): Promise<RustedWallOverlayTextures> {
+  if (rustedWallOverlayTextures) return rustedWallOverlayTextures
   const loader = new THREE.TextureLoader()
-  const [colorMap, normalMap, roughnessMap, aoMap] = await Promise.all([
-    loader.loadAsync(`${DERELICT_TEXTURE_DIR}/color.webp`),
-    loader.loadAsync(`${DERELICT_TEXTURE_DIR}/normal.webp`),
-    loader.loadAsync(`${DERELICT_TEXTURE_DIR}/roughness.webp`),
-    loader.loadAsync(`${DERELICT_TEXTURE_DIR}/ao.webp`),
+  const [colorMap, normalMap, roughnessMap, metalnessMap] = await Promise.all([
+    loader.loadAsync(`${RUSTED_TEXTURE_DIR}/color.webp`),
+    loader.loadAsync(`${RUSTED_TEXTURE_DIR}/normal.webp`),
+    loader.loadAsync(`${RUSTED_TEXTURE_DIR}/roughness.webp`),
+    loader.loadAsync(`${RUSTED_TEXTURE_DIR}/metalness.webp`),
   ])
 
   configureOverlayTexture(colorMap, THREE.SRGBColorSpace)
   configureOverlayTexture(normalMap, THREE.NoColorSpace)
   configureOverlayTexture(roughnessMap, THREE.NoColorSpace)
-  configureOverlayTexture(aoMap, THREE.NoColorSpace)
+  configureOverlayTexture(metalnessMap, THREE.NoColorSpace)
 
-  derelictWallOverlayTextures = { colorMap, normalMap, roughnessMap, aoMap }
-  return derelictWallOverlayTextures
+  rustedWallOverlayTextures = { colorMap, normalMap, roughnessMap, metalnessMap }
+  return rustedWallOverlayTextures
 }
 
 /**
@@ -195,22 +195,22 @@ export async function loadMetalDoorOverlayTextures(): Promise<MetalDoorOverlayTe
 }
 
 /**
- * Apply a derelict wall overlay shader to every standard material in a wall GLB.
+ * Apply a rusted wall overlay shader to every standard material in a wall GLB.
  *
  * @param root - Root object of the loaded wall GLB.
- * @param textures - Derelict overlay PBR texture set.
+ * @param textures - Rusted overlay PBR texture set.
  */
-export function applyDerelictWallOverlay(
+export function applyRustedWallOverlay(
   root: THREE.Object3D,
-  textures: DerelictWallOverlayTextures,
+  textures: RustedWallOverlayTextures,
 ): void {
   applyOverlayToObject(root, {
     ...textures,
-    colorStrength: DERELICT_WALL_COLOR_STRENGTH,
-    roughnessStrength: DERELICT_WALL_ROUGHNESS_STRENGTH,
-    aoStrength: DERELICT_WALL_AO_STRENGTH,
-    metalnessStrength: 0,
-    normalScale: DERELICT_WALL_NORMAL_SCALE,
+    colorStrength: RUSTED_WALL_COLOR_STRENGTH,
+    roughnessStrength: RUSTED_WALL_ROUGHNESS_STRENGTH,
+    aoStrength: 0,
+    metalnessStrength: RUSTED_WALL_METALNESS_STRENGTH,
+    normalScale: RUSTED_WALL_NORMAL_SCALE,
   })
 }
 

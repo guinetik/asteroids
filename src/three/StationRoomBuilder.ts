@@ -23,10 +23,10 @@ import { loadGLB } from '@/three/loadGLB'
 import { StationEntrance, type EntranceSpec } from '@/three/StationEntrance'
 import {
   applyDamagedTileOverlay,
-  applyDerelictWallOverlay,
+  applyRustedWallOverlay,
   applyMetalDoorOverlay,
   loadDamagedTileOverlayTextures,
-  loadDerelictWallOverlayTextures,
+  loadRustedWallOverlayTextures,
   loadMetalDoorOverlayTextures,
 } from '@/three/stationDerelictWallOverlay'
 
@@ -202,7 +202,7 @@ export async function buildStationRoom(layout: StationRoomLayout): Promise<Stati
     cornerSrc,
     entranceSrc,
     doorSrc,
-    derelictWallOverlay,
+    rustedWallOverlay,
     damagedTileOverlay,
     metalDoorOverlay,
   ] = await Promise.all([
@@ -211,16 +211,16 @@ export async function buildStationRoom(layout: StationRoomLayout): Promise<Stati
     loadGLB(CORNER_URL),
     needsEntrance ? loadGLB(ENTRANCE_URL) : Promise.resolve(null),
     needsEntrance ? loadGLB(DOOR_URL) : Promise.resolve(null),
-    isDerelict ? loadDerelictWallOverlayTextures() : Promise.resolve(null),
+    isDerelict ? loadRustedWallOverlayTextures() : Promise.resolve(null),
     isDerelict ? loadDamagedTileOverlayTextures() : Promise.resolve(null),
     isDerelict && needsEntrance ? loadMetalDoorOverlayTextures() : Promise.resolve(null),
   ])
 
-  if (derelictWallOverlay) {
-    applyDerelictWallOverlay(wallSrc, derelictWallOverlay)
-    applyDerelictWallOverlay(cornerSrc, derelictWallOverlay)
+  if (rustedWallOverlay) {
+    applyRustedWallOverlay(wallSrc, rustedWallOverlay)
+    applyRustedWallOverlay(cornerSrc, rustedWallOverlay)
     if (entranceSrc) {
-      applyDerelictWallOverlay(entranceSrc, derelictWallOverlay)
+      applyRustedWallOverlay(entranceSrc, rustedWallOverlay)
     }
   }
   if (damagedTileOverlay) {

@@ -12,14 +12,7 @@
  * @author guinetik
  * @date 2026-05-13
  */
-import {
-  Group,
-  Mesh,
-  PlaneGeometry,
-  Vector3,
-  type Material,
-  type ShaderMaterial,
-} from 'three'
+import { Group, Mesh, PlaneGeometry, Vector3, type Material, type ShaderMaterial } from 'three'
 import { generateSafePath, type MazeMap, type Tile } from '@/lib/station/safePath'
 import { createTronHologramMaterial } from '@/three/tronHologramMaterial'
 import { loadGLB } from '@/three/loadGLB'
@@ -62,9 +55,9 @@ const AUTO_FURNISH_ENABLED = true
 /** Room ids that opt into the auto-furnish pass. Wider rollout follows visual tuning. */
 const AUTO_FURNISH_ROOMS: ReadonlySet<string> = new Set(['r-terminal'])
 import {
-  applyDerelictWallOverlay,
+  applyRustedWallOverlay,
   applyMetalDoorOverlay,
-  loadDerelictWallOverlayTextures,
+  loadRustedWallOverlayTextures,
   loadMetalDoorOverlayTextures,
 } from '@/three/stationDerelictWallOverlay'
 
@@ -98,7 +91,9 @@ const STRAIGHT_CORRIDOR_LENGTH_SCALE = 1.025
 /** Small roof drop for straight corridors so ceiling seams do not expose space. */
 const STRAIGHT_CORRIDOR_ROOF_DROP = 0.18
 /** Small roof drop for window/T corridors so roof seams do not expose space. */
-const WINDOW_CORRIDOR_ROOF_DROP = 0.18
+const WINDOW_CORRIDOR_ROOF_DROP = 0.01
+/** Small roof drop for corner (L) corridors so roof seams do not expose space. */
+const CORNER_CORRIDOR_ROOF_DROP = 0.3
 /** Floor surface Y (shared with the room builder). */
 const STATION_FLOOR_Y = 0.25
 /**
@@ -193,9 +188,10 @@ const WALL_PROP_MID_Y = WALL_HEIGHT / 2
 /**
  * Small inward push (metres) along the wall's inward normal so a wall
  * prop with its back exactly at the wall plane doesn't z-fight the
- * corridor wall mesh.
+ * corridor wall mesh. Keep this tiny; larger values make the utility
+ * visibly hover off straight-corridor walls.
  */
-const WALL_PROP_INWARD_PUSH = 0.02
+const WALL_PROP_INWARD_PUSH = 0.005
 /**
  * Yaw (radians) applied to a wall-station prop so its baked local +Z
  * (forward face) points into the corridor interior, keyed by the wall's
@@ -236,7 +232,7 @@ const CORRIDOR_WALL_OUTWARD_OFFSET: Readonly<Record<CorridorKind, number>> = {
   cross: 0,
   corner: 0,
   window: 0,
-  straight: 0.85,
+  straight: 0.95,
 }
 
 /**
@@ -365,17 +361,17 @@ async function placeCorridor(
     return !Object.hasOwn(node.ports ?? {}, worldSide)
   })
   const needsPortCaps = unusedNativePorts.length > 0
-  const [floorSrc, roofSrc, wallSrc, derelictOverlay] = await Promise.all([
+  const [floorSrc, roofSrc, wallSrc, rustedOverlay] = await Promise.all([
     loadGLB(CORRIDOR_URL[node.kind]),
     loadGLB(ROOF_URL[node.kind]),
     needsPortCaps ? loadGLB(WALL_URL) : Promise.resolve(null),
-    isDerelict ? loadDerelictWallOverlayTextures() : Promise.resolve(null),
+    isDerelict ? loadRustedWallOverlayTextures() : Promise.resolve(null),
   ])
-  if (derelictOverlay) {
-    applyDerelictWallOverlay(floorSrc, derelictOverlay)
-    applyDerelictWallOverlay(roofSrc, derelictOverlay)
+  if (rustedOverlay) {
+    applyRustedWallOverlay(floorSrc, rustedOverlay)
+    applyRustedWallOverlay(roofSrc, rustedOverlay)
     if (wallSrc) {
-      applyDerelictWallOverlay(wallSrc, derelictOverlay)
+      applyRustedWallOverlay(wallSrc, rustedOverlay)
     }
   }
 
@@ -405,6 +401,7 @@ async function placeCorridor(
     roof.scale.z = STRAIGHT_CORRIDOR_LENGTH_SCALE
   }
   if (node.kind === 'corner') {
+    roof.position.y -= CORNER_CORRIDOR_ROOF_DROP
     roof.position.x = -CORNER_VISUAL_ALIGNMENT_OFFSET
     roof.position.z = -CORNER_VISUAL_ALIGNMENT_OFFSET
   }
@@ -656,10 +653,7 @@ function patchGlassTransparency(group: Group): void {
  * @param entrance - One of the room's entrances.
  * @returns The `(col, row)` tile pair the entrance opens into.
  */
-function entranceInnerTile(
-  room: RoomSpec,
-  entrance: EntranceSpec,
-): { col: number; row: number } {
+function entranceInnerTile(room: RoomSpec, entrance: EntranceSpec): { col: number; row: number } {
   switch (entrance.side) {
     case 'N':
       return { col: entrance.index, row: room.depth - 1 }
@@ -895,10 +889,7 @@ function addSecureTileMarker(
  * @param used - Mutable tile-claim set, shared with authored props.
  * @returns The synthesised prop specs (one per resolved reward).
  */
-function synthesizeRewardChests(
-  room: RoomSpec,
-  used: Set<string>,
-): RoomPropSpec[] {
+function synthesizeRewardChests(room: RoomSpec, used: Set<string>): RoomPropSpec[] {
   if (!room.rewards || room.rewards.length === 0) return []
   const out: RoomPropSpec[] = []
   const pickedItemIds = new Set<string>()
@@ -949,6 +940,10 @@ interface CorridorWallSlot {
 function corridorWallSlots(
   corridor: CorridorNode & { ports: Partial<Record<EntranceSide, PortTarget>> },
 ): CorridorWallSlot[] {
+  // Window + corner corridors host the curved exterior canopy. Mounting a
+  // glowing utility on the cramped walls next to the canopy crowds the view
+  // and reads as "stuck on the window". Skip these pieces entirely.
+  if (corridor.kind === 'window' || corridor.kind === 'corner') return []
   const yaw = (corridor.yaw ?? 0) as YawTurns
   const nativePorts = new Set<EntranceSide>(CORRIDOR_NATIVE_PORTS[corridor.kind])
   const windowed = CORRIDOR_WINDOW_NATIVE_SIDES[corridor.kind]
@@ -1062,6 +1057,9 @@ function dedupeKindsPerCorridor(
   }
 }
 
+/**
+ * Ensures a generated station corridor set contains the requested wall station kind.
+ */
 function ensureAtLeastOneWallStation(
   picks: Array<WallStationKind | null>,
   required: WallStationKind,
@@ -1328,7 +1326,10 @@ export async function buildStation(
       const safeTileKeys = new Set<string>()
       if (targetTile) {
         const minLen = Math.max(SAFE_PATH_MIN_LENGTH, 2)
-        const maxLen = Math.max(minLen, Math.floor(room.width * room.depth * SAFE_PATH_MAX_FRACTION))
+        const maxLen = Math.max(
+          minLen,
+          Math.floor(room.width * room.depth * SAFE_PATH_MAX_FRACTION),
+        )
         for (const entranceTile of entranceTiles) {
           const path = generateSafePath(
             room.width,
@@ -1392,7 +1393,7 @@ export async function buildStation(
     ? await Promise.all([loadGLB(ENTRANCE_URL), loadGLB(DOOR_URL)])
     : [null, null]
   if (layout.theme === 'derelict' && entranceSrc) {
-    applyDerelictWallOverlay(entranceSrc, await loadDerelictWallOverlayTextures())
+    applyRustedWallOverlay(entranceSrc, await loadRustedWallOverlayTextures())
   }
   if (layout.theme === 'derelict' && doorSrc) {
     applyMetalDoorOverlay(doorSrc, await loadMetalDoorOverlayTextures())

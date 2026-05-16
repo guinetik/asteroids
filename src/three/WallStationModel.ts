@@ -10,7 +10,10 @@
  * are cloned per-instance and emissive-tinted with the variant accent
  * colour (cyan for O2, green for HP), and a short-range PointLight is
  * tucked inside the body so the spill reads as light bleeding out of
- * the unit. The per-instance material clones let
+ * the unit. The PointLight remains mounted for the prop's lifetime and
+ * is dimmed by intensity instead of `.visible`; changing light visibility
+ * can force Three.js to rebuild lit shader variants during interaction.
+ * The per-instance material clones let
  * {@link WallStationModel.setLightActive} dim a single prop on
  * cooldown without affecting its siblings.
  *
@@ -68,6 +71,8 @@ const WALL_STATION_ACCENT_COLOR: Readonly<Record<WallStationVariant, number>> = 
 const EMISSIVE_TINT_INTENSITY = 0.6
 /** PointLight intensity — tuned for an interior-lit prop in a dim corridor. */
 const INTERIOR_LIGHT_INTENSITY = 2.4
+/** Cooldown PointLight intensity. Keeps the light pooled without adding visible spill. */
+const INTERIOR_LIGHT_OFF_INTENSITY = 0
 /** PointLight falloff distance in metres. */
 const INTERIOR_LIGHT_DISTANCE = 4.0
 /** PointLight inverse-square decay coefficient. */
@@ -188,12 +193,12 @@ export class WallStationModel {
     const color = WALL_STATION_ACCENT_COLOR[this.variant]
     const light = new THREE.PointLight(
       color,
-      INTERIOR_LIGHT_INTENSITY,
+      this.lightActive ? INTERIOR_LIGHT_INTENSITY : INTERIOR_LIGHT_OFF_INTENSITY,
       INTERIOR_LIGHT_DISTANCE,
       INTERIOR_LIGHT_DECAY,
     )
     light.position.set(0, 0, depth * INTERIOR_LIGHT_DEPTH_FRACTION)
-    light.visible = this.lightActive
+    light.visible = true
     this.group.add(light)
     this.interiorLight = light
 
@@ -201,16 +206,22 @@ export class WallStationModel {
   }
 
   /**
-   * Toggle the prop's emissive glow + interior PointLight as a single
+   * Toggle the prop's emissive glow + interior PointLight intensity as a single
    * unit. Used by the host view to dim the prop while it's on cooldown
    * (just refilled the player) and re-enable it when the timer elapses.
+   * The PointLight object stays visible/mounted so Three's active light
+   * list remains stable during interaction.
    *
    * @param active - True to power the prop on, false to dim it dark.
    */
   setLightActive(active: boolean): void {
     if (this.lightActive === active) return
     this.lightActive = active
-    if (this.interiorLight) this.interiorLight.visible = active
+    if (this.interiorLight) {
+      this.interiorLight.intensity = active
+        ? INTERIOR_LIGHT_INTENSITY
+        : INTERIOR_LIGHT_OFF_INTENSITY
+    }
     this.applyEmissiveIntensity(active ? null : 0)
   }
 
