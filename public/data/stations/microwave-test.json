@@ -148,14 +148,14 @@
         {
           "kind": "powergen",
           "pos": [0, 0],
-          "yaw": 0
+          "yaw": 1
         },
         {
           "kind": "terminal",
           "pos": [-2.3, 2.3],
           "yaw": 1,
           "interact": {
-            "prompt": "F  Read Generator Diagnostics",
+            "prompt": "F  Reboot Generator",
             "event": "terminal:use:r-power"
           }
         }
