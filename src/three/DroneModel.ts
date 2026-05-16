@@ -78,7 +78,7 @@ const DRONE_ALERT_EMISSIVE_BOOST = 0.8
  * If the drone faces 90° off when shooting, add or subtract `Math.PI/2`
  * until it lines up. If it's exactly 180° off, add `Math.PI`.
  */
-const DRONE_FACE_YAW_OFFSET = Math.PI / 2
+const DRONE_FACE_YAW_OFFSET = -Math.PI / 2
 
 /**
  * Unit forward vector used by {@link attachMuzzleFlash} to position the
