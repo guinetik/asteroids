@@ -268,17 +268,8 @@ export class DroneModel {
         const scale = DRONE_TARGET_DIAMETER_METERS / longest
         inner.scale.setScalar(scale)
       }
-      // Re-measure under the new scale and recenter so the wrapper's Y
-      // axis runs through the model's centroid. Without this the GLB's
-      // authored translation makes the body swing in an arc when the
-      // wrapper yaws to face the player.
-      inner.updateMatrixWorld(true)
-      const scaled = new THREE.Box3().setFromObject(inner)
-      const center = new THREE.Vector3()
-      scaled.getCenter(center)
-      inner.position.sub(center)
-      this.innerBaseY = inner.position.y
     }
+    this.innerBaseY = inner.position.y
 
     // Capture every standard material so the hit/alert/destruction
     // flashes have a baseline to lerp against without re-traversing
