@@ -14,6 +14,8 @@
  * AsteroidDev.MapView.grantGravitySurfing()
  * AsteroidDev.MapView.giveCredits(5000)
  * AsteroidDev.MapView.setUpgradeLevel('gravitySurfing', 0)
+ * AsteroidDev.StationView.listRooms()
+ * AsteroidDev.StationView.teleportToRoom('r-hub')
  * AsteroidDev.help()
  *
  * Map spacetime anomalies: import types/event names from `devConsole` or listen on

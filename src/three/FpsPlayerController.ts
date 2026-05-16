@@ -483,6 +483,22 @@ export class FpsPlayerController implements Tickable {
     this.sprintReleasedSinceLockout = true
   }
 
+  /**
+   * Move the player root to the given world position and clear carried
+   * momentum (lateral velocity, vertical velocity, knockback override).
+   * Used for scripted snaps and development teleport helpers.
+   *
+   * @param x - World X.
+   * @param y - World Y (feet / capsule origin — use the scene floor Y).
+   * @param z - World Z.
+   */
+  snapWorldPosition(x: number, y: number, z: number): void {
+    this.group.position.set(x, y, z)
+    this.lateralVelocity.set(0, 0, 0)
+    this.body.velocityY = 0
+    this.knockbackTimer = 0
+  }
+
   /** Set ADS state — affects strafe speed. */
   setAiming(aiming: boolean): void {
     this._aiming = aiming

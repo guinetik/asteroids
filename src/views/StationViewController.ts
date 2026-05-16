@@ -63,6 +63,7 @@ import type { StationEntrance } from '@/three/StationEntrance'
 import { loadStationLayout } from '@/lib/station/loadStationLayout'
 import type {
   ExteriorSunSpec,
+  RoomSpec,
   StationIntroSpec,
   StationLayout,
   StationTheme,
@@ -458,6 +459,8 @@ export class StationViewController implements Tickable {
   private startupBriefingVisible = false
   /** Seconds since movement first dismissed the startup briefing, or null while held. */
   private startupBriefingFadeElapsed: number | null = null
+  /** Room definitions from the loaded layout, keyed by {@link RoomSpec.id}. */
+  private roomSpecsById: Map<string, RoomSpec> | null = null
 
   /**
    * Mount the scene into the given container.
@@ -491,6 +494,7 @@ export class StationViewController implements Tickable {
 
     // Whole station from the authored layout fetched by id.
     const layout = await this.fetchLayout(stationId)
+    this.roomSpecsById = new Map(layout.rooms.map((room) => [room.id, room]))
     this.stationIntro = layout.intro ?? null
     this.station = await buildStation(layout, stationId)
     this.sceneManager.addToScene(this.station.group)
@@ -656,6 +660,49 @@ export class StationViewController implements Tickable {
     DevConsole.register('StationView', {
       openDirect: (id = 'yamada-titania') => {
         void this.router?.push(`/station?station=${id}&dev=true`)
+      },
+      /**
+       * Teleport to the centre of a room's floor footprint (`RoomSpec.anchor`).
+       *
+       * @param roomId - Layout room id (see {@link listRooms}).
+       * @returns `true` when the player was moved.
+       */
+      teleportToRoom: (roomId: string) => {
+        const id = String(roomId)
+        const spec = this.roomSpecsById?.get(id)
+        if (!spec) {
+          console.warn(
+            `[AsteroidDev] Unknown room id "${id}". Try AsteroidDev.StationView.listRooms().`,
+          )
+          return false
+        }
+        if (!this.playerController) {
+          console.warn('[AsteroidDev] StationView teleport: player not ready.')
+          return false
+        }
+        if (this.startupIntroActive || this.startupAwaitingPrelude) {
+          console.warn(
+            '[AsteroidDev] Teleport while startup intro is running may feel wrong — wait for walk-in to finish.',
+          )
+        }
+        this.playerController.snapWorldPosition(spec.anchor.x, FLOOR_Y, spec.anchor.z)
+        this.footstepBaselineCaptured = false
+        console.info(
+          `[AsteroidDev] Teleported to room "${id}" at (${spec.anchor.x}, ${FLOOR_Y}, ${spec.anchor.z}).`,
+        )
+        return true
+      },
+      /** Print sorted room ids from the loaded layout to the console. */
+      listRooms: () => {
+        const map = this.roomSpecsById
+        if (!map || map.size === 0) {
+          console.info('[AsteroidDev] No station rooms loaded (is StationView mounted?).')
+          return
+        }
+        const ids = [...map.keys()].sort((a, b) => a.localeCompare(b))
+        console.group('[AsteroidDev] Station room ids')
+        for (const rid of ids) console.log(rid)
+        console.groupEnd()
       },
     })
 
@@ -1740,6 +1787,7 @@ export class StationViewController implements Tickable {
   /** Tear down the scene. */
   dispose(): void {
     DevConsole.unregister('StationView')
+    this.roomSpecsById = null
     this.clearPrompt()
     if (this.powerRestoreSound) {
       this.powerRestoreSound.stop()

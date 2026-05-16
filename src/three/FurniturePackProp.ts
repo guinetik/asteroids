@@ -62,7 +62,7 @@ export class FurniturePackProp {
   /** Public scene-graph node — host scene parents this into its room. */
   readonly group: THREE.Group
 
-  private inner: THREE.Group | null = null
+  private inner: THREE.Object3D | null = null
   private loadStarted = false
   private loaded = false
   private readonly targetLongest: number
