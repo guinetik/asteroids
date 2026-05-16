@@ -40,7 +40,11 @@ import { FpsPointerLockSession } from '@/lib/fps/FpsPointerLockSession'
 import { buildFpsPlayerConfig } from '@/lib/fps/buildFpsPlayerConfig'
 import { StationCollider, type StationRect } from '@/lib/station/StationCollider'
 import { buildStation, type BuiltStation, type PropInteractor } from '@/three/StationBuilder'
-import { computeDeathPresentationState, stepDamageFlash } from '@/lib/fps/fpsPresentation'
+import {
+  computeDeathPresentationState,
+  computeHypoxiaFadeOpacity,
+  stepDamageFlash,
+} from '@/lib/fps/fpsPresentation'
 import { drawMazeCanvas } from '@/views/stationMazeCanvas'
 import {
   drawPowerGenPuzzleCanvas,
@@ -61,6 +65,7 @@ import type { ExteriorSunSpec, StationLayout, StationTheme } from '@/lib/station
 import { createSunMesh, type SunMeshResult } from '@/three/meshes/createSunMesh'
 import { SUN } from '@/lib/planets/catalog'
 import { StationPostProcessing } from '@/three/atmosphere/StationPostProcessing'
+import type { AudioPlaybackHandle } from '@/audio/audioTypes'
 
 /**
  * URL prefix where station-interior layouts are served as static JSON.
@@ -138,6 +143,16 @@ const DIR_LIGHT_INTENSITY = 0.8
 const AMBIENT_LIGHT_INTENSITY_POWERED = 1.0
 /** Directional intensity bumped to once station power is restored. */
 const DIR_LIGHT_INTENSITY_POWERED = 1.4
+/** Ambient light wobble range while the reboot cue is still playing. */
+const POWER_RESTORE_AMBIENT_FLICKER_SCALE = 0.24
+/** Directional light wobble range while the reboot cue is still playing. */
+const POWER_RESTORE_DIR_FLICKER_SCALE = 0.32
+/** Primary flicker frequency for the reboot light wobble. */
+const POWER_RESTORE_FLICKER_FREQ_A = 16
+/** Secondary flicker frequency for the reboot light wobble. */
+const POWER_RESTORE_FLICKER_FREQ_B = 27
+/** Phase offset for the secondary flicker oscillator. */
+const POWER_RESTORE_FLICKER_PHASE = 1.8
 /** Directional fill light height. */
 const DIR_LIGHT_HEIGHT = 20
 /** Directional fill light colour. */
@@ -274,6 +289,10 @@ export class StationViewController implements Tickable {
   private directionalLight: DirectionalLight | null = null
   /** True once a powergen prop has fired its `onPowerRestored` callback. */
   private stationPowerRestored = false
+  /** Reboot cue handle used to keep the room flickering until it ends. */
+  private powerRestoreSound: AudioPlaybackHandle | null = null
+  /** Elapsed time since the reboot cue started, used for light wobble. */
+  private powerRestoreFlickerTime = 0
   /**
    * Scratch state for the generator diagnostics terminal — paints a
    * live status panel onto the r-power terminal's screen. Null when
@@ -301,6 +320,8 @@ export class StationViewController implements Tickable {
     puzzleState: PowerGenPuzzleState | null
     /** Latest cell progress — kept for legacy status-canvas fallbacks. */
     getPuzzleState: () => PowerGenPuzzleState | null
+    /** True after a wrong shot until the player leaves terminal proximity. */
+    retryReenableOnExit: boolean
   } | null = null
   /** Reused upward velocity scratch for impact-emitter spawns. */
   private readonly _impactUp = new Vector3(0, 1, 0)
@@ -319,6 +340,8 @@ export class StationViewController implements Tickable {
   private mazePeekTerminalEvent: string | null = null
   /** Lazily-created canvas reused across map peeks (one per controller). */
   private mazePeekCanvas: HTMLCanvasElement | null = null
+  /** Terminal interactors currently held open until the player leaves range. */
+  private readonly openTerminalEvents = new Set<string>()
   /**
    * Audio director constructed with the `'habitat'` footstep surface so
    * step recipes + cadence match the `/habitat` scene's hard-floor feel.
@@ -361,6 +384,8 @@ export class StationViewController implements Tickable {
   /** Cached prompt text so we only fire `onPrompt` when it changes. */
   private currentPrompt: string | null = null
   private currentInteractorMeta: PropInteractorMeta | null = null
+  /** Entrance event ids hidden until the player leaves that doorway's prompt radius. */
+  private readonly suppressedEntrancePromptEvents = new Set<string>()
   /** Seconds the red vignette has left before decaying back to zero. */
   private damageFlashTimer = 0
   /** Seconds since the player's HP hit zero; drives the death animation. */
@@ -531,10 +556,12 @@ export class StationViewController implements Tickable {
     // which when fully repaired brightens the room lights and unlocks
     // the gated entrance into the rest of the station.
     for (const prop of this.station.props) {
-      if (!prop.scienceRepair) continue
-      this.projectileSystem.setEvaSatelliteServicingScience(prop.scienceRepair.target)
-      prop.scienceRepair.onAllRepaired(() => this.handleStationPowerRestored())
-      this.bindPowerDiagnosticsTerminal(prop.scienceRepair)
+      const scienceRepair = prop.scienceRepair
+      if (!scienceRepair) continue
+      this.projectileSystem.setEvaSatelliteServicingScience(scienceRepair.target)
+      scienceRepair.onAllRepaired(() => this.handleStationPowerRestored())
+      scienceRepair.onComponentActivated(() => this.notifyPowerCellActivated(scienceRepair))
+      this.bindPowerDiagnosticsTerminal(scienceRepair)
     }
 
     // Ceiling turrets: spawn at door corners, register their enemies
@@ -603,6 +630,7 @@ export class StationViewController implements Tickable {
     this.tickHazards(dt)
     this.tickPassiveDamage(dt)
     this.tickDamageFlash(dt)
+    this.tickHypoxiaFade()
     this.tickDeathPresentation(dt)
     this.tickMultiTool()
     this.tickPowerDiagnostics(dt)
@@ -635,6 +663,7 @@ export class StationViewController implements Tickable {
       o2Capacity: this.playerController.o2Capacity,
     })
     this.stationAudio.update(dt, { inHazard: this.inHazardThisFrame })
+    this.tickPowerRestoreLights(dt)
   }
 
   /**
@@ -656,13 +685,18 @@ export class StationViewController implements Tickable {
     let activePrompt: string | null = null
     let activeEntrance: StationEntrance | null = null
     let activeInteractor: PropInteractor | null = null
-    let bestDistSq = ENTRANCE_INTERACT_DISTANCE * ENTRANCE_INTERACT_DISTANCE
+    const promptRangeDistSq = ENTRANCE_INTERACT_DISTANCE * ENTRANCE_INTERACT_DISTANCE
+    let bestDistSq = promptRangeDistSq
 
     for (const entrance of this.station.entrances) {
       if (entrance.isOpening || entrance.isOpened) continue
       this._proximityScratch.copy(entrance.anchor)
       this._proximityScratch.y = pos.y
       const distSq = this._proximityScratch.distanceToSquared(pos)
+      if (this.suppressedEntrancePromptEvents.has(entrance.event)) {
+        if (distSq >= promptRangeDistSq) this.suppressedEntrancePromptEvents.delete(entrance.event)
+        continue
+      }
       if (distSq < bestDistSq) {
         bestDistSq = distSq
         activePrompt = entrance.promptFor(pos)
@@ -704,6 +738,8 @@ export class StationViewController implements Tickable {
           this.onPrompt?.(null)
         }
         this.stationAudio.notifyTerminalInteract()
+        activeInteractor.prop.playInteractAnimation?.()
+        this.openTerminalEvents.add(activeInteractor.event)
         this.startDoorLookSequence(activeInteractor.anchor)
         this.onInteract?.(activeInteractor.event)
       } else if (activeEntrance) {
@@ -714,10 +750,8 @@ export class StationViewController implements Tickable {
         } else {
           const event = activeEntrance.event
           // Hide the prompt the moment the door starts moving.
-          if (this.currentPrompt !== null) {
-            this.currentPrompt = null
-            this.onPrompt?.(null)
-          }
+          this.clearPrompt()
+          this.suppressedEntrancePromptEvents.add(event)
           this.stationAudio.notifyDoorOpen()
           this.startDoorLookSequence(activeEntrance.anchor)
           activeEntrance.triggerOpen(pos, () => this.onInteract?.(event))
@@ -725,6 +759,59 @@ export class StationViewController implements Tickable {
         }
       }
     }
+
+    this.tickOpenTerminalProximity(pos)
+  }
+
+  /**
+   * Fold terminals back once the player actually leaves their interaction
+   * radius. Disabled terminals stay tracked here so one-shot interactions
+   * do not immediately close on the next prompt pass.
+   */
+  private tickOpenTerminalProximity(playerPosition: Vector3): void {
+    if (!this.station || this.openTerminalEvents.size === 0) return
+    const leaveDistSq = ENTRANCE_INTERACT_DISTANCE * ENTRANCE_INTERACT_DISTANCE
+    for (const event of this.openTerminalEvents) {
+      const interactor = this.findInteractorByEvent(event)
+      if (!interactor) {
+        this.openTerminalEvents.delete(event)
+        continue
+      }
+      this._proximityScratch.copy(interactor.anchor)
+      this._proximityScratch.y = playerPosition.y
+      if (this._proximityScratch.distanceToSquared(playerPosition) <= leaveDistSq) continue
+      interactor.prop.playLeaveAnimation?.()
+      this.openTerminalEvents.delete(event)
+      this.reenablePowerDiagnosticsAfterExit(event, interactor)
+    }
+  }
+
+  /**
+   * After a wrong reboot shot, make the diagnostics terminal usable only
+   * once the player has backed out and returned to press F again.
+   */
+  private reenablePowerDiagnosticsAfterExit(event: string, interactor: PropInteractor): void {
+    const diag = this.powerDiagnostics
+    if (!diag || event !== diag.terminalEvent || !diag.retryReenableOnExit) return
+    diag.retryReenableOnExit = false
+    if (this.stationPowerRestored) return
+    interactor.disabled = false
+    interactor.prop.setStatus?.('warning')
+  }
+
+  /**
+   * If a reboot attempt fails after the player already walked away,
+   * re-arm the terminal immediately instead of waiting for another
+   * proximity-exit tick that will never fire.
+   */
+  private reenablePowerDiagnosticsRetryIfAway(interactor: PropInteractor): void {
+    if (!this.playerController) return
+    const pos = this.playerController.group.position
+    this._proximityScratch.copy(interactor.anchor)
+    this._proximityScratch.y = pos.y
+    const leaveDistSq = ENTRANCE_INTERACT_DISTANCE * ENTRANCE_INTERACT_DISTANCE
+    if (this._proximityScratch.distanceToSquared(pos) <= leaveDistSq) return
+    this.reenablePowerDiagnosticsAfterExit(interactor.event, interactor)
   }
 
   /**
@@ -834,12 +921,10 @@ export class StationViewController implements Tickable {
     const pos = this.playerController.group.position
     this.stationAudio.notifyDoorOpen()
     this.startDoorLookSequence(entrance.anchor)
+    this.suppressedEntrancePromptEvents.add(event)
     entrance.triggerOpen(pos, () => this.onInteract?.(event))
     this.updateDoorBlockers()
-    if (this.currentPrompt !== null) {
-      this.currentPrompt = null
-      this.onPrompt?.(null)
-    }
+    this.clearPrompt()
     return true
   }
 
@@ -853,8 +938,9 @@ export class StationViewController implements Tickable {
   private handleStationPowerRestored(): void {
     if (this.stationPowerRestored) return
     this.stationPowerRestored = true
-    if (this.ambientLight) this.ambientLight.intensity = AMBIENT_LIGHT_INTENSITY_POWERED
-    if (this.directionalLight) this.directionalLight.intensity = DIR_LIGHT_INTENSITY_POWERED
+    this.powerRestoreSound = this.stationAudio.notifyPowerRestored()
+    this.powerRestoreFlickerTime = 0
+    this.applyPoweredLighting()
     if (this.station) {
       for (const entrance of this.station.entrances) {
         if (!entrance.locked) continue
@@ -876,6 +962,52 @@ export class StationViewController implements Tickable {
   }
 
   /**
+   * Drive the powered room lights. While the reboot cue is still
+   * playing, the intensities wobble; once it ends, the lights settle
+   * to their stable powered values.
+   */
+  private tickPowerRestoreLights(dt: number): void {
+    const handle = this.powerRestoreSound
+    if (!handle) return
+
+    if (!handle.playing()) {
+      this.powerRestoreSound = null
+      this.applyPoweredLighting()
+      return
+    }
+
+    this.powerRestoreFlickerTime += dt
+    const wobbleA = Math.sin(this.powerRestoreFlickerTime * POWER_RESTORE_FLICKER_FREQ_A)
+    const wobbleB = Math.sin(
+      this.powerRestoreFlickerTime * POWER_RESTORE_FLICKER_FREQ_B + POWER_RESTORE_FLICKER_PHASE,
+    )
+    const wobble = (wobbleA + wobbleB) * 0.5
+
+    if (this.ambientLight) {
+      const base = AMBIENT_LIGHT_INTENSITY_POWERED
+      this.ambientLight.intensity = MathUtils.clamp(
+        base * (1 + wobble * POWER_RESTORE_AMBIENT_FLICKER_SCALE),
+        AMBIENT_LIGHT_INTENSITY,
+        AMBIENT_LIGHT_INTENSITY_POWERED * (1 + POWER_RESTORE_AMBIENT_FLICKER_SCALE),
+      )
+    }
+    if (this.directionalLight) {
+      const base = DIR_LIGHT_INTENSITY_POWERED
+      this.directionalLight.intensity = MathUtils.clamp(
+        base * (1 + wobble * POWER_RESTORE_DIR_FLICKER_SCALE),
+        DIR_LIGHT_INTENSITY,
+        DIR_LIGHT_INTENSITY_POWERED * (1 + POWER_RESTORE_DIR_FLICKER_SCALE),
+      )
+    }
+  }
+
+  /** Snap the room lights to their stable powered intensities. */
+  private applyPoweredLighting(): void {
+    if (this.ambientLight) this.ambientLight.intensity = AMBIENT_LIGHT_INTENSITY_POWERED
+    if (this.directionalLight) this.directionalLight.intensity = DIR_LIGHT_INTENSITY_POWERED
+  }
+
+  /**
    * Wire a powergen prop's repair source to the r-power terminal so its
    * screen mirrors the generator state. No-op if the terminal isn't in
    * the layout — the diagnostics overlay is optional cosmetic UI.
@@ -888,6 +1020,7 @@ export class StationViewController implements Tickable {
     start: () => void
     getPuzzleState: () => PowerGenPuzzleState | null
     onPuzzleStateChanged: (cb: () => void) => void
+    onComponentActivated: (cb: (index: number) => void) => void
   }): void {
     if (!this.station) return
     const interactor = this.findInteractorByEvent(POWER_DIAGNOSTICS_TERMINAL_EVENT)
@@ -902,6 +1035,7 @@ export class StationViewController implements Tickable {
       start: scienceRepair.start,
       puzzleState: scienceRepair.getPuzzleState(),
       getPuzzleState: scienceRepair.getPuzzleState.bind(scienceRepair),
+      retryReenableOnExit: false,
     }
     scienceRepair.onPuzzleStateChanged(() => {
       const diag = this.powerDiagnostics
@@ -912,10 +1046,27 @@ export class StationViewController implements Tickable {
       // re-engages the terminal to redraft a sequence.
       if (diag.puzzleState?.resetPending) {
         diag.stage = 'tutorial'
+        diag.retryReenableOnExit = true
+        interactor.disabled = true
+        interactor.prop.setStatus?.('error')
+        this.reenablePowerDiagnosticsRetryIfAway(interactor)
       }
       this.repaintPowerDiagnostics()
     })
     this.repaintPowerDiagnostics()
+  }
+
+  /**
+   * Play the ascending reboot melody for the latest activated generator cell.
+   *
+   * @param scienceRepair - The prop's repair handle.
+   */
+  private notifyPowerCellActivated(scienceRepair: {
+    getComponentProgress: () => Array<{ index: number; progress: number }>
+  }): void {
+    const cells = scienceRepair.getComponentProgress()
+    const activated = cells.filter((cell) => cell.progress >= 1).length
+    this.stationAudio.notifyPowerCellActivated(activated, cells.length)
   }
 
   /**
@@ -934,6 +1085,12 @@ export class StationViewController implements Tickable {
     // panel rather than reverting to the tutorial.
     diag.stage = 'puzzle'
     diag.sinceRepaint = 0
+    diag.retryReenableOnExit = false
+    const interactor = this.findInteractorByEvent(diag.terminalEvent)
+    if (interactor) {
+      interactor.disabled = true
+      interactor.prop.setStatus?.('warning')
+    }
     diag.start()
     diag.puzzleState = diag.getPuzzleState()
     this.repaintPowerDiagnostics()
@@ -1238,15 +1395,15 @@ export class StationViewController implements Tickable {
 
   /**
    * Detect damage applied to the player from sources outside the
-   * controller's own logic (currently: hypoxia damage when O2 hits 0,
-   * triggered by `FpsPlayerController.tick`). Fires the same grunt SFX
-   * + red vignette the lava path uses, so the player gets unmissable
-   * feedback that the suit is killing them.
+   * controller's own logic. Hypoxia owns its shared fade/pulse effect
+   * and should not also trigger the combat damage vignette.
    */
   private tickPassiveDamage(_dt: number): void {
     if (!this.playerController) return
     const hp = this.playerController.hp
-    if (this.lastHp !== null && hp < this.lastHp - 1e-3) {
+    const damageDetected = this.lastHp !== null && hp < this.lastHp - 1e-3
+    const hypoxiaDamage = this.playerController.o2Level <= 0
+    if (damageDetected && !hypoxiaDamage) {
       // Already covered by the lava path's own SFX/flash when applicable
       // — but it's idempotent enough that a redundant call is fine.
       this.fpsAudio.notifyHazardDamage()
@@ -1260,6 +1417,22 @@ export class StationViewController implements Tickable {
     const flash = stepDamageFlash(this.damageFlashTimer, dt, DAMAGE_FLASH_DURATION)
     this.damageFlashTimer = flash.timer
     this.onDamageFlash?.(flash.opacity)
+  }
+
+  /**
+   * Drive the shared hypoxia fade/pulse while oxygen is empty.
+   */
+  private tickHypoxiaFade(): void {
+    if (!this.playerController || this.playerController.isDead) return
+
+    this.onDeathFade?.(
+      computeHypoxiaFadeOpacity(
+        this.playerController.o2Level,
+        this.playerController.hp,
+        this.playerController.maxHp,
+        performance.now() * 0.001,
+      ),
+    )
   }
 
   /**
@@ -1350,6 +1523,7 @@ export class StationViewController implements Tickable {
     this.deathMessageShown = false
     this.footstepBaselineCaptured = false
     this.lastHp = null
+    this.suppressedEntrancePromptEvents.clear()
     this.stationAudio.stopHazard()
     this.inHazardThisFrame = false
     this.clearMazePeek()
@@ -1358,6 +1532,13 @@ export class StationViewController implements Tickable {
     this.onDamageFlash?.(0)
     this.onDeathFade?.(0)
     this.onDeathMessage?.(false)
+  }
+
+  /** Clear the HUD key prompt immediately when ownership changes outside proximity checks. */
+  private clearPrompt(): void {
+    if (this.currentPrompt === null) return
+    this.currentPrompt = null
+    this.onPrompt?.(null)
   }
 
   /** Refresh door collision blockers from the current entrance animation states. */
@@ -1388,6 +1569,11 @@ export class StationViewController implements Tickable {
   /** Tear down the scene. */
   dispose(): void {
     DevConsole.unregister('StationView')
+    this.clearPrompt()
+    if (this.powerRestoreSound) {
+      this.powerRestoreSound.stop()
+      this.powerRestoreSound = null
+    }
     this.gameLoop?.stop()
     this.starfield?.dispose()
     this.disposeExteriorSun()

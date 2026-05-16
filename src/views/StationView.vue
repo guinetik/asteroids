@@ -329,6 +329,8 @@ const WALL_STATION_COOLDOWN_S = 60
 
 controller.onInteract = (event) => {
   if (event === 'station:exit') {
+    promptText.value = null
+    chestPreview.value = null
     void router.push('/')
     return
   }
@@ -436,6 +438,8 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  promptText.value = null
+  chestPreview.value = null
   for (const handle of pickupTimers.values()) Timer.cancel(handle)
   pickupTimers.clear()
   controller.dispose()
