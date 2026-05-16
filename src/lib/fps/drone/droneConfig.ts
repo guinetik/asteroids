@@ -34,13 +34,13 @@ export const DRONE_BURST_INTERVAL_SECONDS = 0.3
 export const DRONE_BURST_REST_SECONDS = 5
 
 /** Player-detection range in world units. Engage radius before FSM enters alerting. */
-export const DRONE_DETECT_RANGE = 9
+export const DRONE_DETECT_RANGE = 14
 
 /** Range hysteresis used to exit alerting/firing — must exceed {@link DRONE_DETECT_RANGE}. */
-export const DRONE_DETECT_RANGE_HYSTERESIS = 10
+export const DRONE_DETECT_RANGE_HYSTERESIS = 16
 
 /** Distance band inside which the controller actually pulls the trigger. */
-export const DRONE_FIRE_RANGE = 8
+export const DRONE_FIRE_RANGE = 12
 
 /** Collision sphere radius in world units. Smaller silhouette than the turret. */
 export const DRONE_HIT_RADIUS = 0.55
@@ -50,10 +50,10 @@ export const DRONE_HIT_RADIUS = 0.55
 // ---------------------------------------------------------------------------
 
 /** Seconds spent in the alerting beat before the FSM transitions to firing. */
-export const DRONE_ALERT_SECONDS = 0.45
+export const DRONE_ALERT_SECONDS = 0.25
 
 /** Seconds the FSM stays in cooling before it may return to patrolling. */
-export const DRONE_COOLING_SECONDS = 1.5
+export const DRONE_COOLING_SECONDS = 0.7
 
 // ---------------------------------------------------------------------------
 // Wander / hover
