@@ -145,6 +145,23 @@ const ENTRANCE_RAISE = 0.25
  * onto solid floor when looking through the open door.
  */
 const ENTRANCE_PORCH_OFFSET = TILE_SIZE / 2
+/**
+ * Vertical epsilon dropped on the porch tile so its top surface never sits
+ * exactly coplanar with the adjacent corridor/room floor at the doorway.
+ * Without this, the depth buffer flips per pixel across the seam and the
+ * derelict overlay shader renders as flickering streaks along the join.
+ */
+const PORCH_Z_FIGHT_EPSILON = 0.004
+/**
+ * Checkerboard Y stagger applied to floor tiles. The tile asset's flat top
+ * is ~4 m wide but tiles are placed on a 3.85 m pitch (so the underhang
+ * hides below the slab), which means adjacent tile tops overlap by ~0.075 m.
+ * In that overlap band the depth buffer flips per pixel and the derelict
+ * overlay shader renders as flickering streaks along the seam. Offsetting
+ * every other tile by this tiny amount makes one tile deterministically
+ * win in the overlap region with no perceptible height step.
+ */
+const FLOOR_TILE_CHECKER_EPSILON = 0.0015
 
 /** Specification for the room to be generated. */
 export interface StationRoomLayout {
@@ -254,7 +271,8 @@ export async function buildStationRoom(layout: StationRoomLayout): Promise<Stati
       const z = (row - (depth - 1) / 2) * TILE_SIZE
 
       const floor = tileSrc.clone(true)
-      floor.position.set(x, -TILE_HALF_THICK + FLOOR_RAISE, z)
+      const checker = (col + row) % 2 === 0 ? 0 : FLOOR_TILE_CHECKER_EPSILON
+      floor.position.set(x, -TILE_HALF_THICK + FLOOR_RAISE - checker, z)
       group.add(floor)
 
       const ceiling = tileSrc.clone(true)
@@ -321,7 +339,11 @@ export async function buildStationRoom(layout: StationRoomLayout): Promise<Stati
                 ? -halfDepth - ENTRANCE_PORCH_OFFSET
                 : z
           const porch = tileSrc.clone(true)
-          porch.position.set(porchOutX, -TILE_HALF_THICK + FLOOR_RAISE, porchOutZ)
+          porch.position.set(
+            porchOutX,
+            -TILE_HALF_THICK + FLOOR_RAISE - PORCH_Z_FIGHT_EPSILON,
+            porchOutZ,
+          )
           group.add(porch)
         }
 
