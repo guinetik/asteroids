@@ -574,6 +574,21 @@ export interface ExteriorSunSpec {
 export type StationTheme = 'station' | 'derelict'
 
 /**
+ * Optional startup briefing shown by the station view while the player
+ * arrives through a short non-interactive intro.
+ */
+export interface StationIntroSpec {
+  /** Primary station display name, e.g. `'Abandoned Security Outpost'`. */
+  title: string
+  /** Short flavor line shown under the title, e.g. `'Blackbox Salvage Brief'`. */
+  subtitle?: string
+  /** Briefing paragraphs, each rendered as one compact HUD line block. */
+  body: string[]
+  /** Compact uppercase status tags, e.g. `['DERELICT', 'VAULT SEALED']`. */
+  status?: string[]
+}
+
+/**
  * Per-level config for the ceiling-turret spawn system. Authors flip
  * `enabled: false` to opt a layout out of turrets entirely, or tune
  * `spawnProbability` to control how dense the patrol gets.
@@ -596,6 +611,8 @@ export interface TurretsSpec {
 
 /** Full station layout — rooms plus a corridor graph with port targets. */
 export interface StationLayout {
+  /** Optional startup briefing and non-interactive arrival intro copy. */
+  intro?: StationIntroSpec
   /** Visual theme for this station. Defaults to `'station'` when omitted. */
   theme?: StationTheme
   /** Rooms placed in world coordinates. */

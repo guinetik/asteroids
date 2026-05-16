@@ -61,11 +61,22 @@ import type { PropInteractorMeta, PropStatus } from '@/three/stationProps'
 import type { FpsTelemetry } from '@/lib/ui/fpsHudTypes'
 import type { StationEntrance } from '@/three/StationEntrance'
 import { loadStationLayout } from '@/lib/station/loadStationLayout'
-import type { ExteriorSunSpec, StationLayout, StationTheme } from '@/lib/station/StationLayout'
+import type {
+  ExteriorSunSpec,
+  StationIntroSpec,
+  StationLayout,
+  StationTheme,
+} from '@/lib/station/StationLayout'
 import { createSunMesh, type SunMeshResult } from '@/three/meshes/createSunMesh'
 import { SUN } from '@/lib/planets/catalog'
 import { StationPostProcessing } from '@/three/atmosphere/StationPostProcessing'
 import type { AudioPlaybackHandle } from '@/audio/audioTypes'
+import {
+  computeStationBriefingFadeState,
+  computeStationStartupIntroState,
+  type StationBriefingFadeTiming,
+  type StationStartupIntroTiming,
+} from '@/lib/station/stationStartupIntro'
 
 /**
  * URL prefix where station-interior layouts are served as static JSON.
@@ -217,6 +228,23 @@ const DEATH_PITCH_TARGET = -1.4
 const DEATH_FADE_DURATION = 2.0
 /** Seconds after death before the YOU DIED + REWIND overlay appears. */
 const DEATH_MESSAGE_DELAY = 1.5
+
+/** Station startup intro duration and presentation timing, in seconds. */
+const STARTUP_INTRO_TIMING: StationStartupIntroTiming = {
+  duration: 5.2,
+  fadeInDuration: 1.2,
+  walkDuration: 3.6,
+}
+
+/** Seconds the briefing HUD takes to fade after the player starts moving. */
+const STARTUP_BRIEFING_FADE_TIMING: StationBriefingFadeTiming = {
+  duration: 5,
+}
+
+/** Entry offset behind the normal spawn, so the intro walks in from the hatch. */
+const STARTUP_ENTRY_OFFSET_Z = -3.2
+/** Movement actions that count as the player's first post-intro step. */
+const STARTUP_BRIEFING_DISMISS_ACTIONS = ['moveForward', 'moveBack', 'moveLeft', 'moveRight']
 
 // ---------------------------------------------------------------------------
 // Tick priority offsets.
@@ -377,6 +405,14 @@ export class StationViewController implements Tickable {
   onDeathFade: ((opacity: number) => void) | null = null
   /** Toggles the YOU DIED message + REWIND overlay after the message delay. */
   onDeathMessage: ((visible: boolean) => void) | null = null
+  /** Sends optional station startup briefing copy to the Vue HUD layer. */
+  onStationIntro: ((intro: StationIntroSpec | null) => void) | null = null
+  /** Briefing HUD opacity after player movement begins. */
+  onStationIntroOpacity: ((opacity: number) => void) | null = null
+  /** Black startup-fade opacity per tick (0 → 1, where 1 is black). */
+  onStartupFade: ((opacity: number) => void) | null = null
+  /** Toggles cinematic letterbox bars during the startup intro. */
+  onStartupLetterbox: ((visible: boolean) => void) | null = null
   /** Scratch vector reused for the per-frame entrance proximity check. */
   private readonly _proximityScratch = new Vector3()
   /** World-space look-at target for the active door interaction camera turn. */
@@ -404,6 +440,24 @@ export class StationViewController implements Tickable {
   private doorLookSequenceActive = false
   /** Seconds elapsed in the current door-look sequence. */
   private doorLookSequenceTime = 0
+  /** Optional intro copy loaded from the station layout. */
+  private stationIntro: StationIntroSpec | null = null
+  /** True after scene init while waiting for the global prelude handoff. */
+  private startupAwaitingPrelude = false
+  /** Prevents route/prelude edge cases from replaying the intro. */
+  private startupIntroStarted = false
+  /** True while player control is locked for the startup walk-in. */
+  private startupIntroActive = false
+  /** Seconds elapsed since the startup intro began. */
+  private startupIntroElapsed = 0
+  /** Entry walk start position, reused to avoid per-frame allocations. */
+  private readonly startupIntroStart = new Vector3()
+  /** Entry walk end position, equal to the normal station spawn. */
+  private readonly startupIntroEnd = new Vector3()
+  /** True while the startup briefing card is mounted in Vue. */
+  private startupBriefingVisible = false
+  /** Seconds since movement first dismissed the startup briefing, or null while held. */
+  private startupBriefingFadeElapsed: number | null = null
 
   /**
    * Mount the scene into the given container.
@@ -437,6 +491,7 @@ export class StationViewController implements Tickable {
 
     // Whole station from the authored layout fetched by id.
     const layout = await this.fetchLayout(stationId)
+    this.stationIntro = layout.intro ?? null
     this.station = await buildStation(layout, stationId)
     this.sceneManager.addToScene(this.station.group)
 
@@ -610,6 +665,7 @@ export class StationViewController implements Tickable {
     )
     this.fpsAudio.start()
     this.stationAudio.start()
+    this.startupAwaitingPrelude = this.stationIntro !== null
     this.gameLoop = new GameLoop(this.tickHandler)
     this.gameLoop.start()
   }
@@ -622,7 +678,23 @@ export class StationViewController implements Tickable {
   tick(dt: number): void {
     if (!this.playerController) return
 
+    if (this.startupAwaitingPrelude) {
+      this.tickExteriorSun(dt)
+      this.tickHologramMaterials(dt)
+      this.emitFpsTelemetry()
+      return
+    }
+
+    if (this.startupIntroActive) {
+      this.tickStartupIntro(dt)
+      this.tickExteriorSun(dt)
+      this.tickHologramMaterials(dt)
+      this.emitFpsTelemetry()
+      return
+    }
+
     this.updateEntrancePrompt(dt)
+    this.tickStartupBriefing(dt)
     this.tickDoorLookSequence(dt)
     this.tickExteriorSun(dt)
     this.tickHologramMaterials(dt)
@@ -664,6 +736,97 @@ export class StationViewController implements Tickable {
     })
     this.stationAudio.update(dt, { inHazard: this.inHazardThisFrame })
     this.tickPowerRestoreLights(dt)
+  }
+
+  /** Start the optional station startup intro after the global prelude finishes. */
+  startStartupIntro(): void {
+    if (this.startupIntroStarted) return
+    this.startupIntroStarted = true
+    this.startupAwaitingPrelude = false
+    if (!this.stationIntro || !this.playerController || !this.fpsCamera) {
+      this.onStartupFade?.(0)
+      this.onStartupLetterbox?.(false)
+      this.onStationIntro?.(null)
+      this.onStationIntroOpacity?.(1)
+      return
+    }
+
+    this.startupIntroActive = true
+    this.startupIntroElapsed = 0
+    this.startupBriefingVisible = true
+    this.startupBriefingFadeElapsed = null
+    this.startupIntroEnd.copy(this.spawnPos)
+    this.startupIntroStart
+      .copy(this.spawnPos)
+      .add(new Vector3(0, 0, STARTUP_ENTRY_OFFSET_Z))
+    this.playerController.group.position.copy(this.startupIntroStart)
+    this.fpsCamera.yaw = SPAWN_YAW
+    this.fpsCamera.pitch = 0
+    this.onStationIntro?.(this.stationIntro)
+    this.onStationIntroOpacity?.(1)
+    this.onStartupFade?.(1)
+    this.onStartupLetterbox?.(true)
+  }
+
+  /**
+   * Advance the non-interactive station startup intro, moving the player
+   * from the entrance offset into the normal spawn and broadcasting HUD state.
+   *
+   * @param dt - Frame delta in seconds.
+   */
+  private tickStartupIntro(dt: number): void {
+    if (!this.playerController || !this.fpsCamera) return
+    this.startupIntroElapsed += dt
+    const state = computeStationStartupIntroState(this.startupIntroElapsed, STARTUP_INTRO_TIMING)
+    this.playerController.group.position.lerpVectors(
+      this.startupIntroStart,
+      this.startupIntroEnd,
+      state.walkProgress,
+    )
+    this.fpsCamera.yaw = SPAWN_YAW
+    this.fpsCamera.pitch = 0
+    this.onStartupFade?.(state.fadeOpacity)
+    this.onStartupLetterbox?.(state.letterboxVisible)
+    if (state.hudVisible) this.onStationIntroOpacity?.(1)
+    if (!state.complete) return
+    this.startupIntroActive = false
+    this.playerController.group.position.copy(this.startupIntroEnd)
+    this.footstepBaselineCaptured = false
+    this.onStartupFade?.(0)
+    this.onStartupLetterbox?.(false)
+    this.onStationIntroOpacity?.(1)
+  }
+
+  /**
+   * Keep the startup briefing visible after the cinematic until the
+   * player begins walking, then fade it out over the configured duration.
+   *
+   * @param dt - Frame delta in seconds.
+   */
+  private tickStartupBriefing(dt: number): void {
+    if (!this.startupBriefingVisible || this.startupIntroActive) return
+    if (this.startupBriefingFadeElapsed === null) {
+      const moved = STARTUP_BRIEFING_DISMISS_ACTIONS.some((action) =>
+        this.inputManager?.isActionActive(action),
+      )
+      if (!moved) {
+        this.onStationIntroOpacity?.(1)
+        return
+      }
+      this.startupBriefingFadeElapsed = 0
+    }
+
+    this.startupBriefingFadeElapsed += dt
+    const state = computeStationBriefingFadeState(
+      this.startupBriefingFadeElapsed,
+      STARTUP_BRIEFING_FADE_TIMING,
+    )
+    this.onStationIntroOpacity?.(state.opacity)
+    if (!state.complete) return
+    this.startupBriefingVisible = false
+    this.startupBriefingFadeElapsed = null
+    this.onStationIntro?.(null)
+    this.onStationIntroOpacity?.(1)
   }
 
   /**
@@ -1515,6 +1678,9 @@ export class StationViewController implements Tickable {
    */
   restart(): void {
     if (!this.playerController) return
+    this.startupIntroActive = false
+    this.startupBriefingVisible = false
+    this.startupBriefingFadeElapsed = null
     this.playerController.replenish()
     this.playerController.group.position.copy(this.spawnPos)
     if (this.fpsCamera) this.fpsCamera.pitch = 0
@@ -1529,6 +1695,10 @@ export class StationViewController implements Tickable {
     this.clearMazePeek()
     // Bring breathing + footstep loops back online for the new run.
     this.fpsAudio.start()
+    this.onStartupFade?.(0)
+    this.onStartupLetterbox?.(false)
+    this.onStationIntro?.(null)
+    this.onStationIntroOpacity?.(1)
     this.onDamageFlash?.(0)
     this.onDeathFade?.(0)
     this.onDeathMessage?.(false)
@@ -1553,6 +1723,7 @@ export class StationViewController implements Tickable {
 
   /** Request pointer lock on the renderer canvas. */
   requestPointerLock(): void {
+    if (this.startupAwaitingPrelude || this.startupIntroActive) return
     this.pointerLock.requestLock()
   }
 

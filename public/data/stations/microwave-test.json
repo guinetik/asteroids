@@ -2,6 +2,15 @@
   "id": "microwave-test",
   "name": "Microwave Minigame Test Station",
   "theme": "derelict",
+  "intro": {
+    "title": "Abandoned Security Outpost",
+    "subtitle": "Blackbox Salvage Brief",
+    "body": [
+      "Auxiliary power is dead, but the vault still answers to its old access rules.",
+      "Recover the vault keycard. The protected floor grid is lethal; find the floor plan before crossing."
+    ],
+    "status": ["DERELICT", "AUX POWER OFFLINE", "VAULT SEALED"]
+  },
   "exteriorSun": {
     "pos": [200, 5, 14.048],
     "scale": 0.5

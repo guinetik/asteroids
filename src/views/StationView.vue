@@ -6,9 +6,11 @@ import FpsHud from '@/components/FpsHud.vue'
 import DamageFeedback from '@/components/DamageFeedback.vue'
 import DeathOverlay from '@/components/DeathOverlay.vue'
 import PickupToast from '@/components/PickupToast.vue'
+import ScrambleText from '@/components/shuttle-control/ScrambleText.vue'
 import type { PickupEntry } from '@/components/PickupToast.vue'
 import type { FpsTelemetry } from '@/lib/ui/fpsHudTypes'
 import type { Inventory } from '@/lib/inventory/types'
+import type { StationIntroSpec } from '@/lib/station/StationLayout'
 import { parseKeyPrompt } from '@/lib/ui/parseKeyPrompt'
 import { Timer } from '@/lib/Timer'
 import { uiAudio } from '@/audio/UiAudioDirector'
@@ -24,6 +26,10 @@ import { StationViewController } from './StationViewController'
 const DEFAULT_STATION_ID = 'yamada-titania'
 /** Pickup toast lifetime — long enough to register without lingering. */
 const PICKUP_LIFETIME_SEC = 2.4
+/** Delay before the first AR briefing text starts scrambling in. */
+const INTRO_REVEAL_INITIAL_DELAY_SEC = 0.15
+/** Delay between AR briefing text groups, in seconds. */
+const INTRO_REVEAL_STEP_DELAY_SEC = 0.38
 
 /**
  * Vault door's locked-state prompt while the player has no keycard.
@@ -42,6 +48,14 @@ const router = useRouter()
 const promptText = ref<string | null>(null)
 const parsedPrompt = computed(() =>
   promptText.value ? parseKeyPrompt(promptText.value) : null,
+)
+const stationIntro = ref<StationIntroSpec | null>(null)
+const stationIntroOpacity = ref(1)
+const stationIntroRevealStep = ref(0)
+const startupFade = ref(0)
+const startupLetterboxVisible = ref(false)
+const startupIntroActive = computed(
+  () => stationIntro.value !== null || startupFade.value > 0 || startupLetterboxVisible.value,
 )
 
 /**
@@ -75,11 +89,17 @@ const chestPreview = ref<{
 const inventoryFullWarning = ref<{ id: number; label: string } | null>(null)
 let inventoryFullTimer: ReturnType<typeof Timer.after> | null = null
 let inventoryFullSeq = 0
+let stationIntroRevealTimer: ReturnType<typeof Timer.sequence> | null = null
 
 /** Active pickup toasts. Each gets its own auto-removal timer. */
 const pickups = ref<PickupEntry[]>([])
 const pickupTimers = new Map<string, ReturnType<typeof Timer.after>>()
 let pickupSeq = 0
+
+/** Handoff fired when the global prelude has fully finished. */
+function handlePreludePlay(): void {
+  controller.startStartupIntro()
+}
 
 /**
  * Push a one-shot pickup toast that auto-removes after
@@ -246,6 +266,72 @@ controller.onPlayerDeath = () => {
   if (typeof document !== 'undefined' && document.pointerLockElement) {
     document.exitPointerLock()
   }
+}
+controller.onStationIntro = (intro) => {
+  stopStationIntroReveal()
+  stationIntro.value = intro
+  stationIntroRevealStep.value = 0
+  if (intro) startStationIntroReveal(intro)
+}
+controller.onStationIntroOpacity = (opacity) => {
+  stationIntroOpacity.value = opacity
+}
+controller.onStartupFade = (opacity) => {
+  startupFade.value = opacity
+}
+controller.onStartupLetterbox = (visible) => {
+  startupLetterboxVisible.value = visible
+}
+
+/**
+ * Start a staggered reveal for the AR briefing text groups. Uses
+ * {@link Timer.sequence} so the project stays off native timeout APIs.
+ *
+ * @param intro - Briefing copy currently mounted in the HUD.
+ */
+function startStationIntroReveal(intro: StationIntroSpec): void {
+  const groups =
+    INTRO_REVEAL_TITLE_STEP +
+    (intro.subtitle ? 1 : 0) +
+    intro.body.length +
+    (intro.status?.length ?? 0)
+  const steps = Array.from({ length: groups }, (_, index) => ({
+    delay: index === 0 ? INTRO_REVEAL_INITIAL_DELAY_SEC : INTRO_REVEAL_STEP_DELAY_SEC,
+    fn: () => {
+      stationIntroRevealStep.value = index + 1
+    },
+  }))
+  stationIntroRevealTimer = Timer.sequence(steps)
+}
+
+/** Cancel any pending AR briefing reveal timers. */
+function stopStationIntroReveal(): void {
+  if (stationIntroRevealTimer === null) return
+  Timer.cancel(stationIntroRevealTimer)
+  stationIntroRevealTimer = null
+}
+
+/** Reveal step for the briefing title. */
+const INTRO_REVEAL_TITLE_STEP = 2
+
+/**
+ * Compute the reveal step for a body line.
+ *
+ * @param index - Body line index.
+ * @returns Reveal step for the line.
+ */
+function introBodyRevealStep(index: number): number {
+  return INTRO_REVEAL_TITLE_STEP + (stationIntro.value?.subtitle ? 1 : 0) + 1 + index
+}
+
+/**
+ * Compute the reveal step for a status chip.
+ *
+ * @param index - Status chip index.
+ * @returns Reveal step for the chip.
+ */
+function introStatusRevealStep(index: number): number {
+  return introBodyRevealStep(stationIntro.value?.body.length ?? 0) + index
 }
 
 /**
@@ -421,6 +507,9 @@ function handleChestOpen(event: string): void {
 
 onMounted(async () => {
   if (!container.value) return
+  if (typeof window !== 'undefined') {
+    window.addEventListener('prelude-play', handlePreludePlay)
+  }
   // Snapshot the shuttle inventory before we touch anything. On death we
   // roll back to this so the run's loot is forfeit.
   inventorySnapshot = loadInventory()
@@ -434,12 +523,18 @@ onMounted(async () => {
     } else {
       window.dispatchEvent(new Event('prelude-play'))
     }
+  } else {
+    controller.startStartupIntro()
   }
 })
 
 onBeforeUnmount(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('prelude-play', handlePreludePlay)
+  }
   promptText.value = null
   chestPreview.value = null
+  stopStationIntroReveal()
   for (const handle of pickupTimers.values()) Timer.cancel(handle)
   pickupTimers.clear()
   controller.dispose()
@@ -453,22 +548,80 @@ function onPointerDown(): void {
 <template>
   <div ref="container" class="station-view" @pointerdown="onPointerDown" />
   <div class="helmet-visor" />
+  <div
+    class="station-letterbox station-letterbox--top"
+    :class="{ 'station-letterbox--hidden': !startupLetterboxVisible }"
+  />
+  <div
+    class="station-letterbox station-letterbox--bottom"
+    :class="{ 'station-letterbox--hidden': !startupLetterboxVisible }"
+  />
+  <transition name="station-intro">
+    <section
+      v-if="stationIntro"
+      class="station-intro-hud"
+      :style="{ opacity: stationIntroOpacity }"
+      aria-live="polite"
+    >
+      <div v-if="stationIntroRevealStep >= 1" class="station-intro-hud__eyebrow">
+        <ScrambleText text="STATION LINK ESTABLISHED" :play="stationIntroOpacity > 0.98" />
+      </div>
+      <h1 v-if="stationIntroRevealStep >= INTRO_REVEAL_TITLE_STEP" class="station-intro-hud__title">
+        <ScrambleText :text="stationIntro.title" :play="stationIntroOpacity > 0.98" />
+      </h1>
+      <p
+        v-if="stationIntro.subtitle && stationIntroRevealStep >= INTRO_REVEAL_TITLE_STEP + 1"
+        class="station-intro-hud__subtitle"
+      >
+        <ScrambleText :text="stationIntro.subtitle" :play="stationIntroOpacity > 0.98" />
+      </p>
+      <div class="station-intro-hud__body">
+        <template v-for="(line, index) in stationIntro.body" :key="line">
+          <p v-if="stationIntroRevealStep >= introBodyRevealStep(index)">
+            <ScrambleText
+              :text="line"
+              :play="stationIntroOpacity > 0.98"
+              :speed="24"
+              :stagger="1"
+            />
+          </p>
+        </template>
+      </div>
+      <div v-if="stationIntro.status?.length" class="station-intro-hud__status">
+        <template v-for="(tag, index) in stationIntro.status" :key="tag">
+          <span v-if="stationIntroRevealStep >= introStatusRevealStep(index)">{{ tag }}</span>
+        </template>
+      </div>
+    </section>
+  </transition>
   <KeyPrompt
-    v-if="parsedPrompt"
+    v-if="parsedPrompt && !startupIntroActive"
     :key-label="parsedPrompt.key"
     :action="parsedPrompt.label"
     tone="cyan"
     position="bottom"
   />
-  <FpsHud :telemetry="fpsTelemetry" variant="station" hide-movement-readout />
+  <transition name="station-fps-hud">
+    <FpsHud
+      v-if="!startupLetterboxVisible"
+      :telemetry="fpsTelemetry"
+      variant="station"
+      hide-movement-readout
+    />
+  </transition>
   <DamageFeedback :flash-opacity="damageFlash" :intensity="1.8" />
+  <div v-if="startupFade > 0" class="station-startup-fade" :style="{ opacity: startupFade }" />
   <div v-if="deathFade > 0" class="station-death-fade" :style="{ opacity: deathFade }" />
   <div v-if="deathMessageVisible" class="station-death-message">
     <span class="station-death-message__text">YOU DIED</span>
   </div>
   <DeathOverlay :visible="deathMessageVisible" cause="STATION HAZARD" @restart="handleRestart" />
   <PickupToast :pickups="pickups" />
-  <div v-if="chestPreview" class="station-chest-preview" :class="{ 'station-chest-preview--blocked': chestPreview.cannotCarry }">
+  <div
+    v-if="chestPreview && !startupIntroActive"
+    class="station-chest-preview"
+    :class="{ 'station-chest-preview--blocked': chestPreview.cannotCarry }"
+  >
     <img :src="chestPreview.iconUrl" :alt="chestPreview.label" class="station-chest-preview__icon" />
     <div class="station-chest-preview__text">
       <span class="station-chest-preview__label">{{ chestPreview.label }}</span>
@@ -493,6 +646,166 @@ function onPointerDown(): void {
 </template>
 
 <style>
+.station-letterbox {
+  position: fixed;
+  left: 0;
+  right: 0;
+  z-index: 40;
+  height: 12%;
+  background: black;
+  pointer-events: none;
+  transition: height 0.6s ease-in-out;
+}
+.station-letterbox--top {
+  top: 0;
+}
+.station-letterbox--bottom {
+  bottom: 0;
+}
+.station-letterbox--hidden {
+  height: 0;
+}
+.station-startup-fade {
+  position: fixed;
+  inset: 0;
+  z-index: 48;
+  background: black;
+  pointer-events: none;
+}
+.station-intro-hud {
+  position: fixed;
+  top: 16%;
+  left: max(1.4rem, env(safe-area-inset-left, 0px) + 1rem);
+  z-index: 45;
+  width: min(46rem, calc(100vw - 2.8rem));
+  padding: 1rem 1.15rem 1.05rem;
+  overflow: hidden;
+  border: 1px solid rgba(102, 255, 238, 0.62);
+  border-radius: 0.55rem;
+  background:
+    radial-gradient(circle at 18% 0%, rgba(102, 255, 238, 0.16), transparent 42%),
+    linear-gradient(135deg, rgba(3, 12, 24, 0.52), rgba(2, 6, 23, 0.34)),
+    repeating-linear-gradient(
+      180deg,
+      rgba(102, 255, 238, 0.045) 0,
+      rgba(102, 255, 238, 0.045) 1px,
+      transparent 1px,
+      transparent 7px
+    );
+  backdrop-filter: blur(12px) saturate(145%);
+  color: rgba(186, 230, 253, 0.92);
+  font-family: 'Datatype', ui-monospace, monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  pointer-events: none;
+  box-shadow:
+    0 0 0 1px rgba(2, 6, 23, 0.52),
+    0 0 28px rgba(102, 255, 238, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 0 24px rgba(102, 255, 238, 0.07);
+  transition: opacity 0.12s linear;
+}
+.station-intro-hud::before {
+  position: absolute;
+  inset: 0;
+  content: '';
+  pointer-events: none;
+  background:
+    linear-gradient(100deg, transparent 0%, rgba(255, 255, 255, 0.08) 38%, transparent 62%),
+    radial-gradient(circle at 100% 0%, rgba(125, 211, 252, 0.16), transparent 36%);
+  mix-blend-mode: screen;
+}
+.station-intro-hud::after {
+  position: absolute;
+  inset: 0.35rem;
+  content: '';
+  pointer-events: none;
+  border: 1px solid rgba(102, 255, 238, 0.18);
+  border-radius: 0.38rem;
+}
+.station-intro-hud__eyebrow {
+  position: relative;
+  margin-bottom: 0.5rem;
+  color: rgba(102, 255, 238, 0.9);
+  font-size: 0.7rem;
+  letter-spacing: 0.24em;
+}
+.station-intro-hud__title {
+  position: relative;
+  margin: 0;
+  color: rgba(240, 253, 250, 0.98);
+  font-size: clamp(1.4rem, 3vw, 2.35rem);
+  line-height: 1;
+  letter-spacing: 0.18em;
+}
+.station-intro-hud__subtitle {
+  position: relative;
+  margin: 0.5rem 0 0;
+  color: rgba(125, 211, 252, 0.92);
+  font-size: 0.82rem;
+  letter-spacing: 0.2em;
+}
+.station-intro-hud__body {
+  position: relative;
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+.station-intro-hud__body p {
+  margin: 0;
+  max-width: 31rem;
+  color: rgba(203, 213, 225, 0.92);
+  font-size: 0.8rem;
+  line-height: 1.55;
+  letter-spacing: 0.08em;
+  text-transform: none;
+}
+.station-intro-hud__status {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.95rem;
+}
+.station-intro-hud__status span {
+  padding: 0.28rem 0.45rem;
+  border: 1px solid rgba(255, 107, 107, 0.45);
+  background: rgba(127, 29, 29, 0.28);
+  color: rgba(252, 165, 165, 0.95);
+  font-size: 0.62rem;
+  letter-spacing: 0.18em;
+  animation: station-intro-chip-fade 0.35s ease both;
+}
+.station-intro-enter-active,
+.station-intro-leave-active {
+  transition:
+    opacity 0.35s ease,
+    transform 0.35s ease;
+}
+.station-intro-enter-from,
+.station-intro-leave-to {
+  opacity: 0;
+  transform: translateY(0.45rem);
+}
+.station-fps-hud-enter-active,
+.station-fps-hud-leave-active {
+  transition: opacity 0.6s ease;
+}
+.station-fps-hud-enter-from,
+.station-fps-hud-leave-to {
+  opacity: 0;
+}
+@keyframes station-intro-chip-fade {
+  from {
+    opacity: 0;
+    transform: translateY(0.2rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .station-buff-rack {
   position: fixed;
   bottom: max(1rem, env(safe-area-inset-bottom, 0px) + 0.5rem);

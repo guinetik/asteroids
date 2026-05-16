@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import yamadaRaw from '../../../../public/data/stations/yamada-titania.json'
 import ceresRaw from '../../../../public/data/stations/ceres-institute.json'
+import microwaveRaw from '../../../../public/data/stations/microwave-test.json'
 import { loadStationLayout } from '@/lib/station/loadStationLayout'
 import { resolveLayout } from '@/lib/station/StationLayout'
 
@@ -47,5 +48,27 @@ describe('Ceres Institute station layout', () => {
     expect(ids).toEqual(['c-e-straight', 'c-hub', 'c-w-straight', 'r-east', 'r-west'])
     const kinds = new Set(plan.map((p) => p.kind))
     expect(kinds).toEqual(new Set(['room', 'window', 'straight']))
+  })
+})
+
+describe('Microwave test station layout', () => {
+  it('preserves startup intro metadata for the station briefing HUD', () => {
+    const layout = loadStationLayout({
+      intro: microwaveRaw.intro,
+      rooms: [],
+      corridors: [],
+    })
+
+    expect(layout.intro?.title).toBe('Abandoned Security Outpost')
+    expect(layout.intro?.body).toContain(
+      'Recover the vault keycard. The protected floor grid is lethal; find the floor plan before crossing.',
+    )
+    expect(layout.intro?.status).toEqual(['DERELICT', 'AUX POWER OFFLINE', 'VAULT SEALED'])
+  })
+
+  it('stores heist briefing copy in the public microwave-test station data', () => {
+    expect(microwaveRaw.intro.title).toBe('Abandoned Security Outpost')
+    expect(microwaveRaw.intro.body.join(' ')).toContain('vault keycard')
+    expect(microwaveRaw.intro.body.join(' ')).not.toMatch(/microwave/i)
   })
 })
