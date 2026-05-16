@@ -898,6 +898,34 @@ function addSecureTileMarker(
  * @param used - Mutable tile-claim set, shared with authored props.
  * @returns The synthesised prop specs (one per resolved reward).
  */
+/**
+ * Pick a 90°-step yaw that faces a chest away from the nearest wall —
+ * i.e. toward the room centre. The chest's natural facing (with yaw=0)
+ * is the model's local -Z, so we rotate toward whichever cardinal axis
+ * points back at the origin.
+ *
+ * @param pos - Room-local XZ position relative to the room centre.
+ * @returns Yaw in 90° turns (0..3).
+ */
+function chestYawTurnsFacingCenter(pos: readonly [number, number]): 0 | 1 | 2 | 3 {
+  const [px, pz] = pos
+  if (Math.abs(px) >= Math.abs(pz)) {
+    return px > 0 ? 1 : 3
+  }
+  return pz > 0 ? 0 : 2
+}
+
+/**
+ * Synthesize chest {@link RoomPropSpec}s from a room's authored
+ * `rewards`. Each entry rolls its own item + quantity, picks a random
+ * tile (distinct from already-occupied tiles, the entrance, and tiles
+ * used by previous rewards), and assigns a stable `chest:open:<roomId>-<n>`
+ * event id so the UI layer can target it.
+ *
+ * @param room - Room owning the reward slots.
+ * @param used - Mutable tile-claim set, shared with authored props.
+ * @returns The synthesised prop specs (one per resolved reward).
+ */
 function synthesizeRewardChests(room: RoomSpec, used: Set<string>): RoomPropSpec[] {
   if (!room.rewards || room.rewards.length === 0) return []
   const out: RoomPropSpec[] = []
@@ -912,6 +940,7 @@ function synthesizeRewardChests(room: RoomSpec, used: Set<string>): RoomPropSpec
     out.push({
       kind: 'chest',
       pos: pick.pos,
+      yaw: chestYawTurnsFacingCenter(pick.pos),
       loot: { itemId: roll.itemId, qtyMin: roll.quantity, qtyMax: roll.quantity },
       interact: {
         prompt: 'F  Open Chest',

@@ -36,13 +36,13 @@ const DAMAGED_TILE_METALNESS_STRENGTH = 0.75
 /** Normal-map contribution strength for damaged floor/ceiling tiles. */
 const DAMAGED_TILE_NORMAL_SCALE = 1.2
 /** Color overlay strength for derelict metal doors. */
-const METAL_DOOR_COLOR_STRENGTH = 0
+const METAL_DOOR_COLOR_STRENGTH = 0.88
 /** Roughness blend strength for derelict metal doors. */
-const METAL_DOOR_ROUGHNESS_STRENGTH = 0.85
+const METAL_DOOR_ROUGHNESS_STRENGTH = 0.95
 /** Metalness blend strength for derelict metal doors. */
-const METAL_DOOR_METALNESS_STRENGTH = 0.12
+const METAL_DOOR_METALNESS_STRENGTH = 0.6
 /** Normal-map contribution strength for derelict metal doors. */
-const METAL_DOOR_NORMAL_SCALE = 1.15
+const METAL_DOOR_NORMAL_SCALE = 1.8
 
 /** PBR texture set used by the rusted wall overlay shader. */
 export interface RustedWallOverlayTextures {

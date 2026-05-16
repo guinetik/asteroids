@@ -13,6 +13,7 @@ import type { Router } from 'vue-router'
 import type { Tickable } from '@/lib/Tickable'
 import { AmbientLight, Color, DirectionalLight, MathUtils, Vector3 } from 'three'
 import { MultiToolController } from '@/three/MultiToolController'
+import { setActiveFpsCamera } from '@/three/cameraRegistry'
 import { MultiToolState } from '@/lib/fps/multiToolState'
 import { ProjectileSystem } from '@/lib/fps/projectileSystem'
 import { buildMultiToolConfig } from '@/lib/fps/buildMultiToolConfig'
@@ -559,6 +560,7 @@ export class StationViewController implements Tickable {
     this.sceneManager.addToScene(this.playerController.group)
     this.fpsCamera.setTarget(this.playerController.group)
     this.sceneManager.setActiveCamera(this.fpsCamera.camera)
+    setActiveFpsCamera(this.fpsCamera.camera)
     this.postProcessing = new StationPostProcessing(
       this.sceneManager.renderer,
       this.sceneManager.scene,
@@ -1788,6 +1790,7 @@ export class StationViewController implements Tickable {
   dispose(): void {
     DevConsole.unregister('StationView')
     this.roomSpecsById = null
+    setActiveFpsCamera(null)
     this.clearPrompt()
     if (this.powerRestoreSound) {
       this.powerRestoreSound.stop()

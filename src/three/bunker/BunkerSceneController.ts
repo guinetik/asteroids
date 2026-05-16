@@ -258,6 +258,12 @@ export class BunkerSceneController {
     this.chests[1].group.position.set(lootWidth / 2 - 4, 0, doorZ + lootDepth - 4)
     this.chests[0].group.scale.setScalar(BUNKER_CHEST_SCALE)
     this.chests[1].group.scale.setScalar(BUNKER_CHEST_SCALE)
+    // Loot room's back wall is along +Z relative to the bunker root, so
+    // the chests face -Z to point at the player. The model's base yaw
+    // already aligns its lock face to local -Z, but the bunker geometry
+    // is rotated 90° relative to the asset, so add a quarter turn here.
+    this.chests[0].group.rotation.y = -Math.PI / 2
+    this.chests[1].group.rotation.y = -Math.PI / 2
 
     this.enemyDoors = this.geometry.enemyRooms.map((room) => {
       const door = new BunkerDoorController(opts.tint)

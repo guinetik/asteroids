@@ -55,7 +55,7 @@ const stationIntroRevealStep = ref(0)
 const startupFade = ref(0)
 const startupLetterboxVisible = ref(false)
 const startupIntroActive = computed(
-  () => stationIntro.value !== null || startupFade.value > 0 || startupLetterboxVisible.value,
+  () => startupFade.value > 0 || startupLetterboxVisible.value,
 )
 
 /**

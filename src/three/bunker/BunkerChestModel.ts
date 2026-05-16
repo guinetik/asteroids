@@ -14,6 +14,8 @@
  */
 import * as THREE from 'three'
 import { loadGLB } from '@/three/loadGLB'
+import { getActiveFpsCamera } from '@/three/cameraRegistry'
+import { Timer } from '@/lib/Timer'
 
 /** Asset URL for the optimised chest GLB. */
 const CHEST_MODEL_URL = '/models/chest.glb'
@@ -39,18 +41,40 @@ const CHEST_COLOR_BOOST = 1.6
 const CHEST_EMISSIVE_FLOOR = 0x202020
 
 /**
- * Yaw applied to the loaded GLB so the chest's lock face aligns with the
- * group's local -Z axis (Three.js default "forward"). This lets call
- * sites reason about chest facing in the usual way without knowing the
- * Sketchfab asset's authoring orientation.
+ * Yaw applied to the loaded GLB so the chest's lock face aligns with
+ * the group's local -Z axis (Three.js default "forward"). Tuned so call
+ * sites can yaw the chest in the usual way without thinking about the
+ * asset's authoring orientation.
  */
-const CHEST_BASE_YAW = Math.PI / 2
+const CHEST_BASE_YAW = Math.PI
 
 /** Authored node names for the lid pieces that hinge open. */
 const COVER_NODE_NAMES = ['cover', 'cover_decals'] as const
 
 /** Seconds the lid takes to swing from closed to fully open. */
 const OPEN_DURATION_SECONDS = 0.5
+
+/** Seconds to wait after the lid finishes opening before the parcel jumps out. */
+const LOOT_GRAB_DELAY_SECONDS = 0.25
+
+/** Seconds the parcel takes to fly from the chest to the camera corner. */
+const LOOT_FLIGHT_SECONDS = 0.55
+
+/** Parcel size (cube edge length) before world scaling, in metres. */
+const LOOT_PARCEL_SIZE = 0.18
+
+/** Parcel base colour — matches the chest's painted white. */
+const LOOT_PARCEL_BASE_COLOR = 0xe8ecf2
+
+/** Parcel emissive trim colour — matches the looted cyan. */
+const LOOT_PARCEL_EMISSIVE_COLOR = 0x5ce7ff
+
+/**
+ * Camera-local target the parcel lerps to during flight. Bottom-left of
+ * frame, roughly at the inventory HUD anchor. `-Z` is forward (in
+ * front of the camera), `-X` is left, `-Y` is down.
+ */
+const LOOT_PARCEL_CAMERA_TARGET = new THREE.Vector3(-0.32, -0.22, -0.6)
 
 /**
  * Lid pose state: identity quaternion is the closed pose, captured
@@ -96,6 +120,11 @@ export class BunkerChestModel {
   private hingeTarget = 0
   private loaded = false
   private loadStarted = false
+  private parcel: THREE.Mesh | null = null
+  private parcelStartLocal: THREE.Vector3 | null = null
+  private parcelFlightProgress = 0
+  private parcelFlying = false
+  private parcelGrabTimer: number | null = null
 
   /** Build an empty wrapper and start streaming the GLB. */
   constructor() {
@@ -113,8 +142,8 @@ export class BunkerChestModel {
 
     const inner = await loadGLB(CHEST_MODEL_URL)
     this.inner = inner
-    inner.rotation.y = CHEST_BASE_YAW
     this.group.add(inner)
+    inner.rotation.y = CHEST_BASE_YAW
     this.captureLidHinges(inner)
     this.centerAndGround(inner)
     // Collect trim materials FIRST — brightenMaterials applies an
@@ -122,6 +151,7 @@ export class BunkerChestModel {
     // every material into the looted-recolour set.
     this.collectEmissiveMaterials(inner)
     this.brightenMaterials(inner)
+    this.spawnLootParcel()
 
     this.loaded = true
   }
@@ -138,20 +168,8 @@ export class BunkerChestModel {
    * @param dt - Frame delta in seconds.
    */
   tick(dt: number): void {
-    if (this.hinges.length === 0) return
-    if (this.hingeProgress === this.hingeTarget) return
-
-    const step = dt / OPEN_DURATION_SECONDS
-    if (this.hingeTarget > this.hingeProgress) {
-      this.hingeProgress = Math.min(this.hingeTarget, this.hingeProgress + step)
-    } else {
-      this.hingeProgress = Math.max(this.hingeTarget, this.hingeProgress - step)
-    }
-
-    const eased = smoothstep(this.hingeProgress)
-    for (const hinge of this.hinges) {
-      hinge.node.quaternion.slerpQuaternions(hinge.closed, hinge.open, eased)
-    }
+    this.tickHinge(dt)
+    this.tickParcelFlight(dt)
   }
 
   /**
@@ -168,10 +186,20 @@ export class BunkerChestModel {
       mat.color?.setHex(LOOTED_EMISSIVE_COLOR)
       mat.emissive.setHex(LOOTED_EMISSIVE_COLOR)
     }
+
+    this.parcelGrabTimer = Timer.after(OPEN_DURATION_SECONDS + LOOT_GRAB_DELAY_SECONDS, () => {
+      this.parcelGrabTimer = null
+      this.beginParcelFlight()
+    })
   }
 
   /** Release GPU resources. */
   dispose(): void {
+    if (this.parcelGrabTimer !== null) {
+      Timer.cancel(this.parcelGrabTimer)
+      this.parcelGrabTimer = null
+    }
+    this.disposeParcel()
     if (this.inner) {
       this.inner.traverse((child) => {
         if (child instanceof THREE.Mesh) {
@@ -242,6 +270,108 @@ export class BunkerChestModel {
         }
       }
     })
+  }
+
+  /**
+   * Build a small procedural parcel mesh and park it inside the chest
+   * body. While the lid is closed the parcel is hidden by the cover; on
+   * {@link open} it stays put during the lid swing, then flies to the
+   * camera corner via {@link beginParcelFlight}.
+   */
+  private spawnLootParcel(): void {
+    const geo = new THREE.BoxGeometry(LOOT_PARCEL_SIZE, LOOT_PARCEL_SIZE, LOOT_PARCEL_SIZE)
+    const mat = new THREE.MeshStandardMaterial({
+      color: LOOT_PARCEL_BASE_COLOR,
+      emissive: LOOT_PARCEL_EMISSIVE_COLOR,
+      emissiveIntensity: 0.9,
+      roughness: 0.35,
+      metalness: 0.05,
+    })
+    const parcel = new THREE.Mesh(geo, mat)
+    // Sit the parcel on the chest's interior floor (group origin is at
+    // the chest base after centerAndGround). Slight upward offset so
+    // its bottom face rests on the floor rather than clipping it.
+    parcel.position.set(0, LOOT_PARCEL_SIZE * 0.5 + 0.05, 0)
+    parcel.castShadow = false
+    parcel.receiveShadow = false
+    this.group.add(parcel)
+    this.parcel = parcel
+  }
+
+  /**
+   * Snapshot the parcel's current world position, reparent it onto the
+   * active FPS camera so its local-space target tracks the screen-space
+   * corner, and arm the per-frame flight tween.
+   *
+   * Falls back to a silent dispose when no camera is registered (e.g.
+   * headless tests) so the parcel doesn't linger inside the chest.
+   */
+  private beginParcelFlight(): void {
+    if (!this.parcel) return
+    const camera = getActiveFpsCamera()
+    if (!camera) {
+      this.disposeParcel()
+      return
+    }
+    // `attach` preserves the parcel's world transform when reparenting,
+    // so the camera-local start position reads correctly for lerping.
+    camera.attach(this.parcel)
+    this.parcelStartLocal = this.parcel.position.clone()
+    this.parcelFlightProgress = 0
+    this.parcelFlying = true
+  }
+
+  /**
+   * Advance the parcel flight tween in camera-local space and scale it
+   * to zero on landing. Disposal happens on completion so the chest
+   * stays open without a leftover parcel inside.
+   */
+  private tickParcelFlight(dt: number): void {
+    if (!this.parcelFlying || !this.parcel || !this.parcelStartLocal) return
+
+    this.parcelFlightProgress = Math.min(1, this.parcelFlightProgress + dt / LOOT_FLIGHT_SECONDS)
+    const eased = smoothstep(this.parcelFlightProgress)
+    this.parcel.position.lerpVectors(this.parcelStartLocal, LOOT_PARCEL_CAMERA_TARGET, eased)
+    const scale = 1 - eased
+    this.parcel.scale.setScalar(Math.max(0, scale))
+
+    if (this.parcelFlightProgress >= 1) {
+      this.parcelFlying = false
+      this.disposeParcel()
+    }
+  }
+
+  /**
+   * Drive the lid hinge each tick. Pulled out of {@link tick} so the
+   * parcel flight has its own tween in the same update.
+   */
+  private tickHinge(dt: number): void {
+    if (this.hinges.length === 0) return
+    if (this.hingeProgress === this.hingeTarget) return
+
+    const step = dt / OPEN_DURATION_SECONDS
+    if (this.hingeTarget > this.hingeProgress) {
+      this.hingeProgress = Math.min(this.hingeTarget, this.hingeProgress + step)
+    } else {
+      this.hingeProgress = Math.max(this.hingeTarget, this.hingeProgress - step)
+    }
+
+    const eased = smoothstep(this.hingeProgress)
+    for (const hinge of this.hinges) {
+      hinge.node.quaternion.slerpQuaternions(hinge.closed, hinge.open, eased)
+    }
+  }
+
+  /** Remove the parcel from its current parent and release GPU resources. */
+  private disposeParcel(): void {
+    if (!this.parcel) return
+    this.parcel.removeFromParent()
+    this.parcel.geometry.dispose()
+    const mats = Array.isArray(this.parcel.material) ? this.parcel.material : [this.parcel.material]
+    for (const m of mats) if (m instanceof THREE.Material) m.dispose()
+    this.parcel = null
+    this.parcelStartLocal = null
+    this.parcelFlying = false
   }
 
   /**

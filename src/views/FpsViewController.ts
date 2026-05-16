@@ -28,6 +28,7 @@ import type { SurfaceFeatures } from '@/lib/asteroids/types'
 import { AmbientLight, DirectionalLight, Color, Vector3 } from 'three'
 import { Heightmap } from '@/lib/terrain/heightmap'
 import { MultiToolController } from '@/three/MultiToolController'
+import { setActiveFpsCamera } from '@/three/cameraRegistry'
 import { MultiToolState } from '@/lib/fps/multiToolState'
 import { ProjectileSystem, SCIENCE_ENEMY_HEAL_AMOUNT } from '@/lib/fps/projectileSystem'
 import { ParticleEmitter } from '@/three/ParticleEmitter'
@@ -229,6 +230,7 @@ export class FpsViewController implements Tickable {
 
     // Use FpsCamera's perspective camera for rendering
     this.sceneManager.setActiveCamera(this.fpsCamera.camera)
+    setActiveFpsCamera(this.fpsCamera.camera)
 
     // Multi-tool — FPS weapon fixture on camera
     this.multiTool = new MultiToolController()
@@ -863,6 +865,7 @@ export class FpsViewController implements Tickable {
 
   dispose(): void {
     DevConsole.unregister('FpsView')
+    setActiveFpsCamera(null)
     this.gameLoop?.stop()
     for (const dummy of this.targetDummies) dummy.dispose()
     this.fpsHostageController?.dispose()
