@@ -16,7 +16,6 @@
       },
       "devDependencies": {
         "@gltf-transform/cli": "^4.3.0",
-        "@gltf-transform/core": "^4.3.0",
         "@gltf-transform/functions": "^4.3.0",
         "@tailwindcss/postcss": "^4.2.2",
         "@tailwindcss/vite": "^4.2.2",

@@ -15,6 +15,9 @@
 /** Archetypes that use a suspension cylinder instead of the data terminal. */
 const YAMADA_CYLINDER_ARCHETYPES: ReadonlySet<string> = new Set(['bunker-protect', 'bunker-extract'])
 
+/** Uniform scale applied to bunker loot chests — native GLB is ~0.64 m wide. */
+const BUNKER_CHEST_SCALE = 3.5
+
 /**
  * Whether the given archetype string uses a suspension cylinder.
  *
@@ -253,10 +256,8 @@ export class BunkerSceneController {
     // Chests against the left and right walls
     this.chests[0].group.position.set(-lootWidth / 2 + 4, 0, doorZ + lootDepth - 4)
     this.chests[1].group.position.set(lootWidth / 2 - 4, 0, doorZ + lootDepth - 4)
-
-    // Rotate chests to be parallel to the walls (facing inward)
-    this.chests[0].group.rotation.y = Math.PI / 2
-    this.chests[1].group.rotation.y = -Math.PI / 2
+    this.chests[0].group.scale.setScalar(BUNKER_CHEST_SCALE)
+    this.chests[1].group.scale.setScalar(BUNKER_CHEST_SCALE)
 
     this.enemyDoors = this.geometry.enemyRooms.map((room) => {
       const door = new BunkerDoorController(opts.tint)

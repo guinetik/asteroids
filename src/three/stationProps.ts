@@ -44,7 +44,7 @@ import type { RewardSpec } from '@/lib/station/StationLayout'
 const TERMINAL_INTERIOR_SCALE = 1
 
 /** Uniform scale applied to `BunkerChestModel` when used as a station prop. */
-const CHEST_INTERIOR_SCALE = 0.35
+const CHEST_INTERIOR_SCALE = 2.2
 
 /**
  * Default uniform scale for {@link StationPowerGenModel}. Native GLB is
@@ -83,10 +83,10 @@ const TABLE_HALF_X = 0.89
 /** Half-extent along Z for the table's collision footprint. */
 const TABLE_HALF_Z = 0.95
 
-/** Half-extents of the crate body at native scale (matches `DepositCrateModel`). */
-const CHEST_NATIVE_HALF_WIDTH = 2.3
-/** Half-depth of the crate body at native scale. */
-const CHEST_NATIVE_HALF_DEPTH = 1.5
+/** Half-extents of the chest GLB at native scale (`/models/chest.glb` bbox). */
+const CHEST_NATIVE_HALF_WIDTH = 0.32
+/** Half-depth of the chest GLB at native scale. */
+const CHEST_NATIVE_HALF_DEPTH = 0.19
 
 /** Terminal screen colour per status. Drives the emissive panel hex. */
 const TERMINAL_STATUS_COLOR: Readonly<Record<PropStatus, number>> = {

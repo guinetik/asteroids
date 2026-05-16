@@ -159,7 +159,8 @@
             "event": "terminal:use:r-power"
           }
         }
-      ]
+      ],
+      "rewards": [{ "type": "tradeable", "qtyMin": 5, "qtyMax": 10 }]
     },
     {
       "id": "r-vault",
