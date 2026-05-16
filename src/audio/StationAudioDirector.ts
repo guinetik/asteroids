@@ -21,6 +21,7 @@
 
 import { useAudio } from './useAudio'
 import type { AudioPlaybackHandle } from './audioTypes'
+import { playPowerCellActivationNote } from './proceduralAudio'
 
 /** Per-frame state pushed by the host view. */
 export interface StationAudioState {
@@ -95,6 +96,21 @@ export class StationAudioDirector {
   /** One-shot beep fired when the player presses F on a station prop. */
   notifyTerminalInteract(): void {
     this.audio.play('sfx.terminal.interact')
+  }
+
+  /**
+   * Melodic progress cue fired when a generator fuel cell activates.
+   *
+   * @param activated - Cells activated so far, 1-based after this activation.
+   * @param total - Total cells needed for the reboot.
+   */
+  notifyPowerCellActivated(activated: number, total: number): void {
+    playPowerCellActivationNote(activated, total)
+  }
+
+  /** One-shot reboot swell fired when station power comes online. */
+  notifyPowerRestored(): AudioPlaybackHandle {
+    return this.audio.play('sfx.station.reboot')
   }
 
   /**
