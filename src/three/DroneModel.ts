@@ -64,12 +64,28 @@ const DRONE_ALERT_EMISSIVE_COLOR = new THREE.Color(0xff3a18)
 const DRONE_ALERT_EMISSIVE_BOOST = 0.8
 
 /**
- * Local-space forward axis of the drone's face (3-red-eye panel) inside
- * the inner GLB scene. The model is authored with the face pointing
- * along local -Z after the standard Sketchfab orientation. If the drone
- * visually fires from the back of its head, flip this to
- * `new THREE.Vector3(0, 0, -1)` and the muzzle/orientation logic will
- * follow automatically.
+ * Yaw correction (radians) applied AFTER computing the aim-toward-player
+ * yaw, so the visible 3-red-eye face ends up pointing at the player.
+ * The merged drone GLB has no skeleton and no naming hints — the face
+ * sits on whichever local axis the artist chose. Rather than guess the
+ * axis vector, we use a single yaw offset the player can dial:
+ *
+ * - `0`         — face is on local +Z
+ * - `Math.PI`   — face is on local -Z
+ * - `Math.PI/2` — face is on local +X (try this when ±Z look wrong)
+ * - `-Math.PI/2`— face is on local -X
+ *
+ * If the drone faces 90° off when shooting, add or subtract `Math.PI/2`
+ * until it lines up. If it's exactly 180° off, add `Math.PI`.
+ */
+const DRONE_FACE_YAW_OFFSET = Math.PI / 2
+
+/**
+ * Unit forward vector used by {@link attachMuzzleFlash} to position the
+ * additive flash quad along the face. Always local +Z; the muzzle flash
+ * rotates with the wrapper group, and the wrapper yaw already bakes in
+ * {@link DRONE_FACE_YAW_OFFSET}, so the flash naturally lands in front
+ * of the face regardless of which axis the artist picked.
  */
 const DRONE_FACE_FORWARD = new THREE.Vector3(0, 0, 1)
 
@@ -187,6 +203,9 @@ export class DroneModel {
   /** Hover bob offset (world metres) applied each tick to inner Y. */
   private hoverBobOffsetY = 0
 
+  /** Inner Y baseline captured after centering — bob adds on top of this. */
+  private innerBaseY = 0
+
   /** True once the death tumble started. */
   private dying = false
 
@@ -249,6 +268,16 @@ export class DroneModel {
         const scale = DRONE_TARGET_DIAMETER_METERS / longest
         inner.scale.setScalar(scale)
       }
+      // Re-measure under the new scale and recenter so the wrapper's Y
+      // axis runs through the model's centroid. Without this the GLB's
+      // authored translation makes the body swing in an arc when the
+      // wrapper yaws to face the player.
+      inner.updateMatrixWorld(true)
+      const scaled = new THREE.Box3().setFromObject(inner)
+      const center = new THREE.Vector3()
+      scaled.getCenter(center)
+      inner.position.sub(center)
+      this.innerBaseY = inner.position.y
     }
 
     // Capture every standard material so the hit/alert/destruction
@@ -461,14 +490,11 @@ export class DroneModel {
     const dx = this.aimTargetX - this.group.position.x
     const dz = this.aimTargetZ - this.group.position.z
     if (dx === 0 && dz === 0) return
-    // The model's authored forward axis is DRONE_FACE_FORWARD. atan2
-    // on (-x, -z) is the standard "yaw a local -Z forward to face a
-    // world target" computation; flip the sign when the face-forward
-    // constant is flipped to local +Z.
-    const targetYaw =
-      DRONE_FACE_FORWARD.z >= 0
-        ? Math.atan2(dx, dz)
-        : Math.atan2(-dx, -dz)
+    // `atan2(dx, dz)` is the yaw that aligns local +Z with the world
+    // vector (dx, dz). DRONE_FACE_YAW_OFFSET adds the per-model
+    // correction so the actual face axis (whichever local direction
+    // the artist authored) ends up pointing at the player.
+    const targetYaw = Math.atan2(dx, dz) + DRONE_FACE_YAW_OFFSET
     // Damp on a continuous angle; unwrap to avoid the ±π discontinuity.
     let diff = targetYaw - this.currentYaw
     while (diff > Math.PI) diff -= Math.PI * 2
@@ -489,7 +515,7 @@ export class DroneModel {
    */
   private tickHoverBob(): void {
     if (!this.inner) return
-    this.inner.position.y = this.hoverBobOffsetY
+    this.inner.position.y = this.innerBaseY + this.hoverBobOffsetY
   }
 
   /**

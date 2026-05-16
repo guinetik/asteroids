@@ -25,6 +25,7 @@
       "height": 2,
       "anchor": { "x": 0, "z": 15.305 },
       "yaw": 0,
+      "drones": true,
       "entrances": [
         {
           "side": "S",
@@ -110,6 +111,7 @@
       "height": 2,
       "anchor": { "x": 19.172, "z": 15.305 },
       "yaw": 0,
+      "drones": true,
       "hazard": "lava",
       "entrances": [
         {
@@ -143,6 +145,7 @@
       "height": 2,
       "anchor": { "x": -7.86, "z": 1.925 },
       "yaw": 0,
+      "drones": true,
       "entrances": [
         {
           "side": "E",
