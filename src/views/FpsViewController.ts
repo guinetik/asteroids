@@ -49,6 +49,7 @@ import { FpsHostageController } from '@/three/FpsHostageController'
 import { VirusModel } from '@/three/VirusModel'
 import { FpsAudioDirector } from '@/audio/FpsAudioDirector'
 import { FpsPointerLockSession } from '@/lib/fps/FpsPointerLockSession'
+import { applyKeyboardLook } from '@/lib/fps/keyboardLook'
 import {
   computeKnockbackAwayFromSource,
   computeRelativeDamageAngle,
@@ -173,6 +174,13 @@ export class FpsViewController implements Tickable {
   onDamageDirection: ((angle: number) => void) | null = null
 
   private damageFlashTimer = 0
+
+  /**
+   * Persistent ADS state driven by the keyboard `adsToggle` action.
+   * OR'd with right-mouse hold when feeding {@link MultiToolState.setAiming}
+   * so either input source can hold the player in ADS independently.
+   */
+  private adsKeyboardToggled = false
 
   /**
    * Single owner for all FPS player-movement audio (breathing, floating,
@@ -555,7 +563,19 @@ export class FpsViewController implements Tickable {
     this.gameLoop.start()
   }
 
-  tick(_dt: number): void {
+  tick(dt: number): void {
+    // Keyboard look (arrow keys) — trackpad-friendly camera control that
+    // layers on top of mouse look; both feed FpsCamera and combined input
+    // simply sums. ADS slows the rate for precise aim.
+    if (this.inputManager && this.fpsCamera) {
+      applyKeyboardLook(
+        this.inputManager,
+        this.fpsCamera,
+        dt,
+        this.multiToolState?.aiming ?? false,
+      )
+    }
+
     // --- Tool keybinds ---
     if (this.inputManager && this.multiToolState) {
       if (this.inputManager.wasActionPressed('toolDrill')) this.multiToolState.setMode('drill')
@@ -563,11 +583,20 @@ export class FpsViewController implements Tickable {
       if (this.inputManager.wasActionPressed('toolScience')) this.multiToolState.setMode('science')
 
       // Feed mouse state + speed to tool
-      this.multiToolState.setAiming(this.pointerLock.isRightMouseDown)
-      this.multiToolState.setInput(
-        this.pointerLock.isLeftMouseDown,
-        this.pointerLock.consumeLeftMouseJustPressed(),
+      if (this.inputManager.wasActionPressed('adsToggle')) {
+        this.adsKeyboardToggled = !this.adsKeyboardToggled
+      }
+      this.multiToolState.setAiming(
+        this.pointerLock.isRightMouseDown || this.adsKeyboardToggled,
       )
+      // OR the keyboard `fire` action into the mouse state so Enter shoots
+      // alongside left mouse — trackpad fallback for laptops.
+      const fireHeld =
+        this.pointerLock.isLeftMouseDown || this.inputManager.isActionActive('fire')
+      const fireEdge =
+        this.pointerLock.consumeLeftMouseJustPressed() ||
+        this.inputManager.wasActionPressed('fire')
+      this.multiToolState.setInput(fireHeld, fireEdge)
       this.multiToolState.setSpeed(this.playerController?.speed ?? 0)
     }
 
@@ -801,7 +830,7 @@ export class FpsViewController implements Tickable {
     }
 
     // --- Damage flash decay ---
-    const flash = stepDamageFlash(this.damageFlashTimer, _dt, DAMAGE_FLASH_DURATION)
+    const flash = stepDamageFlash(this.damageFlashTimer, dt, DAMAGE_FLASH_DURATION)
     this.damageFlashTimer = flash.timer
     this.onDamageFlash?.(flash.opacity)
 
@@ -811,7 +840,7 @@ export class FpsViewController implements Tickable {
     // run-breath loop doesn't chatter while the player holds Shift through
     // stamina exhaustion.
     if (this.playerController) {
-      this.fpsAudio.update(_dt, {
+      this.fpsAudio.update(dt, {
         grounded: this.playerController.grounded,
         sprinting: this.playerController.isSprinting,
         speed: this.playerController.speed,

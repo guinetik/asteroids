@@ -86,6 +86,7 @@ import {
 import { generateMapCanvas } from '@/lib/terrain/mapColors'
 import type { MiniGame, MiniGameStep } from '@/lib/minigame/MiniGame'
 import { buildFpsPlayerConfig } from '@/lib/fps/buildFpsPlayerConfig'
+import { applyKeyboardLook } from '@/lib/fps/keyboardLook'
 import { buildMultiToolConfig } from '@/lib/fps/buildMultiToolConfig'
 import { SurfaceRockController } from '@/three/controllers/SurfaceRockController'
 import { createEnemyVisualWarmup, type EnemyVisualWarmup } from '@/three/EnemyVisualWarmup'
@@ -831,6 +832,13 @@ export class LevelViewController implements Tickable {
 
   /** Seconds remaining on the active damage flash. Driven by `tick`. */
   private damageFlashTimer = 0
+
+  /**
+   * Persistent ADS state driven by the keyboard `adsToggle` action.
+   * OR'd with right-mouse hold when feeding `MultiToolState.setAiming`
+   * so either input source can hold the player in ADS independently.
+   */
+  private adsKeyboardToggled = false
 
   /** When true, successful exfil grants CR and clears persisted active shuttle mission. */
   private persistShuttleMissionRewards = false
@@ -3105,6 +3113,23 @@ export class LevelViewController implements Tickable {
 
   /** Per-frame EVA logic — tool input, camera bob, aiming. */
   private tickEva(dt: number): void {
+    // Arrow-key look (trackpad-friendly). Skipped while dead so the death
+    // presentation owns the camera. Mouse look still works in parallel.
+    // ADS slows the rate for precise aim.
+    if (
+      this.inputManager &&
+      this.fpsCamera &&
+      this.playerController &&
+      !this.playerController.isDead
+    ) {
+      applyKeyboardLook(
+        this.inputManager,
+        this.fpsCamera,
+        dt,
+        this.multiToolState?.aiming ?? false,
+      )
+    }
+
     if (this.dropSystem && this.playerController) {
       const pos = this.playerController.group.position
       this.dropSystem.tick(dt, { x: pos.x, y: pos.y, z: pos.z })
@@ -3116,11 +3141,20 @@ export class LevelViewController implements Tickable {
       if (this.inputManager.wasActionPressed('toolWeapon')) this.multiToolState.setMode('weapon')
       if (this.inputManager.wasActionPressed('toolScience')) this.multiToolState.setMode('science')
 
-      this.multiToolState.setAiming(this.pointerLock.isRightMouseDown)
-      this.multiToolState.setInput(
-        this.pointerLock.isLeftMouseDown,
-        this.pointerLock.consumeLeftMouseJustPressed(),
+      if (this.inputManager.wasActionPressed('adsToggle')) {
+        this.adsKeyboardToggled = !this.adsKeyboardToggled
+      }
+      this.multiToolState.setAiming(
+        this.pointerLock.isRightMouseDown || this.adsKeyboardToggled,
       )
+      // OR the keyboard `fire` action into the mouse state so Enter shoots
+      // alongside left mouse — trackpad fallback for laptops.
+      const fireHeld =
+        this.pointerLock.isLeftMouseDown || this.inputManager.isActionActive('fire')
+      const fireEdge =
+        this.pointerLock.consumeLeftMouseJustPressed() ||
+        this.inputManager.wasActionPressed('fire')
+      this.multiToolState.setInput(fireHeld, fireEdge)
       this.multiToolState.setSpeed(this.playerController?.speed ?? 0)
     }
 

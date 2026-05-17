@@ -70,6 +70,20 @@ export const FPS_BINDINGS: Record<string, string[]> = {
   toolDrill: ['Digit1'],
   toolWeapon: ['Digit2'],
   toolScience: ['Digit3'],
+  // Arrow keys drive keyboard look — useful on a laptop trackpad where
+  // mouse look is awkward. Mouse and keyboard look both feed FpsCamera
+  // and can be used together.
+  lookUp: ['ArrowUp'],
+  lookDown: ['ArrowDown'],
+  lookLeft: ['ArrowLeft'],
+  lookRight: ['ArrowRight'],
+  // Keyboard fire — trackpad-friendly alternative to left mouse button.
+  // OR'd with the mouse state so either source can shoot.
+  fire: ['Enter'],
+  // Keyboard ADS toggle — trackpad-friendly alternative to holding right
+  // mouse. Tap once to aim, tap again to un-aim. Survives mouse release
+  // (a toggle that survives mouse release is the whole point).
+  adsToggle: ['KeyR'],
 }
 
 /** Level bindings — combines lander + FPS + interact (F key). */
@@ -101,6 +115,16 @@ export const LEVEL_BINDINGS: Record<string, string[]> = {
   skipCinematic: ['Escape'],
   toggleMap: ['KeyM'],
   toggleInventory: ['KeyB'],
+  // Arrow-key look (trackpad-friendly camera) — see FPS_BINDINGS.
+  lookUp: ['ArrowUp'],
+  lookDown: ['ArrowDown'],
+  lookLeft: ['ArrowLeft'],
+  lookRight: ['ArrowRight'],
+  // Keyboard fire — see FPS_BINDINGS.
+  fire: ['Enter'],
+  // Keyboard ADS toggle — see FPS_BINDINGS. Overlaps with the lander's
+  // `resetCamera` on the same key; each controller reads its own action.
+  adsToggle: ['KeyR'],
 }
 
 /** Habitat interior key bindings — FPS walk + interact. */
@@ -111,4 +135,9 @@ export const HABITAT_BINDINGS: Record<string, string[]> = {
   moveRight: ['KeyD'],
   interact: ['KeyF'],
   exitHabitat: ['KeyH'],
+  // Arrow-key look (trackpad-friendly camera) — see FPS_BINDINGS.
+  lookUp: ['ArrowUp'],
+  lookDown: ['ArrowDown'],
+  lookLeft: ['ArrowLeft'],
+  lookRight: ['ArrowRight'],
 }

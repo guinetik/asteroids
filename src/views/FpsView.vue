@@ -193,6 +193,15 @@ const telemetry = reactive<FpsTelemetry>({
  * time the user hits PLAY all the listeners are already in place.
  */
 onMounted(() => {
+  // The /fps sandbox predates the index.html prelude minigame and has its
+  // own pre-flight "Play" overlay (audio unlock + pointer-lock gesture),
+  // so we dismiss the prelude container immediately rather than waiting on
+  // its PLAY button. Without this, the prelude sits in its loading state
+  // forever (it only reveals PLAY after `Prelude.ready()` is called) and
+  // covers the FPS overlay at z-index 9999.
+  if (typeof window !== 'undefined' && window.Prelude?.isActive?.()) {
+    window.Prelude.play()
+  }
   viewController.onTelemetry = (t) => {
     Object.assign(telemetry, t)
   }

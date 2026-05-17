@@ -292,6 +292,23 @@ export class FpsCamera implements Tickable {
   }
 
   /**
+   * Apply a look delta directly in radians, bypassing mouse sensitivity.
+   * Used by keyboard look (arrow keys) so callers can specify an angular
+   * rate without going through the per-pixel mouse scale.
+   *
+   * Sign convention matches {@link applyMouseDelta}: positive `yawRad`
+   * turns the camera right; positive `pitchRad` tilts it down.
+   *
+   * @param yawRad - Yaw delta in radians (positive = look right).
+   * @param pitchRad - Pitch delta in radians (positive = look down).
+   */
+  applyLookDelta(yawRad: number, pitchRad: number): void {
+    this.yaw -= yawRad
+    this.pitch -= pitchRad
+    this.pitch = Math.max(-this.config.pitchClamp, Math.min(this.config.pitchClamp, this.pitch))
+  }
+
+  /**
    * Full 3D camera forward (pitch included). Allocation-free — fills `out`.
    *
    * @param out - Vector to write into

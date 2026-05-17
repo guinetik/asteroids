@@ -19,6 +19,7 @@ import { HABITAT_BINDINGS } from '@/lib/defaultBindings'
 import { BOWL_SERVINGS_MAX, LITTER_POLLUTION_MAX } from '@/lib/player/profile'
 import { loadGLB } from '@/three/loadGLB'
 import { FootstepSystem } from '@/lib/fps/footstepSystem'
+import { applyKeyboardLook } from '@/lib/fps/keyboardLook'
 import {
   CatController,
   type CatNeedsBridge,
@@ -2044,6 +2045,10 @@ export class HabitatInteriorScene {
       !this.hatchExitActive &&
       !arcadeEngaged
     ) {
+      // Arrow-key look (trackpad-friendly). Same gating as tickMovement so
+      // scripted camera sequences and the arcade-engaged camera aren't
+      // fought by held arrow keys.
+      applyKeyboardLook(this.inputManager, this.fpsCamera, dt)
       this.tickMovement(dt)
     }
     this.tickInteraction()

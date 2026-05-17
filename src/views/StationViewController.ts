@@ -39,6 +39,7 @@ import { FpsPlayerController } from '@/three/FpsPlayerController'
 import { FpsAudioDirector } from '@/audio/FpsAudioDirector'
 import { StationAudioDirector } from '@/audio/StationAudioDirector'
 import { FpsPointerLockSession } from '@/lib/fps/FpsPointerLockSession'
+import { applyKeyboardLook } from '@/lib/fps/keyboardLook'
 import { buildFpsPlayerConfig } from '@/lib/fps/buildFpsPlayerConfig'
 import { StationCollider, type StationRect } from '@/lib/station/StationCollider'
 import {
@@ -429,6 +430,12 @@ export class StationViewController implements Tickable {
   private readonly suppressedEntrancePromptEvents = new Set<string>()
   /** Seconds the red vignette has left before decaying back to zero. */
   private damageFlashTimer = 0
+  /**
+   * Persistent ADS state driven by the keyboard `adsToggle` action.
+   * OR'd with right-mouse hold when feeding `MultiToolState.setAiming`
+   * so either input source can hold the player in ADS independently.
+   */
+  private adsKeyboardToggled = false
   /** Seconds since the player's HP hit zero; drives the death animation. */
   private deathStateTime = 0
   /** Player X last frame — used to compute realised speed for the audio dir. */
@@ -764,6 +771,7 @@ export class StationViewController implements Tickable {
       return
     }
 
+    this.tickKeyboardLook(dt)
     this.updateEntrancePrompt(dt)
     this.tickStartupBriefing(dt)
     this.tickDoorLookSequence(dt)
@@ -1397,6 +1405,24 @@ export class StationViewController implements Tickable {
   }
 
   /**
+   * Apply arrow-key keyboard look. Skipped while the door-look sequence
+   * owns the camera or the player is dead so we don't fight scripted
+   * camera motion / the death presentation.
+   *
+   * @param dt - Frame delta in seconds.
+   */
+  private tickKeyboardLook(dt: number): void {
+    if (!this.inputManager || !this.fpsCamera || !this.playerController) return
+    if (this.doorLookSequenceActive || this.playerController.isDead) return
+    applyKeyboardLook(
+      this.inputManager,
+      this.fpsCamera,
+      dt,
+      this.multiToolState?.aiming ?? false,
+    )
+  }
+
+  /**
    * Advance the door-look camera turn.
    *
    * @param dt - Frame delta in seconds.
@@ -1716,11 +1742,20 @@ export class StationViewController implements Tickable {
     if (this.inputManager.wasActionPressed('toolWeapon')) this.multiToolState.setMode('weapon')
     if (this.inputManager.wasActionPressed('toolScience')) this.multiToolState.setMode('science')
 
-    this.multiToolState.setAiming(this.pointerLock.isRightMouseDown)
-    this.multiToolState.setInput(
-      this.pointerLock.isLeftMouseDown,
-      this.pointerLock.consumeLeftMouseJustPressed(),
+    if (this.inputManager.wasActionPressed('adsToggle')) {
+      this.adsKeyboardToggled = !this.adsKeyboardToggled
+    }
+    this.multiToolState.setAiming(
+      this.pointerLock.isRightMouseDown || this.adsKeyboardToggled,
     )
+    // OR the keyboard `fire` action into the mouse state so Enter shoots
+    // alongside left mouse — trackpad fallback for laptops.
+    const fireHeld =
+      this.pointerLock.isLeftMouseDown || this.inputManager.isActionActive('fire')
+    const fireEdge =
+      this.pointerLock.consumeLeftMouseJustPressed() ||
+      this.inputManager.wasActionPressed('fire')
+    this.multiToolState.setInput(fireHeld, fireEdge)
     this.multiToolState.setSpeed(this.playerController.speed)
 
     this.multiTool.setMode(this.multiToolState.modeConfig.color, this.multiToolState.mode)
