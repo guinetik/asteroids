@@ -23,6 +23,8 @@ import { StationDroneDirector } from '@/three/StationDroneDirector'
 import { StationTurretDirector } from '@/three/StationTurretDirector'
 import type { MultiToolMode } from '@/lib/fps/multiToolState'
 import { DevConsole } from '@/lib/devConsole'
+import { isDebugHudEnabled } from '@/lib/debug/debugMetrics'
+import { DebugMetricsTracker } from '@/lib/debug/DebugMetricsTracker'
 import { GameLoop } from '@/lib/GameLoop'
 import { TickHandler } from '@/lib/TickHandler'
 import { InputManager } from '@/lib/InputManager'
@@ -317,6 +319,8 @@ export class StationViewController implements Tickable {
    * director's projectile sim and dart visual pool so we don't duplicate
    * either. */
   private droneDirector: StationDroneDirector | null = null
+  /** Per-frame sampler that feeds the `?debug=1` HUD. Null when the flag is off. */
+  private debugMetricsTracker: DebugMetricsTracker | null = null
   /** Ambient fill — brightens once station power is restored. */
   private ambientLight: AmbientLight | null = null
   /** Directional fill — brightens once station power is restored. */
@@ -685,6 +689,19 @@ export class StationViewController implements Tickable {
     this.tickHandler.register(this.fpsCamera, TICK_PRIORITY_RENDER - TICK_OFFSET_CAMERA)
     this.tickHandler.register(this.multiTool, TICK_PRIORITY_RENDER - TICK_OFFSET_CAMERA + 1)
     this.tickHandler.register(this.sceneManager, TICK_PRIORITY_RENDER)
+
+    // Debug HUD instrumentation. Sits at RENDER + 1 so renderer.info reflects
+    // the frame that was just submitted by the SceneManager / postprocessor.
+    if (isDebugHudEnabled()) {
+      this.debugMetricsTracker = new DebugMetricsTracker({
+        renderer: this.sceneManager.renderer,
+        tickHandler: this.tickHandler,
+        getEnemyCount: () =>
+          (this.droneDirector?.drones.length ?? 0) + (this.turretDirector?.turrets.length ?? 0),
+        getProjectileCount: () => this.projectileSystem?.projectileCount ?? 0,
+      })
+      this.tickHandler.register(this.debugMetricsTracker, TICK_PRIORITY_RENDER + 1)
+    }
 
     this.setupPointerLock()
 
@@ -1860,6 +1877,11 @@ export class StationViewController implements Tickable {
       for (const prop of this.station.props) prop.dispose()
       disposeTronHologramMaterials(this.station.hologramMaterials)
     }
+    if (this.debugMetricsTracker && this.tickHandler) {
+      this.tickHandler.unregister(this.debugMetricsTracker)
+    }
+    this.debugMetricsTracker?.dispose()
+    this.debugMetricsTracker = null
     this.projectileSystem?.dispose()
     this.impactEmitter?.dispose()
     this.wallImpactDecals?.dispose()

@@ -5,8 +5,10 @@ import KeyPrompt from '@/components/KeyPrompt.vue'
 import FpsHud from '@/components/FpsHud.vue'
 import DamageFeedback from '@/components/DamageFeedback.vue'
 import DeathOverlay from '@/components/DeathOverlay.vue'
+import DebugHud from '@/components/DebugHud.vue'
 import PickupToast from '@/components/PickupToast.vue'
 import ScrambleText from '@/components/shuttle-control/ScrambleText.vue'
+import { isDebugHudEnabled } from '@/lib/debug/debugMetrics'
 import type { PickupEntry } from '@/components/PickupToast.vue'
 import type { FpsTelemetry } from '@/lib/ui/fpsHudTypes'
 import type { Inventory } from '@/lib/inventory/types'
@@ -48,6 +50,9 @@ const router = useRouter()
 const promptText = ref<string | null>(null)
 const parsedPrompt = computed(() =>
   promptText.value ? parseKeyPrompt(promptText.value) : null,
+)
+const debugHudVisible = computed(
+  () => route.query.debug === '1' || route.query.debug === 'true' || isDebugHudEnabled(),
 )
 const stationIntro = ref<StationIntroSpec | null>(null)
 const stationIntroOpacity = ref(1)
@@ -610,6 +615,7 @@ function onPointerDown(): void {
     />
   </transition>
   <DamageFeedback :flash-opacity="damageFlash" :intensity="1.8" />
+  <DebugHud v-if="debugHudVisible" />
   <div v-if="startupFade > 0" class="station-startup-fade" :style="{ opacity: startupFade }" />
   <div v-if="deathFade > 0" class="station-death-fade" :style="{ opacity: deathFade }" />
   <div v-if="deathMessageVisible" class="station-death-message">
